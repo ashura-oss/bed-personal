@@ -1,0 +1,67 @@
+@keyframes shardPulse {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow:
+      0 0 18px rgba(216, 175, 98, 0.42),
+      inset 0 0 12px rgba(255, 255, 255, 0.34);
+  }
+
+  50% {
+    filter: brightness(1.16);
+    box-shadow:
+      0 0 30px rgba(232, 105, 47, 0.46),
+      inset 0 0 18px rgba(255, 255, 255, 0.4);
+  }
+}
+
+@keyframes panelEnter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes softGlow {
+  0%,
+  100% {
+    border-color: rgba(216, 175, 98, 0.23);
+  }
+
+  50% {
+    border-color: rgba(216, 175, 98, 0.58);
+  }
+}
+
+.worldheart-mark,
+.worldheart-large {
+  animation: shardPulse 3.8s ease-in-out infinite;
+}
+
+.game-panel,
+.nav-card,
+.quest-card,
+.ability-card,
+.auth-card {
+  animation: panelEnter 420ms ease both;
+}
+
+.status-card {
+  animation: softGlow 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 1ms !important;
+  }
+}

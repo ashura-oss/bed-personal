@@ -1,0 +1,10 @@
+node_modules/
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+realmforge.db
+.codex-run/
+.claude/
+*.log

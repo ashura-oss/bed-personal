@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard | Realmforge</title>
+    <link rel="stylesheet" href="./css/global.css" />
+    <link rel="stylesheet" href="./css/game-ui.css" />
+    <link rel="stylesheet" href="./css/animations.css" />
+    <script type="module" src="./js/ui.js"></script>
+    <script type="module" src="./js/dashboard.js"></script>
+    <script type="module" src="./js/loader.js"></script>
+  </head>
+  <body data-page="dashboard">
+    <div class="game-loader" data-game-loader role="status" aria-live="polite">
+      <div class="game-loader-shard" aria-hidden="true"></div>
+      <h1 class="game-loader-title">Realmforge</h1>
+      <p class="game-loader-lore" data-game-loader-lore>Awakening the Worldheart shards.</p>
+    </div>
+    <canvas class="ambient-canvas" data-particles aria-hidden="true"></canvas>
+
+    <div class="app-shell dashboard-shell">
+      <header class="topbar hud-bar">
+        <a class="brand-mark" href="./index.html" aria-label="Realmforge home">
+          <span class="worldheart-mark" aria-hidden="true"></span>
+          <span>
+            <strong>Realmforge</strong>
+            <small>Hearthmere Outpost</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Dashboard navigation">
+          <a href="#overview" data-panel-link="overview">Dashboard</a>
+          <a href="#character" data-panel-link="character">Character</a>
+          <a href="./characterCreation.html">Forge Hero</a>
+          <a href="#map" data-panel-link="map">Map</a>
+          <a href="#quests" data-panel-link="quests">Quests</a>
+          <a href="#abilities" data-panel-link="abilities">Abilities</a>
+          <a href="#logs" data-panel-link="logs">Logs</a>
+          <button class="nav-button" type="button" data-logout>Logout</button>
+        </nav>
+      </header>
+
+      <main class="dashboard-layout">
+        <aside class="side-rail game-panel" aria-label="Player HUD">
+          <div class="profile-block">
+            <span class="portrait-token" aria-hidden="true" data-dashboard-initial>U</span>
+            <div>
+              <p class="eyebrow">Unbound Profile</p>
+              <h1 data-session-label data-dashboard-username>Loading Profile</h1>
+            </div>
+          </div>
+
+          <div class="stat-list">
+            <div class="stat-row">
+              <span>Level</span>
+              <strong data-user-level>1</strong>
+            </div>
+            <div class="stat-row">
+              <span>Gold</span>
+              <strong data-user-gold>0</strong>
+            </div>
+            <div class="stat-row">
+              <span>Total XP</span>
+              <strong data-user-total-xp>0</strong>
+            </div>
+            <div class="progress-block">
+              <div class="progress-label">
+                <span>XP</span>
+                <span data-user-xp>0 / 100</span>
+              </div>
+              <div class="progress-track" aria-hidden="true">
+                <span data-user-xp-fill style="width: 0%"></span>
+              </div>
+            </div>
+          </div>
+
+          <div class="hud-summary-grid">
+            <div>
+              <strong data-character-count>0</strong>
+              <span>Heroes</span>
+            </div>
+            <div>
+              <strong data-region-count>0</strong>
+              <span>Regions</span>
+            </div>
+            <div>
+              <strong data-log-count>0</strong>
+              <span>Logs</span>
+            </div>
+          </div>
+
+          <div class="status-card" data-health-status>
+            <span class="status-dot status-dot-pending" aria-hidden="true"></span>
+            <span>Checking backend signal</span>
+          </div>
+        </aside>
+
+        <section class="dashboard-main">
+          <div class="alert alert-info dashboard-alert" data-dashboard-alert>
+            Loading your saved profile from the backend.
+          </div>
+          <div class="status-card dashboard-loading" data-dashboard-loading>
+            <span class="status-dot status-dot-pending" aria-hidden="true"></span>
+            <span>Reading guild records</span>
+          </div>
+
+          <div class="panel-view is-active" id="overview" data-panel="overview">
+            <div class="section-heading">
+              <p class="eyebrow">Command Table</p>
+              <h2>Realm Operations</h2>
+            </div>
+
+            <div class="navigation-grid">
+              <a class="nav-card" href="./characterCreation.html">
+                <span class="badge" data-nav-character-status>Forge</span>
+                <strong>Create Character</strong>
+                <span>Choose origin, class, affinity, name, and save a real hero.</span>
+              </a>
+              <a class="nav-card" href="#map" data-panel-link="map">
+                <span class="badge badge-steel">World</span>
+                <strong>World Map</strong>
+                <span>Browse regions, shards, danger, factions, and quests.</span>
+              </a>
+              <a class="nav-card" href="#quests" data-panel-link="quests">
+                <span class="badge badge-ember">Quests</span>
+                <strong>Quest Board</strong>
+                <span>Attempt region contracts for XP, gold, and story progress.</span>
+              </a>
+              <a class="nav-card" href="#abilities" data-panel-link="abilities">
+                <span class="badge">Power</span>
+                <strong>Abilities</strong>
+                <span>Unlock abilities, build combos, and resolve training or boss encounters.</span>
+              </a>
+              <a class="nav-card" href="#logs" data-panel-link="logs">
+                <span class="badge badge-steel" data-nav-log-status>Empty</span>
+                <strong>Adventure Logs</strong>
+                <span>Progression history from real adventure log records.</span>
+              </a>
+            </div>
+
+            <div class="dashboard-two-column">
+              <section class="game-panel">
+                <div class="section-heading">
+                  <p class="eyebrow">Current Hero</p>
+                  <h2>Character Summary</h2>
+                </div>
+                <div data-current-character></div>
+              </section>
+
+              <section class="game-panel">
+                <div class="section-heading">
+                  <p class="eyebrow">World Signal</p>
+                  <h2>Region Preview</h2>
+                </div>
+                <div class="region-preview-grid" data-region-preview></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="panel-view" id="character" data-panel="character">
+            <div class="section-heading">
+              <p class="eyebrow">Hero Forge</p>
+              <h2>Character</h2>
+            </div>
+            <div class="command-row compact-command-row">
+              <a class="btn btn-primary" href="./characterCreation.html">Forge New Hero</a>
+            </div>
+            <div class="character-list" data-character-list></div>
+          </div>
+
+          <div class="panel-view" id="map" data-panel="map">
+            <div class="section-heading">
+              <p class="eyebrow">Elarion</p>
+              <h2>World Map</h2>
+            </div>
+            <div class="map-workspace">
+              <div class="map-shell game-panel" aria-label="Interactive world map">
+                <div class="map-legend">
+                  <span class="badge">Unlocked</span>
+                  <span>Click a region to read its quests.</span>
+                </div>
+                <div class="map-node-layer" data-world-map-nodes></div>
+              </div>
+              <aside class="region-detail-panel game-panel" data-region-detail>
+                <span class="badge">World Map</span>
+                <h3>Select a region</h3>
+                <p>Region details and available quests will load from the backend.</p>
+              </aside>
+            </div>
+            <div class="region-list" data-region-list></div>
+          </div>
+
+          <div class="panel-view" id="quests" data-panel="quests">
+            <div class="section-heading">
+              <p class="eyebrow">Guild Contracts</p>
+              <h2>Quest Board</h2>
+            </div>
+            <div class="quest-board-layout">
+              <aside class="game-panel quest-control-panel">
+                <div data-quest-region-summary></div>
+                <div class="quest-region-switcher" data-quest-region-switcher></div>
+                <div class="section-heading compact-section-heading">
+                  <p class="eyebrow">Hero</p>
+                  <h2>Select Character</h2>
+                </div>
+                <div class="quest-character-list" data-quest-character-list></div>
+              </aside>
+              <section class="quest-contract-panel">
+                <div class="quest-contract-grid" data-quest-list></div>
+              </section>
+            </div>
+            <div data-quest-result></div>
+          </div>
+
+          <div class="panel-view" id="abilities" data-panel="abilities">
+            <div class="section-heading">
+              <p class="eyebrow">Shardcraft</p>
+              <h2>Abilities</h2>
+            </div>
+            <div class="ability-workspace">
+              <aside class="game-panel ability-control-panel">
+                <div data-ability-character-summary></div>
+                <div class="ability-character-list" data-ability-character-list></div>
+
+                <div class="section-heading compact-section-heading">
+                  <p class="eyebrow">Combo Builder</p>
+                  <h2>Sequence</h2>
+                </div>
+                <div class="combo-slot-list" data-combo-slots></div>
+                <div class="ability-action-row">
+                  <button class="btn btn-primary" type="button" data-resolve-combo>Resolve Combo</button>
+                  <button class="btn btn-secondary" type="button" data-clear-combo>Clear</button>
+                </div>
+              </aside>
+
+              <section class="ability-board">
+                <div class="game-panel ability-status-panel" data-ability-status></div>
+                <div data-boss-encounter></div>
+                <div class="ability-type-grid" data-ability-list></div>
+                <div data-combo-result></div>
+              </section>
+            </div>
+          </div>
+
+          <div class="panel-view" id="logs" data-panel="logs">
+            <div class="section-heading">
+              <p class="eyebrow">Story Record</p>
+              <h2>Adventure Logs</h2>
+            </div>
+            <div class="log-dashboard-grid">
+              <aside class="game-panel log-progress-panel">
+                <div class="section-heading compact-section-heading">
+                  <p class="eyebrow">Progression</p>
+                  <h2>Journey Totals</h2>
+                </div>
+                <div class="log-metric-grid" data-log-progress-summary></div>
+                <p class="log-scope-note" data-log-scope-summary>0 visible in current filters</p>
+
+                <div class="section-heading compact-section-heading">
+                  <p class="eyebrow">Heroes</p>
+                  <h2>Level Progress</h2>
+                </div>
+                <div class="character-progress-list" data-log-character-progress></div>
+              </aside>
+
+              <section class="journal-workspace">
+                <div class="game-panel log-filter-panel">
+                  <div class="log-filter-row" data-log-filter-buttons></div>
+                  <div class="log-select-grid">
+                    <label class="field compact-field">
+                      <span>Region</span>
+                      <select data-log-region-filter aria-label="Filter logs by region"></select>
+                    </label>
+                    <label class="field compact-field">
+                      <span>Hero</span>
+                      <select data-log-character-filter aria-label="Filter logs by character"></select>
+                    </label>
+                  </div>
+                </div>
+                <ol class="timeline adventure-journal" data-log-summary></ol>
+              </section>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

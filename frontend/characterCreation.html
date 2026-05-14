@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forge a Hero | Realmforge</title>
+    <link rel="stylesheet" href="./css/global.css" />
+    <link rel="stylesheet" href="./css/game-ui.css" />
+    <link rel="stylesheet" href="./css/animations.css" />
+    <script type="module" src="./js/scenes/characterCreationScene.js"></script>
+    <script type="module" src="./js/ui.js"></script>
+    <script type="module" src="./js/loader.js"></script>
+  </head>
+  <body data-page="character-creation">
+    <div class="game-loader" data-game-loader role="status" aria-live="polite">
+      <div class="game-loader-shard" aria-hidden="true"></div>
+      <h1 class="game-loader-title">Realmforge</h1>
+      <p class="game-loader-lore" data-game-loader-lore>Awakening the Worldheart shards.</p>
+    </div>
+    <canvas class="ambient-canvas" data-particles aria-hidden="true"></canvas>
+
+    <div class="app-shell creator-shell">
+      <header class="topbar">
+        <a class="brand-mark" href="./dashboard.html" aria-label="Back to dashboard">
+          <span class="worldheart-mark" aria-hidden="true"></span>
+          <span>
+            <strong>Realmforge</strong>
+            <small>Hero Forge</small>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Creator navigation">
+          <span class="main-nav-static">Forging as <strong data-scene-username>...</strong></span>
+          <a href="./dashboard.html">Back to Dashboard</a>
+        </nav>
+      </header>
+
+      <main class="creator-layout">
+        <ol class="step-bar" aria-label="Character creation steps">
+          <li data-step-indicator="origin" class="is-active"><span>1</span>Origin</li>
+          <li data-step-indicator="class"><span>2</span>Class</li>
+          <li data-step-indicator="affinity"><span>3</span>Affinity</li>
+          <li data-step-indicator="name"><span>4</span>Name</li>
+          <li data-step-indicator="confirm"><span>5</span>Confirm</li>
+        </ol>
+
+        <div class="alert alert-info" data-scene-alert hidden></div>
+
+        <div class="creator-grid">
+          <section class="creator-stage">
+            <article class="step-panel is-active game-panel" data-step="origin">
+              <div class="section-heading">
+                <p class="eyebrow">Step 1 of 5</p>
+                <h2>Where did you start?</h2>
+                <p>Your origin shapes how the realm sees you and gives a small stat lean.</p>
+              </div>
+              <div class="option-grid" data-options="origin"></div>
+              <div class="step-actions">
+                <span></span>
+                <button class="btn btn-primary" type="button" data-step-next disabled>Continue</button>
+              </div>
+            </article>
+
+            <article class="step-panel game-panel" data-step="class">
+              <div class="section-heading">
+                <p class="eyebrow">Step 2 of 5</p>
+                <h2>How do you fight?</h2>
+                <p>Class decides your strongest stat block and which abilities you can unlock first.</p>
+              </div>
+              <div class="option-grid" data-options="class"></div>
+              <div class="step-actions">
+                <button class="btn btn-secondary" type="button" data-step-back>Back</button>
+                <button class="btn btn-primary" type="button" data-step-next disabled>Continue</button>
+              </div>
+            </article>
+
+            <article class="step-panel game-panel" data-step="affinity">
+              <div class="section-heading">
+                <p class="eyebrow">Step 3 of 5</p>
+                <h2>Which power answers you?</h2>
+                <p>Affinity flavours your stats and decides which Worldheart shards bond cleanly.</p>
+              </div>
+              <div class="option-grid" data-options="affinity"></div>
+              <div class="step-actions">
+                <button class="btn btn-secondary" type="button" data-step-back>Back</button>
+                <button class="btn btn-primary" type="button" data-step-next disabled>Continue</button>
+              </div>
+            </article>
+
+            <article class="step-panel game-panel" data-step="name">
+              <div class="section-heading">
+                <p class="eyebrow">Step 4 of 5</p>
+                <h2>What name will the guild record?</h2>
+                <p>Two to forty characters. The guild ledger is unforgiving.</p>
+              </div>
+              <label class="field">
+                <span>Character Name</span>
+                <input
+                  type="text"
+                  data-name-input
+                  maxlength="40"
+                  autocomplete="off"
+                  placeholder="e.g. Mira Ashstep"
+                />
+              </label>
+              <div class="step-actions">
+                <button class="btn btn-secondary" type="button" data-step-back>Back</button>
+                <button class="btn btn-primary" type="button" data-step-next disabled>Review</button>
+              </div>
+            </article>
+
+            <article class="step-panel game-panel" data-step="confirm">
+              <div class="section-heading">
+                <p class="eyebrow">Step 5 of 5</p>
+                <h2>Forge the hero?</h2>
+                <p>The backend will recalculate stats and save your character to the guild ledger.</p>
+              </div>
+              <div data-confirm-summary></div>
+              <div class="step-actions">
+                <button class="btn btn-secondary" type="button" data-step-back>Back</button>
+                <button class="btn btn-primary" type="button" data-confirm-submit>Forge Hero</button>
+              </div>
+            </article>
+          </section>
+
+          <aside class="creator-preview game-panel" aria-label="Live stat preview" data-stat-preview>
+            <header class="preview-header">
+              <p class="eyebrow">Base Stats</p>
+              <h3>Unnamed Hero</h3>
+              <p class="preview-tagline">No path chosen yet</p>
+            </header>
+            <div class="stat-grid compact-stat-grid">
+              <span><strong>100</strong>HP</span>
+              <span><strong>5</strong>STR</span>
+              <span><strong>5</strong>INT</span>
+              <span><strong>5</strong>AGI</span>
+              <span><strong>5</strong>FAI</span>
+              <span><strong>5</strong>END</span>
+              <span><strong>5</strong>CHA</span>
+            </div>
+            <p class="preview-footnote">Pick origin, class, and affinity to see your hero's forged stats.</p>
+          </aside>
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
