@@ -12,6 +12,14 @@ Codex and Claude Code may both work on this project. Each agent must inspect cur
 
 ## Project Activity Log
 
+### 2026-05-14
+
+- Initialized the local workspace as a Git repository on branch `main`.
+- Added Git ignores for local runtime files: `.env`, `.env.*` except `.env.example`, `node_modules`, libSQL/SQLite database files, `.codex-run`, `.claude`, and logs.
+- Created the private GitHub repository `ashura-oss/realmforge-shards-of-the-worldheart`.
+- Pushed the current project state to `https://github.com/ashura-oss/realmforge-shards-of-the-worldheart`.
+- Verified source JavaScript syntax before the initial commit with `node --check` across 54 backend/frontend JavaScript files.
+
 ### 2026-05-12
 
 - Inspected workspace at `C:\bed project real`.
