@@ -1,45 +1,50 @@
 # Student Assignment Template
 
-Express.js + libsql + Drizzle ORM starter. Comes with a working task list feature — copy the pattern to build your own.
+Express.js + libsql + Drizzle ORM starter for building your own API and frontend feature.
+
+This template now starts without any sample MVC feature routes. Only infrastructure endpoints are pre-wired:
+
+- `GET /api/health`
+- `GET /api-docs`
 
 ## Setup
 
 ```bash
-npm install       # install dependencies
-npm run db        # create and seed the database
-npm run dev       # start the dev server (auto-reloads on changes)
+npm install
+npm run db
+npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000). API docs are at [http://localhost:3000/api-docs](http://localhost:3000/api-docs).
+Open http://localhost:3000 after the server starts.
 
-## Add a New Feature (cheat sheet)
+## Build Your Feature
 
-1. **Schema** — add your table in `src/db/schema.js` (copy the `tasks` table pattern)
-2. **Seed** — add sample data in `src/db/seed.js`, then run `npm run db`
-3. **Model** — create `src/models/yourModel.js` (copy `exampleModel.js`)
-4. **Controller** — create `src/controllers/yourController.js` (copy `exampleController.js`)
-5. **Route** — create `src/routes/yourRoute.js` (copy `exampleRoute.js`)
-6. **Register** — add `app.use('/api/your-resource', yourRoutes)` in `index.js` (before the error handler)
-7. **Frontend** — add a new `.html` page in `src/frontend/` (copy `index.html`)
+1. Add tables in `src/db/schema.js`
+2. Add seed data in `src/db/seed.js`
+3. Create model files in `src/models/`
+4. Create controller files in `src/controllers/`
+5. Create route files in `src/routes/`
+6. Register routes in `index.js` before `app.use(errorHandler)`
+7. Build/update pages in `src/frontend/`
 
-## Files You'll Touch
+## Key Files
 
-| File | What to do |
+| File | Purpose |
 |---|---|
-| `src/db/schema.js` | Add your table definitions |
-| `src/db/seed.js` | Add seed data for your tables |
-| `index.js` | Register your new routes |
-| `src/models/` | Create your model (copy `exampleModel.js`) |
-| `src/controllers/` | Create your controller (copy `exampleController.js`) |
-| `src/routes/` | Create your route file (copy `exampleRoute.js`) |
-| `src/frontend/` | Create your HTML pages, JS, and CSS |
-
-Everything else is infrastructure — you shouldn't need to change it.
+| `index.js` | App setup, middleware, route registration, global error handler |
+| `src/db/schema.js` | Drizzle table schemas |
+| `src/db/seed.js` | Database reset and seed script |
+| `src/models/` | Data access layer |
+| `src/controllers/` | Request validation and response formatting |
+| `src/routes/` | Route to controller mapping |
+| `src/utils/_errors.js` | `AppError`, `ERROR_CODES`, and `errorHandler` |
+| `_extras/tests/` | Infrastructure and baseline tests |
 
 ## Scripts
 
-| Command | What it does |
+| Command | Description |
 |---|---|
 | `npm run dev` | Start dev server with auto-reload |
-| `npm run db` | Reset database and seed sample data |
-| `npm test` | Run tests |
+| `npm run db` | Recreate DB and seed data |
+| `npm test` | Run test suite |
+| `npm run export` | Export project zip (without node_modules) |

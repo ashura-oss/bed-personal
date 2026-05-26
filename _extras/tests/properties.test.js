@@ -122,11 +122,11 @@ describe('Property 7: MVC separation — models have no HTTP concerns', () => {
     );
   });
 
-  it('src/models/ contains at least one .js file', () => {
-    expect(modelFiles.length).toBeGreaterThan(0);
-  });
-
   it('no model file imports express or HTTP-related modules', () => {
+    if (modelFiles.length === 0) {
+      return;
+    }
+
     // HTTP-related patterns: importing express, referencing req/res as parameters
     const httpImportPatterns = [
       /import\s+.*from\s+['"]express['"]/,
@@ -151,6 +151,10 @@ describe('Property 7: MVC separation — models have no HTTP concerns', () => {
   });
 
   it('no model file references req or res parameters', () => {
+    if (modelFiles.length === 0) {
+      return;
+    }
+
     // Patterns that indicate HTTP handler signatures: (req, res), (req, res, next)
     const httpParamPatterns = [
       /=\s*(?:async\s*)?\([^)]*\breq\b/,
@@ -174,108 +178,8 @@ describe('Property 7: MVC separation — models have no HTTP concerns', () => {
 
 
 
-// Feature: student-assignment-template, Property 9: Example functions have JSDoc comments
-// Validates: Requirements 10.3
-describe('Property 9: Example functions have JSDoc comments', () => {
-  const exampleFiles = [
-    'src/models/exampleModel.js',
-    'src/controllers/exampleController.js',
-  ];
-
-  let exportedFunctions = [];
-
-  beforeAll(async () => {
-    for (const relPath of exampleFiles) {
-      const filePath = path.resolve(__dirname, '..', '..', relPath);
-      const content = await fs.readFile(filePath, 'utf-8');
-
-      // Find all exported arrow function declarations
-      const exportRegex = /export\s+const\s+(\w+)\s*=\s*(?:async\s*)?\(/g;
-      let match;
-      while ((match = exportRegex.exec(content)) !== null) {
-        const funcName = match[1];
-        const beforeFunc = content.slice(0, match.index);
-        exportedFunctions.push({ relPath, funcName, beforeFunc });
-      }
-    }
-  });
-
-  it('example files contain at least one exported function', () => {
-    expect(exportedFunctions.length).toBeGreaterThan(0);
-  });
-
-  it('every exported function is preceded by a JSDoc comment block', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...exportedFunctions),
-        ({ relPath, funcName, beforeFunc }) => {
-          // Check that the text immediately before the export has a JSDoc block
-          // Trim trailing whitespace/newlines and check for closing */
-          const trimmed = beforeFunc.trimEnd();
-          const hasJSDoc = /\/\*\*[\s\S]*?\*\/\s*$/.test(trimmed);
-          expect(hasJSDoc).toBe(true);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
-
-// Feature: student-assignment-template, Property 10: Async functions use async/await
-// Validates: Requirements 10.6
-describe('Property 10: Async functions use async/await', () => {
-  const targetFiles = [
-    'src/models/exampleModel.js',
-    'src/controllers/exampleController.js',
-  ];
-
-  let asyncFunctions = [];
-
-  beforeAll(async () => {
-    for (const relPath of targetFiles) {
-      const filePath = path.resolve(__dirname, '..', '..', relPath);
-      const content = await fs.readFile(filePath, 'utf-8');
-
-      // Match async arrow function declarations and capture their bodies
-      // We find each "const name = async (...) => {" and then extract the body
-      const asyncFuncRegex = /(?:export\s+)?const\s+(\w+)\s*=\s*async\s*\([^)]*\)\s*=>\s*\{/g;
-      let match;
-      while ((match = asyncFuncRegex.exec(content)) !== null) {
-        const funcName = match[1];
-        const bodyStart = match.index + match[0].length;
-
-        // Find the matching closing brace by counting braces
-        let braceCount = 1;
-        let i = bodyStart;
-        while (i < content.length && braceCount > 0) {
-          if (content[i] === '{') braceCount++;
-          if (content[i] === '}') braceCount--;
-          i++;
-        }
-
-        const body = content.slice(bodyStart, i - 1);
-        asyncFunctions.push({ relPath, funcName, body });
-      }
-    }
-  });
-
-  it('model and controller files contain at least one async function', () => {
-    expect(asyncFunctions.length).toBeGreaterThan(0);
-  });
-
-  it('every async function uses at least one await expression', () => {
-    fc.assert(
-      fc.property(
-        fc.constantFrom(...asyncFunctions),
-        ({ relPath, funcName, body }) => {
-          const hasAwait = /\bawait\b/.test(body);
-          expect(hasAwait).toBe(true);
-        }
-      ),
-      { numRuns: 100 }
-    );
-  });
-});
+// Properties 9 and 10 were intentionally removed.
+// This template no longer ships starter MVC files to assert against.
 
 
 
