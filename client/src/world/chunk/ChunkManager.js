@@ -13,7 +13,7 @@ import { Chunk, chunkKey } from "./Chunk.js";
  * - One shared material across all chunks keeps draw-call/material cost flat.
  */
 export class ChunkManager {
-  constructor(scene, rapier, seed) {
+  constructor(scene, rapier, seed, options = {}) {
     this.loaded = new Map();
     /** Pre-sorted (nearest-first) build queue. Rebuilt only on chunk-boundary crossing. */
     this.pendingQueue = [];
@@ -23,18 +23,28 @@ export class ChunkManager {
 
     this.scene = scene;
     this.rapier = rapier;
-    this.generator = new TerrainGenerator(seed);
+    this.generator = new TerrainGenerator(seed, {
+      biomeSource: options.biomeSource,
+      prefabSource: options.prefabSource
+    });
+    this.prefabLoader = options.prefabLoader ?? null;
+    this.gatheringSystem = options.gatheringSystem ?? null;
     this.material = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0x4a4636),
+      color: new THREE.Color(0xffffff),
       roughness: 0.96,
       metalness: 0.0,
-      flatShading: false
+      flatShading: false,
+      vertexColors: true
     });
   }
 
   /** Terrain height at any world point — used to place entities on the ground. */
   sampleHeight(x, z) {
     return this.generator.heightAt(x, z);
+  }
+
+  sampleBiome(x, z) {
+    return this.generator.biomeAt(x, z);
   }
 
   /** Convert a world position to its chunk coordinate. */
@@ -152,6 +162,7 @@ export class ChunkManager {
 
     for (const [key, chunk] of this.loaded.entries()) {
       if (Math.abs(chunk.cx - cx) > keep || Math.abs(chunk.cz - cz) > keep) {
+        if (this.gatheringSystem) this.gatheringSystem.despawnNodesForChunk(chunk.cx, chunk.cz);
         chunk.dispose();
         this.loaded.delete(key);
       }
@@ -164,5 +175,12 @@ export class ChunkManager {
 
     const chunk = new Chunk(this.scene, this.rapier, this.generator, this.material, cx, cz);
     this.loaded.set(key, chunk);
+    this.prefabLoader?.ensureChunk?.(cx, cz);
+    if (this.gatheringSystem) {
+      const biome = this.generator.biomeAt((cx + 0.5) * 32, (cz + 0.5) * 32);
+      const biomeId = biome.key ?? biome.id ?? 'hearthmere';
+      const heightAt = (x, z) => this.generator.heightAt(x, z);
+      this.gatheringSystem.spawnNodesForChunk(cx, cz, biomeId, heightAt);
+    }
   }
 }

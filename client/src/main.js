@@ -2,12 +2,14 @@ import "./styles.css";
 import * as THREE from "three";
 import { createCamera, updateCameraAspect } from "./engine/createCamera.js";
 import { createRenderer, resizeRenderer } from "./engine/createRenderer.js";
-import { createScene } from "./engine/createScene.js";
+import { createScene, getSceneBiomeAtmosphere } from "./engine/createScene.js";
 import { startLoop } from "./engine/startLoop.js";
 import { initRapier } from "./physics/initRapier.js";
 import { ChunkManager } from "./world/chunk/ChunkManager.js";
+import { BiomeMap } from "./world/gen/BiomeMap.js";
 import { WORLD_SEED_DEFAULT } from "./world/gen/WorldConfig.js";
-import { Hearthlight } from "./world/Hearthlight.js";
+import { PrefabLoader } from "./world/prefab/PrefabLoader.js";
+import { PrefabRegistry } from "./world/prefab/PrefabRegistry.js";
 import { UIBus } from "./ui/UIBus.js";
 import { HUD } from "./ui/HUD.js";
 import { GameContext } from "./core/GameContext.js";
@@ -28,6 +30,8 @@ import { authService } from "./net/AuthService.js";
 import { runState } from "./progression/RunState.js";
 import { AudioManager } from "./audio/AudioManager.js";
 import { OptionsMenu } from "./ui/OptionsMenu.js";
+import { ResourceScatter } from "./world/resources/ResourceScatter.js";
+import { GatheringSystem } from "./gameplay/gathering/GatheringSystem.js";
 
 // ── Boot setup ────────────────────────────────────────────────────────────────
 
@@ -102,16 +106,47 @@ async function boot() {
     const renderer = createRenderer(sceneRoot);
     if (!addCleanup(() => { renderer.dispose(); renderer.domElement.remove(); })) return;
 
+    setBootStatus("Loading biome map…", false);
+    const biomeSource = new BiomeMap(WORLD_SEED_DEFAULT);
+
     const scene = createScene();
     addCleanup(() => { disposeSceneGraph(scene); scene.clear(); });
+    const sceneBiomeAtmosphere = getSceneBiomeAtmosphere(scene);
 
     const { camera, target: initialTarget } = createCamera(sceneRoot);
 
-    // ── Procedural world (W-01) ───────────────────────────────────────────
-    const chunkManager = new ChunkManager(scene, rapier, WORLD_SEED_DEFAULT);
+    // ── Procedural world (W-01/W-03) ─────────────────────────────────────
+    const prefabRegistry = new PrefabRegistry(WORLD_SEED_DEFAULT, { biomeSource });
+    const prefabLoader = new PrefabLoader(scene, rapier, prefabRegistry, {
+      onHearthlightRest: () => {
+        ctx.transition(AppMode.Menu);
+        uiBus.emit("hearthlight:opened", {});
+      }
+    });
+    addCleanup(() => { prefabLoader.dispose(); });
+
+    const chunkManager = new ChunkManager(scene, rapier, WORLD_SEED_DEFAULT, {
+      biomeSource,
+      prefabSource: prefabRegistry,
+      prefabLoader
+    });
     chunkManager.ensureSpawnArea(0, 3, 1); // solid ground under the spawn before the loop
     addCleanup(() => { chunkManager.dispose(); });
     const groundAt = (x, z) => chunkManager.sampleHeight(x, z);
+
+    // ── Resources + Gathering (W-04) ────────────────────────────────────
+    const resourceScatter = new ResourceScatter({ worldSeed: WORLD_SEED_DEFAULT, biomeMap: biomeSource });
+    const gatheringSystem = new GatheringSystem({
+      scene,
+      rapier,
+      resourceScatter,
+      chunkManager,
+      uiBus
+    });
+    // Register gatheringSystem with chunkManager so existing chunks can notify it
+    chunkManager.gatheringSystem = gatheringSystem;
+    addCleanup(() => { gatheringSystem.dispose(); });
+    sceneBiomeAtmosphere?.applyBiome(chunkManager.sampleBiome(0, 3));
 
     // ── Input ────────────────────────────────────────────────────────────
     const input = new InputMap();
@@ -178,24 +213,15 @@ async function boot() {
       },
     });
 
-    // ── Hearthlight ──────────────────────────────────────────────────────
-    const hearthlight = new Hearthlight(
-      scene,
-      { x: -5, y: groundAt(-5, 4), z: 4 },
-      {
-        onRest: () => {
-          ctx.transition(AppMode.Menu);
-          uiBus.emit("hearthlight:opened", {});
-        },
-      },
-    );
-    addCleanup(() => { hearthlight.dispose(); });
-
     // Hearthlight rest action (from menu button)
     uiBus.on("hearthlight:rested", () => {
+      const hearthlight = prefabLoader.getPrimaryHearthlight();
+      if (!hearthlight) return;
+
       player.fullRestore();
       player.setRespawnPoint(hearthlight.group.position);
       enemy.respawn();
+      gatheringSystem?.respawnAll();
       ctx.transition(AppMode.Exploration);
       uiBus.emit("menu:closed", {});
       // Persist run-state
@@ -391,6 +417,10 @@ async function boot() {
 
         // ── Stream procedural world chunks around the player (W-01) ───────
         chunkManager.update(player.position.x, player.position.z);
+        sceneBiomeAtmosphere?.applyBiome(
+          chunkManager.sampleBiome(player.position.x, player.position.z),
+          dt
+        );
 
         // ── Combat ────────────────────────────────────────────────────────
         // Exploration: attack the training dummy. Boss arena: attack the boss.
@@ -442,9 +472,14 @@ async function boot() {
           }
         }
 
-        // ── Hearthlight update ────────────────────────────────────────────
-        hearthlight.update(dt, player.position, input.isJustPressed(Action.Interact));
-        hud.setInteractPromptVisible(hearthlight.isPlayerNear && !controlLocked);
+        // ── Authored prefab updates (W-03 Hearthmere camp) ───────────────
+        prefabLoader.update(dt, player.position, input.isJustPressed(Action.Interact));
+        hud.setInteractPromptVisible(prefabLoader.isPlayerNearInteractable() && !controlLocked);
+
+        // ── Gathering (W-04) ──────────────────────────────────────────────
+        if (!controlLocked) {
+          gatheringSystem.update(player.position, playerForward, input);
+        }
 
         // ── HUD i-frame indicator ─────────────────────────────────────────
         hud.setIFrameIndicator(player.hasIframes);
