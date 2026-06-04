@@ -9,6 +9,7 @@ import abilityRoutes from "./routes/abilityRoutes.js";
 import authRoutes from "./routes/authRoutes.js";
 import characterRoutes from "./routes/characterRoutes.js";
 import comboRoutes from "./routes/comboRoutes.js";
+import progressionRoutes from "./routes/progressionRoutes.js";
 import questRoutes from "./routes/questRoutes.js";
 import regionRoutes from "./routes/regionRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
@@ -17,9 +18,16 @@ const app = express();
 const currentFilePath = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFilePath);
 const frontendPath = path.resolve(currentDir, "..", "frontend");
+const clientDistPath = path.resolve(currentDir, "..", "client", "dist");
 
 app.use(express.json());
 app.use(express.static(frontendPath));
+
+// Phase 5: serve the webpack 3D client production build at /play
+app.use("/play", express.static(clientDistPath));
+app.get("/play/*", (_req, res) => {
+  res.sendFile(path.join(clientDistPath, "index.html"));
+});
 
 app.get("/health", async (_req, res, next) => {
   try {
@@ -43,6 +51,7 @@ app.use("/quests", questRoutes);
 app.use("/adventures", adventureRoutes);
 app.use("/abilities", abilityRoutes);
 app.use("/combos", comboRoutes);
+app.use("/progression", progressionRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
 export const users = sqliteTable("users", {
   userId: text("user_id").primaryKey(),
@@ -109,3 +109,16 @@ export const characterAbilities = sqliteTable(
     )
   })
 );
+
+export const characterRunStates = sqliteTable("character_run_states", {
+  characterId: text("character_id")
+    .primaryKey()
+    .references(() => characters.characterId, { onDelete: "cascade" }),
+  schemaVersion: integer("schema_version").notNull().default(1),
+  embers: integer("embers").notNull().default(0),
+  flaskCharges: integer("flask_charges").notNull().default(4),
+  lastHearthlightX: real("last_hearthlight_x").notNull().default(-5),
+  lastHearthlightY: real("last_hearthlight_y").notNull().default(0),
+  lastHearthlightZ: real("last_hearthlight_z").notNull().default(4),
+  savedAt: text("saved_at").notNull()
+});

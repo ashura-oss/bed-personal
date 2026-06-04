@@ -8,3 +8,4 @@ realmforge.db
 .codex-run/
 .claude/
 *.log
+client/dist/

@@ -1,39 +1,32 @@
 # Realmforge Codex Context
 
-This file is the Codex-facing companion to `CLAUDE.md`. Keep `CLAUDE.md` short so Claude Code does not load the full project memory on every turn.
+Read `CLAUDE.md` first. This file has Codex-specific details.
 
-## Startup Rule
+## Direction (2026-05-29 pivot, updated 2026-06-02)
 
-Read `CLAUDE.md` first. Read this file when working as Codex or when Claude needs deeper workflow guidance. Do not load the long docs unless the current task needs them.
+Third-person 3D action RPG (soulslike) on Three.js + webpack 5, reusing the Express/libSQL backend.
+Phases 1–5 implemented on `feat/app-mode-context`. Full game plan in `docs/forge3d/05-full-game-roadmap.md`.
 
-## Current State
+## What's Done (feat/app-mode-context, uncommitted)
 
-- Completed through corrective `10.3 Boss battle presentation`, Phase 11 UI polish, and `12.1 Action gameplay architecture and art plan`.
-- Next recommended work is `12.2 Phaser game shell and static serving`.
-- CA1 backend is validated.
-- CA2 auth, login/register frontend, dashboard HUD, character creation, map quest browsing, quest attempts, adventure journal review, combo backend resolution, ability unlock UI, combo frontend resolution, and boss quest combo encounters are validated.
-- Gameplay reality: Realmforge currently has school-assignment RPG gameplay through backend-backed UI flows. Track 2 is now planned as a real Phaser action game, but no Phaser runtime has been implemented yet.
-- Track 2 action gameplay must follow `docs/game-design-doc.md` and `docs/pixel-art-style-guide.md`.
+- client-bootstrap: webpack5, plain JS ESM, Three.js, Rapier, FollowCamera, UIBus, Jest
+- T-01: AppMode/GameContext state machine
+- T-02–T-20: Player (KCC+dodge+i-frames), stamina, combat, HUD, dummy enemy + TrainingEnemyVisual, PlayerVisual, BossController (3-phase), fog gate, Hearthlight, EmberOrb, lock-on camera, backend login/character stats, run-state persistence, procedural audio, options menu, /play production route
 
-## Codex Workflow
+## Ownership
 
-- Use `docs/project-master-plan.md` when changing ticket status, completing work, or checking the roadmap.
-- Use `docs/ca-requirements-map.md` before CA1/CA2 requirement changes.
-- Use `docs/api-reference.md` before route/API changes.
-- Use `docs/story-bible.md` or `docs/project-context.md` only for story, region, NPC, ability, or game-feel work.
-- Use `docs/game-design-doc.md` and `docs/pixel-art-style-guide.md` before Track 2 Phaser/action work.
-- Update `CLAUDE.md` only for compact high-level state changes and keep it under 2000 characters.
-- Update this file when Codex-specific workflow or handoff notes change.
-- Log completed tickets in `docs/project-master-plan.md`.
+Active AI session implements. Human approves commits/pushes/merges/tags/deploys.
+See `.ai/00-master-control.md`.
 
-## Implementation Rules
+## Key Rules
 
-- Plain HTML/CSS/JS only unless the user explicitly asks otherwise.
-- Keep frontend game logic separate from DOM manipulation.
-- Use `frontend/js/scenes/` for page controllers.
-- Use `frontend/js/game/` for pure rules and state.
-- Treat `frontend/js/game/gameState.js` as the central frontend store.
-- For Track 2, put Phaser code under `game/`; do not mix Phaser scene code into `frontend/`.
-- Track 2 must ship real playable slices: nonblank canvas, controllable player, real collisions/combat, and backend-backed rewards.
-- Keep backend layering: routes -> controllers -> models -> database.
-- Do not create fake UI, dead buttons, fake routes, or docs claiming unfinished work is complete.
+- Backend `src/` stays routes→controllers→models→db. Do not rewrite.
+- gameplay/ never imports ui/ — UIBus only.
+- Assets must go through `client/src/assets/AssetManifest.js`.
+- Death banner is `UNMADE`. No copied game phrases.
+- Branch flow: `feat/* → dev → qa → staging → main`. No skipping.
+
+## Next Slices (G-01 onward)
+
+See `docs/forge3d/05-full-game-roadmap.md` for the full 15-slice plan:
+G-01 World Map → G-02 Region Geometry → G-03 NPCs → G-04 Dialogue → G-05 Quests → G-06 Skills/Hotbar → G-07 Inventory → G-08 Crafting → G-09 Cutscenes → G-10 Music → G-11 Char Creation → G-12 Act 1 Story → G-13 Faction Rep → G-14 All Regions → G-15 Endgame

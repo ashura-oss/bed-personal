@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="data:," />
+    <title>Realmforge: Shards of the Worldheart</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="scene-root" aria-label="Realmforge Ashfall Road scene"></div>
+      <p id="boot-status" aria-live="polite">Kindling the Worldheart...</p>
+
+      <!-- HUD — shown after boot, driven by UIBus -->
+      <div id="hud" aria-hidden="true">
+        <!-- Top-left: vital bars -->
+        <div id="hud-vitals">
+          <div class="vital-row" title="HP">
+            <div class="vital-bar">
+              <div class="vital-fill" id="fill-hp"></div>
+              <div class="vital-ghost" id="ghost-hp"></div>
+            </div>
+            <span class="vital-label">HP</span>
+          </div>
+          <div class="vital-row" title="Focus Points">
+            <div class="vital-bar">
+              <div class="vital-fill" id="fill-fp"></div>
+            </div>
+            <span class="vital-label">FP</span>
+          </div>
+          <div class="vital-row" title="Stamina">
+            <div class="vital-bar">
+              <div class="vital-fill" id="fill-stamina"></div>
+            </div>
+            <span class="vital-label">STM</span>
+          </div>
+        </div>
+
+        <!-- Center: lock-on reticle -->
+        <div id="lockon-reticle" aria-hidden="true">◆</div>
+
+        <!-- Bottom: flask charges + embers -->
+        <div id="hud-bottom">
+          <div id="hud-flask" title="Emberflask charges">
+            <span id="flask-icon">⬡</span>
+            <span id="flask-count">4</span>
+          </div>
+          <div id="hud-embers" title="Embers held">
+            <span id="embers-icon">◇</span>
+            <span id="embers-count">0</span>
+          </div>
+        </div>
+
+        <!-- I-frame debug indicator (greybox only) -->
+        <div id="iframe-indicator" aria-hidden="true">I-FRAMES</div>
+      </div>
+
+      <!-- Interaction prompt -->
+      <div id="interact-prompt" aria-live="polite" aria-hidden="true">
+        <kbd class="prompt-key">E</kbd>
+        <span class="prompt-text">Rest at Hearthlight</span>
+      </div>
+
+      <!-- UNMADE death banner -->
+      <div id="death-banner" role="status" aria-live="assertive" aria-hidden="true">
+        <span id="death-word">UNMADE</span>
+      </div>
+
+      <!-- Pause menu -->
+      <div id="pause-menu" role="dialog" aria-modal="true" aria-label="Paused" aria-hidden="true">
+        <div class="rf-panel pause-panel">
+          <h2 class="rf-title">PAUSED</h2>
+          <ul class="rf-menu-list">
+            <li class="rf-menu-item" id="btn-resume" tabindex="0">Resume</li>
+            <li class="rf-menu-item rf-menu-item--inactive" id="btn-options" tabindex="0">Options</li>
+            <li class="rf-menu-item" id="btn-quit" tabindex="0">Quit to Title</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Hearthlight rest menu -->
+      <div id="hearthlight-menu" role="dialog" aria-modal="true" aria-label="Hearthlight" aria-hidden="true">
+        <div class="rf-panel hearthlight-panel">
+          <h2 class="rf-title hearthlight-title">HEARTHLIGHT</h2>
+          <ul class="rf-menu-list">
+            <li class="rf-menu-item" id="btn-rest" tabindex="0">Rest &amp; Recover</li>
+            <li class="rf-menu-item" id="btn-hearthlight-leave" tabindex="0">Leave</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- Controls hint (shown briefly on first boot) -->
+      <div id="controls-hint" aria-hidden="true">
+        WASD Move · Space Dodge · J Attack · Tab Lock-on · F Flask · E Interact · Esc Pause
+      </div>
+    </main>
+  </body>
+</html>

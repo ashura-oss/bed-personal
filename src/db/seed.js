@@ -93,6 +93,17 @@ const createTableStatements = [
     FOREIGN KEY (character_id) REFERENCES characters(character_id) ON DELETE CASCADE,
     FOREIGN KEY (ability_id) REFERENCES abilities(ability_id) ON DELETE CASCADE,
     UNIQUE (character_id, ability_id)
+  )`,
+  `CREATE TABLE IF NOT EXISTS character_run_states (
+    character_id TEXT PRIMARY KEY,
+    schema_version INTEGER NOT NULL DEFAULT 1,
+    embers INTEGER NOT NULL DEFAULT 0,
+    flask_charges INTEGER NOT NULL DEFAULT 4,
+    last_hearthlight_x REAL NOT NULL DEFAULT -5,
+    last_hearthlight_y REAL NOT NULL DEFAULT 0,
+    last_hearthlight_z REAL NOT NULL DEFAULT 4,
+    saved_at TEXT NOT NULL,
+    FOREIGN KEY (character_id) REFERENCES characters(character_id) ON DELETE CASCADE
   )`
 ];
 

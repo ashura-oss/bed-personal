@@ -2,7 +2,7 @@ import "dotenv/config";
 import app from "./app.js";
 import { client, databaseUrl } from "./db/client.js";
 
-const port = Number(process.env.PORT) || 3000;
+const port = Number(process.env.PORT) || 3001;
 
 try {
   await client.execute("PRAGMA foreign_keys = ON");
