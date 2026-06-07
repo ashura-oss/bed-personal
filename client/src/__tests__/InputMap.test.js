@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { axesToDirection } from "../controls/InputMap.js";
+import { Action, actionForKeyCode, axesToDirection } from "../controls/InputMap.js";
 
 // InputMap itself requires a DOM environment; we test only the pure helper.
 
@@ -44,5 +44,20 @@ describe("axesToDirection", () => {
     const direction = axesToDirection(0, 0);
     expect(Number.isNaN(direction.x)).toBe(false);
     expect(Number.isNaN(direction.z)).toBe(false);
+  });
+});
+
+describe("actionForKeyCode", () => {
+  it("maps KeyI to the inventory action", () => {
+    expect(actionForKeyCode("KeyI")).toBe(Action.Inventory);
+  });
+
+  it("maps KeyL to the quest log action without moving LightAttack off KeyJ", () => {
+    expect(actionForKeyCode("KeyL")).toBe(Action.QuestLog);
+    expect(actionForKeyCode("KeyJ")).toBe(Action.LightAttack);
+  });
+
+  it("returns null for unmapped keys", () => {
+    expect(actionForKeyCode("KeyP")).toBeNull();
   });
 });

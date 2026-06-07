@@ -1,5 +1,67 @@
 // Ghost HP bar decay time (seconds)
 const GHOST_DECAY_DELAY = 0.5;
+const DEFAULT_HEARTHLIGHT_PROMPT = "Rest at Hearthlight";
+const DEFAULT_GATHERING_PROMPT = "Gather Resource";
+const DEFAULT_WARD_META = "Ashfall Road / Hearthmere Fringe";
+const HARVEST_FEEDBACK_MS = 1800;
+
+export function formatGatheringPrompt(definition) {
+  const name = definition?.name?.trim();
+  return name ? `Gather ${name}` : DEFAULT_GATHERING_PROMPT;
+}
+
+export function formatHarvestFeedback({ count, nodeDef, itemId }) {
+  const label = nodeDef?.name?.trim() || humanizeItemId(itemId) || "Resource";
+  const amount = Number.isFinite(count) ? Math.max(1, count) : 1;
+  return `Gathered +${amount} ${label}`;
+}
+
+export function formatQuestObjectiveText(payload = {}) {
+  const objective = payload.objective;
+  if (objective?.label) {
+    const current = Number.isFinite(objective.current) ? Math.max(0, Math.floor(objective.current)) : 0;
+    const requiredCount = Number.isFinite(objective.requiredCount)
+      ? Math.max(1, Math.floor(objective.requiredCount))
+      : 1;
+    return `${objective.label}: ${Math.min(current, requiredCount)}/${requiredCount}`;
+  }
+
+  return payload.text || payload.summary || "Continue the Hearthmere writ.";
+}
+
+export function resolveInteractPromptState({
+  controlsLocked = false,
+  hearthlightVisible = false,
+  hearthlightText = DEFAULT_HEARTHLIGHT_PROMPT,
+  gatheringVisible = false,
+  gatheringText = DEFAULT_GATHERING_PROMPT
+} = {}) {
+  if (controlsLocked) {
+    return { visible: false, text: hearthlightText };
+  }
+
+  if (hearthlightVisible) {
+    return { visible: true, text: hearthlightText };
+  }
+
+  if (gatheringVisible) {
+    return { visible: true, text: gatheringText };
+  }
+
+  return { visible: false, text: hearthlightText };
+}
+
+function humanizeItemId(itemId) {
+  if (typeof itemId !== "string" || itemId.length === 0) {
+    return "";
+  }
+
+  return itemId
+    .split(/[_-]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
 
 /**
  * HUD — subscribes to UIBus events and updates the HTML overlay.
@@ -12,8 +74,17 @@ export class HUD {
     this.ghostHpTimer = 0;
     this.bossName = null;
     this.bossDefeated = false;
+    this.controlsLocked = false;
     this.unsubs = [];
     this.domCleanups = [];
+    this.wardMetaFeedbackTimer = null;
+    this.hearthlightPrompt = { visible: false, text: DEFAULT_HEARTHLIGHT_PROMPT };
+    this.gatheringPrompt = {
+      visible: false,
+      nodeId: null,
+      text: DEFAULT_GATHERING_PROMPT
+    };
+    this.questObjective = null;
 
     this.vitalsRoot = this.get("#hud-vitals");
     this.fillHp = this.get("#fill-hp");
@@ -29,11 +100,13 @@ export class HUD {
     this.pauseMenu = this.get("#pause-menu");
     this.hearthlightMenu = this.get("#hearthlight-menu");
     this.interactPrompt = this.get("#interact-prompt");
+    this.interactPromptText = this.getWithin(this.interactPrompt, ".prompt-text");
     this.controlsHint = document.querySelector("#controls-hint");
 
     const vitalsChrome = this.decorateVitals();
     this.vitalsPlate = vitalsChrome.plate;
     this.wardMeta = vitalsChrome.meta;
+    this.baseWardMetaText = this.wardMeta.textContent || DEFAULT_WARD_META;
 
     this.objectivePanel = this.createObjectivePanel();
     this.objectiveRegion = this.getWithin(this.objectivePanel, ".objective-region");
@@ -59,15 +132,11 @@ export class HUD {
     }
   }
 
-  /** Show / hide the interaction prompt (near Hearthlight). */
-  setInteractPromptVisible(visible, text = "Rest at Hearthlight") {
-    const el = this.interactPrompt.querySelector(".prompt-text");
-    if (el) {
-      el.textContent = text;
-    }
-
-    this.interactPrompt.setAttribute("aria-hidden", String(!visible));
-    this.interactPrompt.classList.toggle("prompt-visible", visible);
+  /** Update the Hearthlight-owned interact prompt state. */
+  setInteractPromptVisible(visible, text = DEFAULT_HEARTHLIGHT_PROMPT) {
+    this.hearthlightPrompt.visible = visible;
+    this.hearthlightPrompt.text = text;
+    this.renderInteractPrompt();
   }
 
   /** Show / hide the i-frame debug indicator. */
@@ -85,6 +154,11 @@ export class HUD {
       cleanup();
     }
     this.domCleanups.length = 0;
+
+    if (this.wardMetaFeedbackTimer !== null) {
+      clearTimeout(this.wardMetaFeedbackTimer);
+      this.wardMetaFeedbackTimer = null;
+    }
 
     this.objectivePanel.remove();
     this.vitalsPlate.remove();
@@ -110,6 +184,55 @@ export class HUD {
 
   setBar(fill, ratio) {
     fill.style.transform = `scaleX(${Math.max(0, Math.min(1, ratio))})`;
+  }
+
+  renderInteractPrompt() {
+    const { visible, text } = resolveInteractPromptState({
+      controlsLocked: this.controlsLocked,
+      hearthlightVisible: this.hearthlightPrompt.visible,
+      hearthlightText: this.hearthlightPrompt.text,
+      gatheringVisible: this.gatheringPrompt.visible,
+      gatheringText: this.gatheringPrompt.text
+    });
+
+    this.interactPromptText.textContent = text;
+    this.interactPrompt.setAttribute("aria-hidden", String(!visible));
+    this.interactPrompt.classList.toggle("prompt-visible", visible);
+  }
+
+  setGatheringPrompt(visible, definition = null, nodeId = null) {
+    this.gatheringPrompt.visible = visible;
+    this.gatheringPrompt.nodeId = visible ? nodeId : null;
+    this.gatheringPrompt.text = visible
+      ? formatGatheringPrompt(definition)
+      : DEFAULT_GATHERING_PROMPT;
+    this.renderInteractPrompt();
+  }
+
+  setWardMeta(text, { deferUntilFeedbackEnds = false } = {}) {
+    this.baseWardMetaText = text;
+    if (deferUntilFeedbackEnds && this.wardMetaFeedbackTimer !== null) {
+      return;
+    }
+
+    if (this.wardMetaFeedbackTimer !== null) {
+      clearTimeout(this.wardMetaFeedbackTimer);
+      this.wardMetaFeedbackTimer = null;
+    }
+
+    this.wardMeta.textContent = text;
+  }
+
+  showHarvestFeedback(payload) {
+    if (this.wardMetaFeedbackTimer !== null) {
+      clearTimeout(this.wardMetaFeedbackTimer);
+    }
+
+    this.wardMeta.textContent = formatHarvestFeedback(payload);
+    this.wardMetaFeedbackTimer = setTimeout(() => {
+      this.wardMetaFeedbackTimer = null;
+      this.wardMeta.textContent = this.baseWardMetaText;
+    }, HARVEST_FEEDBACK_MS);
   }
 
   bindUIBus() {
@@ -167,12 +290,45 @@ export class HUD {
       this.bus.on("menu:opened", () => {
         // handled by specific menu handlers
       }),
+      this.bus.on("controls:locked", () => {
+        this.controlsLocked = true;
+        this.renderInteractPrompt();
+      }),
+      this.bus.on("controls:unlocked", () => {
+        this.controlsLocked = false;
+        this.renderInteractPrompt();
+      }),
       this.bus.on("menu:closed", () => {
         this.pauseMenu.classList.remove("menu-open");
         this.pauseMenu.setAttribute("aria-hidden", "true");
         this.hearthlightMenu.classList.remove("menu-open");
         this.hearthlightMenu.setAttribute("aria-hidden", "true");
         this.restoreObjective();
+      }),
+      this.bus.on("gathering:node_nearby", ({ nodeId, definition }) => {
+        this.setGatheringPrompt(true, definition, nodeId ?? null);
+      }),
+      this.bus.on("gathering:node_left", ({ nodeId }) => {
+        if (this.gatheringPrompt.nodeId !== null && nodeId !== this.gatheringPrompt.nodeId) {
+          return;
+        }
+
+        this.setGatheringPrompt(false);
+      }),
+      this.bus.on("gathering:harvested", (payload) => {
+        this.showHarvestFeedback(payload);
+      }),
+      this.bus.on("quest:set", (payload) => {
+        this.questObjective = payload ?? null;
+        if (!this.bossName) {
+          this.restoreObjective();
+        }
+      }),
+      this.bus.on("quest:clear", () => {
+        this.questObjective = null;
+        if (!this.bossName) {
+          this.restoreObjective();
+        }
       }),
       this.bus.on("hearthlight:opened", () => {
         this.hearthlightMenu.classList.add("menu-open");
@@ -191,17 +347,17 @@ export class HUD {
       this.bus.on("boss:entered", ({ name }) => {
         this.bossName = name;
         this.bossDefeated = false;
-        this.wardMeta.textContent = "Ashfall Road / Fog Gate Breached";
+        this.setWardMeta("Ashfall Road / Fog Gate Breached");
         this.setBossObjective(name);
       }),
       this.bus.on("boss:defeated", ({ name }) => {
         this.bossName = null;
         this.bossDefeated = true;
-        this.wardMeta.textContent = "Ashfall Road / First Shard Claimed";
-        this.setPostBossObjective(name);
+        this.setWardMeta("Ashfall Road / First Shard Claimed");
+        this.restoreObjective(name);
       }),
       this.bus.on("character:levelUp", ({ newLevel }) => {
-        this.wardMeta.textContent = `Worldheart Stirring / Level ${newLevel}`;
+        this.setWardMeta(`Worldheart Stirring / Level ${newLevel}`);
       })
     );
   }
@@ -228,6 +384,9 @@ export class HUD {
     bindClick("btn-rest", () => {
       this.bus.emit("hearthlight:rested", {});
     });
+    bindClick("btn-hearthlight-crafting", () => {
+      this.bus.emit("hearthlight:crafting", {});
+    });
     bindClick("btn-hearthlight-leave", () => {
       this.bus.emit("menu:closed", {});
     });
@@ -239,7 +398,7 @@ export class HUD {
     plate.innerHTML = `
       <div class="hud-plate__kicker">Realmforge</div>
       <div class="hud-plate__title">Unbound Writ</div>
-      <div class="hud-plate__meta">Ashfall Road / Hearthmere Fringe</div>
+      <div class="hud-plate__meta">${DEFAULT_WARD_META}</div>
     `;
 
     this.vitalsRoot.prepend(plate);
@@ -334,14 +493,28 @@ export class HUD {
     );
   }
 
-  restoreObjective() {
+  setQuestObjective(payload) {
+    this.setObjective(
+      payload.regionTitle || "Hearthmere",
+      payload.title || "Hearthmere Writ",
+      formatQuestObjectiveText(payload),
+      payload.state || "In Progress"
+    );
+  }
+
+  restoreObjective(defeatedBossName = "Hollowbound Caravan Guard") {
     if (this.bossName) {
       this.setBossObjective(this.bossName);
       return;
     }
 
+    if (this.questObjective) {
+      this.setQuestObjective(this.questObjective);
+      return;
+    }
+
     if (this.bossDefeated) {
-      this.setPostBossObjective("Hollowbound Caravan Guard");
+      this.setPostBossObjective(defeatedBossName);
       return;
     }
 

@@ -104,6 +104,15 @@ const createTableStatements = [
     last_hearthlight_z REAL NOT NULL DEFAULT 4,
     saved_at TEXT NOT NULL,
     FOREIGN KEY (character_id) REFERENCES characters(character_id) ON DELETE CASCADE
+  )`,
+  `CREATE TABLE IF NOT EXISTS character_quest_completions (
+    character_quest_completion_id TEXT PRIMARY KEY,
+    character_id TEXT NOT NULL,
+    quest_id TEXT NOT NULL,
+    reward_xp INTEGER NOT NULL,
+    awarded_at TEXT NOT NULL,
+    FOREIGN KEY (character_id) REFERENCES characters(character_id) ON DELETE CASCADE,
+    UNIQUE (character_id, quest_id)
   )`
 ];
 

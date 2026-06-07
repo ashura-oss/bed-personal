@@ -26,6 +26,7 @@ export class Chunk {
     this.mesh = new THREE.Mesh(terrain.geometry, material);
     this.mesh.name = `chunk-${this.key}`;
     this.mesh.position.set(terrain.centerX, 0, terrain.centerZ);
+    this.mesh.userData.biome = terrain.centerBiome;
     this.mesh.receiveShadow = true;
     this.mesh.castShadow = false; // terrain receives but does not cast (perf)
     scene.add(this.mesh);

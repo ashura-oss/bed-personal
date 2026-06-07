@@ -8,6 +8,21 @@
 /** Default world seed (one integer drives the entire world). */
 export const WORLD_SEED_DEFAULT = 1337;
 
+/** WM-series authored-map switch. Enabled once authored heightmap + zones are ready. */
+export const USE_AUTHORED_MAP = true;
+
+/** Full authored world footprint. Coordinates run from -5000 to +5000. */
+export const AUTHORED_WORLD_SIZE = 10000;
+export const AUTHORED_WORLD_HALF_SIZE = AUTHORED_WORLD_SIZE / 2;
+
+/** Hearthmere is the reference region for the authored-map migration. */
+export const HEARTHMERE_REGION_BOUNDS = Object.freeze({
+  minX: -2500,
+  maxX: 2500,
+  minZ: -2000,
+  maxZ: 2000
+});
+
 /** Edge length of one chunk in world units. */
 export const CHUNK_SIZE = 32;
 

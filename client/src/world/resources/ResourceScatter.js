@@ -1,4 +1,6 @@
 import { hash2 } from "../gen/Rng.js";
+import { CHUNK_SIZE } from "../gen/WorldConfig.js";
+import { samplePrefabInfluence } from "../prefab/PrefabFootprint.js";
 import { getResourcesForBiome } from "./ResourceDefinitions.js";
 
 /**
@@ -15,7 +17,6 @@ import { getResourcesForBiome } from "./ResourceDefinitions.js";
  *  - Nodes are placed in a uniform grid jitter within the chunk bounds
  */
 
-const CHUNK_SIZE = 32;
 const MIN_SEPARATION = 3;
 const MAX_NODES_PER_CHUNK = 8;
 const MIN_NODES_PER_CHUNK = 4;
@@ -32,11 +33,12 @@ function hashToInt(value, min, max) {
 
 export class ResourceScatter {
   /**
-   * @param {{ worldSeed: number, biomeMap: object }} options
+   * @param {{ worldSeed: number, biomeMap: object, prefabSource?: object }} options
    */
-  constructor({ worldSeed, biomeMap }) {
+  constructor({ worldSeed, biomeMap, prefabSource = null }) {
     this._worldSeed = worldSeed | 0;
     this._biomeMap = biomeMap;
+    this._prefabSource = prefabSource;
   }
 
   /**
@@ -77,6 +79,10 @@ export class ResourceScatter {
       const worldX = originX + EDGE_PAD + hx * inner;
       const worldZ = originZ + EDGE_PAD + hz * inner;
 
+      if (samplePrefabInfluence(worldX, worldZ, this._prefabSource).influence > 0) {
+        continue;
+      }
+
       // Rejection: skip if too close to an already-placed node in this chunk
       let tooClose = false;
       for (const existing of placed) {
@@ -90,12 +96,37 @@ export class ResourceScatter {
       if (tooClose) continue;
 
       // Pick definition for this slot
-      const defIndex = Math.floor(hd * availableDefs.length);
-      const definition = availableDefs[Math.min(defIndex, availableDefs.length - 1)];
+      const nodeBiomeId = this._sampleBiomeId(worldX, worldZ, biomeId);
+      const nodeDefs = nodeBiomeId === biomeId ? availableDefs : getResourcesForBiome(nodeBiomeId);
+      if (nodeDefs.length === 0) continue;
+
+      const defIndex = Math.floor(hd * nodeDefs.length);
+      const definition = nodeDefs[Math.min(defIndex, nodeDefs.length - 1)];
 
       placed.push({ worldX, worldZ, definition });
     }
 
     return placed;
+  }
+
+  _sampleBiomeId(worldX, worldZ, fallbackBiomeId) {
+    if (this._biomeMap && typeof this._biomeMap.sampleBiomeId === "function") {
+      return this._biomeMap.sampleBiomeId(worldX, worldZ) ?? this._missingBiomeFallback(fallbackBiomeId);
+    }
+
+    if (this._biomeMap && typeof this._biomeMap.sampleSpawnSafeBiome === "function") {
+      return this._biomeMap.sampleSpawnSafeBiome(worldX, worldZ).biomeId ?? this._missingBiomeFallback(fallbackBiomeId);
+    }
+
+    if (this._biomeMap && typeof this._biomeMap.biomeAt === "function") {
+      const biome = this._biomeMap.biomeAt(worldX, worldZ);
+      return biome?.key ?? biome?.id ?? this._missingBiomeFallback(fallbackBiomeId);
+    }
+
+    return fallbackBiomeId;
+  }
+
+  _missingBiomeFallback(fallbackBiomeId) {
+    return typeof this._biomeMap?.findRegionAt === "function" ? null : fallbackBiomeId;
   }
 }

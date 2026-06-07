@@ -39,7 +39,7 @@ export class BossController {
   pendingAttack = "sweep";
   tmp = new THREE.Vector3();
 
-  constructor(scene, rapier, position, callbacks) {
+  constructor(scene, rapier, position, callbacks = {}) {
     this.scene = scene;
     this.rapier = rapier;
     this.callbacks = callbacks;
@@ -169,10 +169,10 @@ export class BossController {
       position.y + CAPSULE_RADIUS + CAPSULE_HALF_HEIGHT,
       position.z,
     );
-    const rb = this.rapier.world.createRigidBody(bodyDesc);
+    this.body = this.rapier.world.createRigidBody(bodyDesc);
     this.rapier.world.createCollider(
       this.rapier.module.ColliderDesc.capsule(CAPSULE_HALF_HEIGHT, CAPSULE_RADIUS),
-      rb,
+      this.body,
     );
   }
 
@@ -214,7 +214,7 @@ export class BossController {
   hit(damage, poiseDamage = 0) {
     if (this.state === "dead") return false;
     this.hp = Math.max(0, this.hp - damage);
-    this.callbacks.onHpChanged(this.hp, BOSS_MAX_HP, this.phase);
+    this.callbacks.onHpChanged?.(this.hp, BOSS_MAX_HP, this.phase);
     if (poiseDamage > 0) this.applyPoiseDamage(poiseDamage);
 
     // Flash red on hit
@@ -244,7 +244,15 @@ export class BossController {
 
   /** Main update — AI state machine. */
   update(dt, playerPos, playerHasIFrames) {
+    // Death dissolve driven by the game loop (no rAF)
+    if (this.dissolveTimer > 0) {
+      this.dissolveTimer -= dt;
+      const progress = Math.max(0, 1 - this.dissolveTimer / 1.5);
+      this.group.scale.setScalar(Math.max(0.02, 1 - progress * 0.98));
+      if (this.dissolveTimer <= 0) this.group.visible = false;
+    }
     if (this.state === "dead") return;
+
     this.timer -= dt;
 
     const toPlayer = new THREE.Vector3().subVectors(playerPos, this.group.position);
@@ -257,14 +265,6 @@ export class BossController {
       while (d > Math.PI) d -= 2 * Math.PI;
       while (d < -Math.PI) d += 2 * Math.PI;
       this.group.rotation.y += d * 0.06;
-    }
-
-    // Death dissolve driven by the game loop (no rAF)
-    if (this.dissolveTimer > 0) {
-      this.dissolveTimer -= dt;
-      const progress = Math.max(0, 1 - this.dissolveTimer / 1.5);
-      this.group.scale.setScalar(Math.max(0.02, 1 - progress * 0.98));
-      if (this.dissolveTimer <= 0) this.group.visible = false;
     }
 
     switch (this.state) {
@@ -315,6 +315,8 @@ export class BossController {
   }
 
   dispose() {
+    this.removePhysicsBody();
+
     this.scene.remove(this.group);
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
@@ -362,7 +364,7 @@ export class BossController {
     }
 
     if (damage > 0) {
-      this.callbacks.onAttack(this.pendingAttack, playerHasIFrames ? 0 : damage);
+      this.callbacks.onAttack?.(this.pendingAttack, playerHasIFrames ? 0 : damage);
     }
 
     this.material.emissive.setHex(this.phaseEmissive());
@@ -377,7 +379,7 @@ export class BossController {
     this.timer = STAGGER_DURATION;
     this.material.emissive.setHex(0x00ffdd);
     this.material.emissiveIntensity = 1.2;
-    this.callbacks.onStaggered();
+    this.callbacks.onStaggered?.();
   }
 
   enterPhase(phase) {
@@ -390,16 +392,17 @@ export class BossController {
     this.material.emissive.setHex(this.phaseEmissive());
     this.material.emissiveIntensity = this.phaseEmissiveIntensity();
     this.shardMaterial.emissiveIntensity = phase === 2 ? 3.2 : 4.6;
-    this.callbacks.onPhaseChanged(phase);
-    this.callbacks.onHpChanged(this.hp, BOSS_MAX_HP, phase);
+    this.callbacks.onPhaseChanged?.(phase, this.combatContext());
+    this.callbacks.onHpChanged?.(this.hp, BOSS_MAX_HP, phase);
   }
 
   die() {
     this.state = "dead";
     this.dissolveTimer = 1.5; // 1.5s dissolve, driven by update()
+    this.removePhysicsBody();
     this.material.emissive.setHex(0xffd080);
     this.material.emissiveIntensity = 2;
-    this.callbacks.onDied(EMBERS_REWARD);
+    this.callbacks.onDied?.(EMBERS_REWARD, this.combatContext());
   }
 
   pickAttack() {
@@ -427,5 +430,24 @@ export class BossController {
 
   phaseAttackCooldown() {
     return this.phase === 1 ? PHASE1_ATTACK_COOLDOWN : this.phase === 2 ? PHASE2_ATTACK_COOLDOWN : PHASE3_ATTACK_COOLDOWN;
+  }
+
+  combatContext() {
+    return {
+      hp: this.hp,
+      current: this.hp,
+      maxHp: BOSS_MAX_HP,
+      max: BOSS_MAX_HP,
+      hpRatio: this.hpRatio,
+      phase: this.phase,
+      state: this.state,
+    };
+  }
+
+  removePhysicsBody() {
+    if (!this.body) return;
+
+    this.rapier?.world?.removeRigidBody?.(this.body);
+    this.body = null;
   }
 }

@@ -19,6 +19,8 @@ export const Action = Object.freeze({
   LockOn: "LockOn",
   UseFlask: "UseFlask",
   Interact: "Interact",
+  Inventory: "Inventory",
+  QuestLog: "QuestLog",
   Pause: "Pause"
 });
 
@@ -39,8 +41,14 @@ const KEY_BINDINGS = {
   Tab: Action.LockOn,
   KeyF: Action.UseFlask,
   KeyE: Action.Interact,
+  KeyI: Action.Inventory,
+  KeyL: Action.QuestLog,
   Escape: Action.Pause
 };
+
+export function actionForKeyCode(code) {
+  return KEY_BINDINGS[code] ?? null;
+}
 
 export class InputMap {
   constructor() {
@@ -54,7 +62,7 @@ export class InputMap {
     this.mb2Just = false;
 
     this.onKeyDown = event => {
-      const action = KEY_BINDINGS[event.code];
+      const action = actionForKeyCode(event.code);
       if (!action) return;
 
       // Prevent browser defaults (space = scroll, tab = focus trap, etc.)
@@ -68,7 +76,7 @@ export class InputMap {
     };
 
     this.onKeyUp = event => {
-      const action = KEY_BINDINGS[event.code];
+      const action = actionForKeyCode(event.code);
       if (action) this.held.delete(action);
     };
 

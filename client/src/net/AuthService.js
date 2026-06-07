@@ -22,6 +22,15 @@ export function deriveStats(char) {
   };
 }
 
+function normalizeNonNegativeInteger(value, fallback = 0) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(0, Math.floor(value));
+}
+
+function calculateLevelFromXp(xp) {
+  return Math.floor(normalizeNonNegativeInteger(xp) / 100) + 1;
+}
+
 // ── AuthService ────────────────────────────────────────────────────────────────
 
 export class AuthService {
@@ -106,17 +115,65 @@ export class AuthService {
 
   /**
    * Persist character XP gain after boss victory.
-   * Uses PUT /characters/:id to update xp and optionally level.
+   * Uses PUT /progression/characters/:id to update xp and optionally level.
    */
   async saveXpGain(characterId, xpDelta, currentXp, newLevel) {
+    const nextXp = normalizeNonNegativeInteger(currentXp) + normalizeNonNegativeInteger(xpDelta);
+
     try {
-      await api.put(`/characters/${characterId}`, {
-        xp: currentXp + xpDelta,
+      await api.put(`/progression/characters/${characterId}`, {
+        xp: nextXp,
         level: newLevel
       });
     } catch {
       // Non-fatal — game continues even if the save fails
       console.warn("[AuthService] Failed to persist XP gain");
+    }
+  }
+
+  /**
+   * Claim an idempotent backend-owned quest completion reward.
+   * Returns awarded/rewards/character/characterProgression from the server.
+   */
+  async claimQuestCompletionReward(characterId, questId) {
+    return api.put(
+      `/progression/characters/${characterId}/quest-completions/${encodeURIComponent(questId)}`
+    );
+  }
+
+  /**
+   * Persist XP awarded by a claimed quest reward.
+   * Returns an explicit result so callers can mark rewards claimed only after persistence succeeds.
+   */
+  async saveQuestRewardXpGain(characterId, rewardXp, currentXp, currentLevel) {
+    const nextXp = normalizeNonNegativeInteger(currentXp) + normalizeNonNegativeInteger(rewardXp);
+    const nextLevel = Math.max(
+      normalizeNonNegativeInteger(currentLevel, 1),
+      calculateLevelFromXp(nextXp)
+    );
+
+    try {
+      const progression = await api.put(`/progression/characters/${characterId}`, {
+        xp: nextXp,
+        level: nextLevel
+      });
+
+      return {
+        ok: true,
+        progression,
+        xp: nextXp,
+        level: nextLevel
+      };
+    } catch (err) {
+      const message = err instanceof ApiError
+        ? err.payload.message
+        : "Could not persist quest reward XP.";
+
+      console.warn("[AuthService] Failed to persist quest reward XP");
+      return {
+        ok: false,
+        message
+      };
     }
   }
 }

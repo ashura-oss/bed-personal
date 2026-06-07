@@ -1,4 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
+import { CHUNK_SIZE, WORLD_SEED_DEFAULT } from "../world/gen/WorldConfig.js";
+import { PrefabRegistry } from "../world/prefab/PrefabRegistry.js";
+import { samplePrefabInfluence } from "../world/prefab/PrefabFootprint.js";
 import { ResourceScatter } from "../world/resources/ResourceScatter.js";
 import { getResourcesForBiome } from "../world/resources/ResourceDefinitions.js";
 
@@ -53,6 +56,72 @@ describe("ResourceScatter", () => {
     const nodes = scatter.getNodesForChunk(2, -3, biomeId, heightAt);
     for (const node of nodes) {
       expect(validIds.has(node.definition.id)).toBe(true);
+    }
+  });
+
+  it("samples the exact node biome when a biome map is provided", () => {
+    const biomeMap = {
+      sampleBiomeId: (worldX) => (worldX > 0 ? "ironvale" : "hearthmere")
+    };
+    const scatter = new ResourceScatter({ worldSeed: seed, biomeMap });
+    const validIds = new Set(getResourcesForBiome("ironvale").map((d) => d.id));
+
+    const nodes = scatter.getNodesForChunk(0, 0, "hearthmere", heightAt);
+
+    expect(nodes.length).toBeGreaterThan(0);
+    for (const node of nodes) {
+      expect(validIds.has(node.definition.id)).toBe(true);
+    }
+  });
+
+  it("falls back to the chunk biome when the biome map has no exact node biome", () => {
+    const biomeMap = {
+      sampleBiomeId: () => null
+    };
+    const scatter = new ResourceScatter({ worldSeed: seed, biomeMap });
+
+    const nodes = scatter.getNodesForChunk(0, 0, biomeId, heightAt);
+
+    expect(nodes.length).toBeGreaterThan(0);
+    for (const node of nodes) {
+      expect(node.definition.biomes).toContain(biomeId);
+    }
+  });
+
+  it("does not fall back to chunk biome when an authored biome source reports no region", () => {
+    const biomeMap = {
+      findRegionAt: () => null,
+      sampleBiomeId: () => null
+    };
+    const scatter = new ResourceScatter({ worldSeed: seed, biomeMap });
+
+    expect(scatter.getNodesForChunk(0, 0, biomeId, heightAt)).toEqual([]);
+  });
+
+  it("does not place nodes inside prefab footprints when a prefab source is provided", () => {
+    const biomeSource = { sampleBiomeId: () => "hearthmere" };
+    const prefabSource = new PrefabRegistry(WORLD_SEED_DEFAULT, { biomeSource });
+    const [camp] = prefabSource.getPrefabAnchors();
+    const campChunkX = Math.floor(camp.origin.x / CHUNK_SIZE);
+    const campChunkZ = Math.floor(camp.origin.z / CHUNK_SIZE);
+    const scatter = new ResourceScatter({
+      worldSeed: WORLD_SEED_DEFAULT,
+      biomeMap: biomeSource,
+      prefabSource
+    });
+    const nodes = [];
+
+    for (let dz = -1; dz <= 1; dz += 1) {
+      for (let dx = -1; dx <= 1; dx += 1) {
+        nodes.push(
+          ...scatter.getNodesForChunk(campChunkX + dx, campChunkZ + dz, biomeId, heightAt)
+        );
+      }
+    }
+
+    for (const node of nodes) {
+      const { influence } = samplePrefabInfluence(node.worldX, node.worldZ, prefabSource);
+      expect(influence).toBe(0);
     }
   });
 

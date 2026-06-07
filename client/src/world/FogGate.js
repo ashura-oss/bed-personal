@@ -63,6 +63,18 @@ export class FogGate {
     return false;
   }
 
+  /**
+   * Externally seal the gate (hide visuals, mark as crossed).
+   * Called by BossArena when distance-based activation fires so the
+   * existing Z-axis trigger is bypassed — backward-compatible: the
+   * normal update() path still works if onCrossed is wired instead.
+   */
+  seal() {
+    if (this.crossed) return;
+    this.crossed = true;
+    this.group.visible = false;
+  }
+
   dispose() {
     this.scene.remove(this.group);
     this.group.traverse(child => {

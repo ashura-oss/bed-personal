@@ -23,12 +23,16 @@ export class ChunkManager {
 
     this.scene = scene;
     this.rapier = rapier;
+    this.biomeSource = options.biomeSource ?? null;
     this.generator = new TerrainGenerator(seed, {
       biomeSource: options.biomeSource,
-      prefabSource: options.prefabSource
+      prefabSource: options.prefabSource,
+      heightSource: options.heightSource
     });
     this.prefabLoader = options.prefabLoader ?? null;
     this.gatheringSystem = options.gatheringSystem ?? null;
+    this.enemySpawner = options.enemySpawner ?? null;
+    this.npcSpawner = options.npcSpawner ?? null;
     this.material = new THREE.MeshStandardMaterial({
       color: new THREE.Color(0xffffff),
       roughness: 0.96,
@@ -45,6 +49,34 @@ export class ChunkManager {
 
   sampleBiome(x, z) {
     return this.generator.biomeAt(x, z);
+  }
+
+  sampleAtmosphereBiome(x, z) {
+    return this.sampleRuntimeBiome(x, z) ?? this.generator.biomeAt(x, z);
+  }
+
+  sampleRuntimeBiome(x, z) {
+    const source = this.biomeSource ?? null;
+
+    if (typeof source === "function") {
+      return source(x, z);
+    }
+
+    if (source && typeof source.biomeAt === "function") {
+      const biome = source.biomeAt(x, z);
+      if (biome) return biome;
+    }
+
+    if (source && typeof source.getBiomeAt === "function") {
+      const biome = source.getBiomeAt(x, z);
+      if (biome) return biome;
+    }
+
+    if (source && typeof source.terrainBiomeAt === "function") {
+      return source.terrainBiomeAt(x, z);
+    }
+
+    return null;
   }
 
   /** Convert a world position to its chunk coordinate. */
@@ -91,9 +123,15 @@ export class ChunkManager {
 
   dispose() {
     for (const chunk of this.loaded.values()) {
+      if (this.gatheringSystem) this.gatheringSystem.despawnNodesForChunk(chunk.cx, chunk.cz);
+      if (this.enemySpawner) this.enemySpawner.despawnEnemiesForChunk(chunk.cx, chunk.cz);
+      if (this.npcSpawner) this.npcSpawner.despawnNpcsForChunk(chunk.cx, chunk.cz);
+      this.prefabLoader?.unloadChunk?.(chunk.cx, chunk.cz);
       chunk.dispose();
     }
 
+    this.enemySpawner?.dispose();
+    this.npcSpawner?.dispose();
     this.loaded.clear();
     this.pendingQueue = [];
     this.queueCursor = 0;
@@ -163,6 +201,9 @@ export class ChunkManager {
     for (const [key, chunk] of this.loaded.entries()) {
       if (Math.abs(chunk.cx - cx) > keep || Math.abs(chunk.cz - cz) > keep) {
         if (this.gatheringSystem) this.gatheringSystem.despawnNodesForChunk(chunk.cx, chunk.cz);
+        if (this.enemySpawner) this.enemySpawner.despawnEnemiesForChunk(chunk.cx, chunk.cz);
+        if (this.npcSpawner) this.npcSpawner.despawnNpcsForChunk(chunk.cx, chunk.cz);
+        this.prefabLoader?.unloadChunk?.(chunk.cx, chunk.cz);
         chunk.dispose();
         this.loaded.delete(key);
       }
@@ -176,11 +217,52 @@ export class ChunkManager {
     const chunk = new Chunk(this.scene, this.rapier, this.generator, this.material, cx, cz);
     this.loaded.set(key, chunk);
     this.prefabLoader?.ensureChunk?.(cx, cz);
-    if (this.gatheringSystem) {
-      const biome = this.generator.biomeAt((cx + 0.5) * 32, (cz + 0.5) * 32);
+    const chunkCenterX = (cx + 0.5) * CHUNK_SIZE;
+    const chunkCenterZ = (cz + 0.5) * CHUNK_SIZE;
+    const canSpawnStreamedContent = this.shouldSpawnStreamedContentForChunk(cx, cz);
+
+    if (this.gatheringSystem && canSpawnStreamedContent) {
+      const biome = this.generator.biomeAt(chunkCenterX, chunkCenterZ);
       const biomeId = biome.key ?? biome.id ?? 'hearthmere';
       const heightAt = (x, z) => this.generator.heightAt(x, z);
       this.gatheringSystem.spawnNodesForChunk(cx, cz, biomeId, heightAt);
     }
+    if (this.enemySpawner && canSpawnStreamedContent) {
+      const biome = this.generator.biomeAt(chunkCenterX, chunkCenterZ);
+      const biomeId = biome.key ?? biome.id ?? 'hearthmere';
+      const heightAt = (x, z) => this.generator.heightAt(x, z);
+      this.enemySpawner.spawnEnemiesForChunk(cx, cz, biomeId, heightAt);
+    }
+    if (this.npcSpawner && canSpawnStreamedContent) {
+      this.npcSpawner.spawnNpcsForChunk(cx, cz);
+    }
+  }
+
+  shouldSpawnStreamedContentAt(worldX, worldZ) {
+    if (this.biomeSource && typeof this.biomeSource.findRegionAt === "function") {
+      return Boolean(this.biomeSource.findRegionAt(worldX, worldZ));
+    }
+
+    return true;
+  }
+
+  shouldSpawnStreamedContentForChunk(chunkX, chunkZ) {
+    if (this.biomeSource && typeof this.biomeSource.getRegions === "function") {
+      const minX = chunkX * CHUNK_SIZE;
+      const minZ = chunkZ * CHUNK_SIZE;
+      const maxX = minX + CHUNK_SIZE;
+      const maxZ = minZ + CHUNK_SIZE;
+
+      return this.biomeSource.getRegions().some((region) => (
+        maxX >= region.bounds.minX &&
+        minX <= region.bounds.maxX &&
+        maxZ >= region.bounds.minZ &&
+        minZ <= region.bounds.maxZ
+      ));
+    }
+
+    const centerX = (chunkX + 0.5) * CHUNK_SIZE;
+    const centerZ = (chunkZ + 0.5) * CHUNK_SIZE;
+    return this.shouldSpawnStreamedContentAt(centerX, centerZ);
   }
 }

@@ -29,6 +29,15 @@ function buildGeometry(meshType) {
   }
 }
 
+function getVisualHalfHeight(geometry) {
+  const params = geometry.parameters ?? {};
+
+  if (typeof params.height === "number") return params.height / 2;
+  if (typeof params.radius === "number") return params.radius;
+
+  return 0.6;
+}
+
 export class ResourceNode {
   constructor({ scene, rapier, worldX, worldZ, heightAt, definition }) {
     this._id = _nextNodeId;
@@ -53,10 +62,7 @@ export class ResourceNode {
     this._mesh = new THREE.Mesh(geometry, material);
 
     // Centre the mesh so its base sits on the terrain surface
-    const halfH = geometry.parameters
-      ? (geometry.parameters.height ?? geometry.parameters.radius ?? 0.6)
-      : 0.6;
-    this._mesh.position.set(worldX, y + halfH / 2, worldZ);
+    this._mesh.position.set(worldX, y + getVisualHalfHeight(geometry), worldZ);
     this._mesh.castShadow = true;
     this._mesh.receiveShadow = false;
     scene.add(this._mesh);

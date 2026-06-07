@@ -161,7 +161,7 @@ export class FollowCamera {
     this.lastPointerX = e.clientX;
     this.lastPointerY = e.clientY;
     this.desired.theta -= dx * ROTATE_SPEED;
-    this.desired.phi = THREE.MathUtils.clamp(this.desired.phi + dy * ROTATE_SPEED, 0.35, Math.PI - 0.18);
+    this.desired.phi = THREE.MathUtils.clamp(this.desired.phi - dy * ROTATE_SPEED, 0.35, Math.PI - 0.18);
   };
 
   onPointerUp = (e) => {

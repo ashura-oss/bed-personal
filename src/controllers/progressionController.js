@@ -3,6 +3,10 @@ import {
   findCharacterProgressionById,
   saveCharacterProgression
 } from "../models/progressionModel.js";
+import {
+  claimCharacterQuestCompletion,
+  findHearthmereLocalQuestReward
+} from "../models/questCompletionModel.js";
 import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
 import { createHttpError } from "../utils/httpError.js";
 import { getOptionalInteger } from "../utils/validate.js";
@@ -95,6 +99,46 @@ export async function putCharacterProgression(req, res, next) {
     });
 
     res.status(200).json(savedProgression);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function putCharacterQuestCompletion(req, res, next) {
+  try {
+    const existingCharacter = await findCharacterById(req.params.characterId);
+
+    if (!existingCharacter) {
+      throw createHttpError(404, "Not Found", "Character was not found.");
+    }
+
+    assertOwnsUserResource(req, existingCharacter.userId);
+
+    const questReward = findHearthmereLocalQuestReward(req.params.questId);
+
+    if (!questReward) {
+      throw createHttpError(
+        404,
+        "Not Found",
+        "Quest completion reward was not found."
+      );
+    }
+
+    const claimResult = await claimCharacterQuestCompletion({
+      characterId: req.params.characterId,
+      questReward
+    });
+
+    res.status(200).json({
+      awarded: claimResult.awarded,
+      rewards: {
+        xp: claimResult.awardedXp
+      },
+      quest: questReward,
+      characterProgression: claimResult.characterProgression,
+      character: claimResult.character,
+      questCompletion: claimResult.questCompletion
+    });
   } catch (error) {
     next(error);
   }

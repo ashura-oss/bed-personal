@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   RESOURCE_DEFINITIONS,
+  getResourceDefinitionForPlacementTags,
   getResourcesForBiome
 } from "../world/resources/ResourceDefinitions.js";
 
@@ -36,6 +37,23 @@ describe("ResourceDefinitions", () => {
 
   it("getResourcesForBiome with empty string returns []", () => {
     expect(getResourcesForBiome("")).toEqual([]);
+  });
+
+  it("resolves authored resource placement tags to their definitions", () => {
+    expect(getResourceDefinitionForPlacementTags(["timber"])?.id).toBe("wood");
+    expect(getResourceDefinitionForPlacementTags(["iron_ore"])?.id).toBe("ore");
+    expect(getResourceDefinitionForPlacementTags(["ashleaf"])?.id).toBe("herb");
+  });
+
+  it("accepts either resource ids or yield item ids in placement tags", () => {
+    expect(getResourceDefinitionForPlacementTags([" wood "])?.yield.itemId).toBe("timber");
+    expect(getResourceDefinitionForPlacementTags([" mooncrystal "])?.id).toBe("crystal");
+  });
+
+  it("returns null when placement tags do not resolve a resource definition", () => {
+    expect(getResourceDefinitionForPlacementTags([])).toBeNull();
+    expect(getResourceDefinitionForPlacementTags(["unknown_resource"])).toBeNull();
+    expect(getResourceDefinitionForPlacementTags(null)).toBeNull();
   });
 
   it("every definition has the required fields", () => {

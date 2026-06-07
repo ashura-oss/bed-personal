@@ -28,6 +28,7 @@ export default [
         WheelEvent: "readonly",
         Window: "readonly",
         cancelAnimationFrame: "readonly",
+        clearTimeout: "readonly",
         console: "readonly",
         document: "readonly",
         fetch: "readonly",

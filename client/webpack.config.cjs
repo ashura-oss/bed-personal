@@ -55,7 +55,8 @@ module.exports = {
   ],
   devServer: {
     host: "127.0.0.1",
-    port: 5173,
+    port: parseInt(process.env.PORT) || 5173,
+    allowedHosts: "all",
     hot: true,
     historyApiFallback: true,
     static: {

@@ -122,3 +122,21 @@ export const characterRunStates = sqliteTable("character_run_states", {
   lastHearthlightZ: real("last_hearthlight_z").notNull().default(4),
   savedAt: text("saved_at").notNull()
 });
+
+export const characterQuestCompletions = sqliteTable(
+  "character_quest_completions",
+  {
+    characterQuestCompletionId: text("character_quest_completion_id").primaryKey(),
+    characterId: text("character_id")
+      .notNull()
+      .references(() => characters.characterId, { onDelete: "cascade" }),
+    questId: text("quest_id").notNull(),
+    rewardXp: integer("reward_xp").notNull(),
+    awardedAt: text("awarded_at").notNull()
+  },
+  (table) => ({
+    characterQuestCompletionUnique: uniqueIndex(
+      "character_quest_completions_character_quest_unique"
+    ).on(table.characterId, table.questId)
+  })
+);

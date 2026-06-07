@@ -73,6 +73,17 @@ export const RESOURCE_DEFINITIONS = Object.freeze([
   })
 ]);
 
+function normalizeResourceKey(resourceKey) {
+  return typeof resourceKey === "string" ? resourceKey.trim() : "";
+}
+
+const RESOURCE_DEFINITION_TAG_MAP = new Map(
+  RESOURCE_DEFINITIONS.flatMap((definition) => [
+    [definition.id, definition],
+    [definition.yield.itemId, definition]
+  ])
+);
+
 /**
  * Return all resource definitions valid for the given biome.
  * Returns an empty array for unknown biome IDs.
@@ -83,4 +94,26 @@ export const RESOURCE_DEFINITIONS = Object.freeze([
 export function getResourcesForBiome(biomeId) {
   if (typeof biomeId !== "string" || biomeId.length === 0) return [];
   return RESOURCE_DEFINITIONS.filter((def) => def.biomes.includes(biomeId));
+}
+
+/**
+ * Resolve a resource definition from authored placement tags.
+ * Supports both resource-definition ids ("wood") and yielded item ids
+ * used by authored placements ("timber").
+ *
+ * @param {readonly string[]} tags
+ * @returns {object | null}
+ */
+export function getResourceDefinitionForPlacementTags(tags) {
+  if (!Array.isArray(tags) || tags.length === 0) return null;
+
+  for (const tag of tags) {
+    const normalizedTag = normalizeResourceKey(tag);
+    if (!normalizedTag) continue;
+
+    const definition = RESOURCE_DEFINITION_TAG_MAP.get(normalizedTag);
+    if (definition) return definition;
+  }
+
+  return null;
 }

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CHUNK_SEGS, CHUNK_SIZE } from "./WorldConfig.js";
-import { terrainHeightAt } from "./heightField.js";
+import { resolveBiomeAt, terrainHeightAt, terrainSampleAt } from "./heightField.js";
 
 /**
  * Result of generating one chunk's terrain.
@@ -19,13 +19,20 @@ import { terrainHeightAt } from "./heightField.js";
  * identical heights at the shared vertices — seamless, deterministic.
  */
 export class TerrainGenerator {
-  constructor(seed) {
+  constructor(seed, options = {}) {
     this.seed = seed;
+    this.biomeSource = options.biomeSource ?? null;
+    this.prefabSource = options.prefabSource ?? null;
+    this.heightSource = options.heightSource ?? null;
   }
 
   /** World-space terrain height at any point. The single source of truth. */
   heightAt(worldX, worldZ) {
-    return terrainHeightAt(worldX, worldZ, this.seed);
+    return terrainHeightAt(worldX, worldZ, this.seed, this.biomeSource, this.prefabSource, this.heightSource);
+  }
+
+  biomeAt(worldX, worldZ) {
+    return resolveBiomeAt(worldX, worldZ, this.biomeSource);
   }
 
   /**
@@ -41,6 +48,10 @@ export class TerrainGenerator {
     const centerX = (cx + 0.5) * size;
     const centerZ = (cz + 0.5) * size;
     const positions = new Float32Array(vertexCount * 3);
+    const colors = new Float32Array(vertexCount * 3);
+    const paletteCache = new Map();
+    const vertexColor = new THREE.Color();
+    const centerBiome = this.biomeAt(centerX, centerZ);
 
     // Fill vertices. iz -> z axis, ix -> x axis.
     let pointer = 0;
@@ -52,11 +63,23 @@ export class TerrainGenerator {
       for (let ix = 0; ix <= segs; ix += 1) {
         const localX = (ix / segs - 0.5) * size;
         const worldX = centerX + localX;
-        const y = this.heightAt(worldX, worldZ);
+        const sample = terrainSampleAt(
+          worldX,
+          worldZ,
+          this.seed,
+          this.biomeSource,
+          this.prefabSource,
+          this.heightSource
+        );
+        const y = sample.height;
 
         positions[pointer] = localX;
         positions[pointer + 1] = y;
         positions[pointer + 2] = localZ;
+        getTerrainColor(sample, paletteCache, vertexColor);
+        colors[pointer] = vertexColor.r;
+        colors[pointer + 1] = vertexColor.g;
+        colors[pointer + 2] = vertexColor.b;
         pointer += 3;
       }
     }
@@ -86,6 +109,7 @@ export class TerrainGenerator {
 
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     geometry.setIndex(new THREE.Uint32BufferAttribute(indices, 1));
     geometry.computeVertexNormals();
 
@@ -98,7 +122,25 @@ export class TerrainGenerator {
       colliderVertices,
       colliderIndices,
       centerX,
-      centerZ
+      centerZ,
+      centerBiome
     };
   }
+}
+
+function getTerrainColor(sample, paletteCache, targetColor) {
+  const { biome, normalizedHeight } = sample;
+  const paletteKey = `${biome.key}:${biome.palette.low}:${biome.palette.high}`;
+  let palette = paletteCache.get(paletteKey);
+
+  if (!palette) {
+    palette = {
+      low: new THREE.Color(biome.palette.low),
+      high: new THREE.Color(biome.palette.high)
+    };
+    paletteCache.set(paletteKey, palette);
+  }
+
+  const blend = THREE.MathUtils.smoothstep(normalizedHeight, 0.16, 0.9);
+  return targetColor.copy(palette.low).lerp(palette.high, blend);
 }

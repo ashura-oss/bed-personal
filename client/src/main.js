@@ -6,10 +6,12 @@ import { createScene, getSceneBiomeAtmosphere } from "./engine/createScene.js";
 import { startLoop } from "./engine/startLoop.js";
 import { initRapier } from "./physics/initRapier.js";
 import { ChunkManager } from "./world/chunk/ChunkManager.js";
-import { BiomeMap } from "./world/gen/BiomeMap.js";
-import { WORLD_SEED_DEFAULT } from "./world/gen/WorldConfig.js";
+import { AuthoredMapSource } from "./world/authored/AuthoredMapSource.js";
+import { resolveAuthoredSpawnPoint } from "./world/authored/AuthoredSpawn.js";
+import { USE_AUTHORED_MAP, WORLD_SEED_DEFAULT } from "./world/gen/WorldConfig.js";
 import { PrefabLoader } from "./world/prefab/PrefabLoader.js";
 import { PrefabRegistry } from "./world/prefab/PrefabRegistry.js";
+import { AuthoredPrefabRegistry } from "./world/authored/AuthoredPrefabRegistry.js";
 import { UIBus } from "./ui/UIBus.js";
 import { HUD } from "./ui/HUD.js";
 import { GameContext } from "./core/GameContext.js";
@@ -20,18 +22,44 @@ import { StaminaSystem } from "./gameplay/player/StaminaSystem.js";
 import { ResourceBar } from "./gameplay/player/ResourceBar.js";
 import { PlayerController } from "./gameplay/player/PlayerController.js";
 import { DummyEnemy } from "./gameplay/enemies/DummyEnemy.js";
-import { BossController, BOSS_MAX_HP } from "./gameplay/enemies/BossController.js";
+import { BOSS_MAX_HP } from "./gameplay/enemies/BossController.js";
 import { CombatSystem } from "./gameplay/combat/CombatSystem.js";
 import { EmberOrb } from "./world/EmberOrb.js";
-import { FogGate } from "./world/FogGate.js";
 import { BossHUD } from "./ui/BossHUD.js";
 import { LoginScreen } from "./ui/LoginScreen.js";
-import { authService } from "./net/AuthService.js";
+import { authService, deriveStats } from "./net/AuthService.js";
 import { runState } from "./progression/RunState.js";
 import { AudioManager } from "./audio/AudioManager.js";
 import { OptionsMenu } from "./ui/OptionsMenu.js";
 import { ResourceScatter } from "./world/resources/ResourceScatter.js";
 import { GatheringSystem } from "./gameplay/gathering/GatheringSystem.js";
+import { Inventory } from "./gameplay/items/Inventory.js";
+import { getItemDefinition } from "./gameplay/items/ItemDefinitions.js";
+import { CraftingSystem } from "./gameplay/crafting/CraftingSystem.js";
+import { buildCraftingRecipeViews, describeCraftingResult } from "./gameplay/crafting/CraftingViewModel.js";
+import { InventoryUI } from "./ui/InventoryUI.js";
+import { CraftingMenu } from "./ui/CraftingMenu.js";
+import { QuestLogUI } from "./ui/QuestLogUI.js";
+import { EnemySpawner } from "./gameplay/enemies/EnemySpawner.js";
+import { rollLoot } from "./gameplay/enemies/LootResolver.js";
+import { mulberry32 } from "./world/gen/Rng.js";
+import { NpcSpawner } from "./gameplay/npc/NpcSpawner.js";
+import { DialogueUI } from "./ui/DialogueUI.js";
+import { DialogueEngine } from "./gameplay/dialogue/DialogueEngine.js";
+import { getDialogueTree } from "./gameplay/dialogue/DialogueDefinitions.js";
+import {
+  QUEST_EVENT_TYPES,
+  addClaimedQuestRewardIds,
+  buildQuestLogView,
+  buildQuestObjectiveView,
+  createQuestLog,
+  detectNewlyCompletedQuestRewards,
+  deserializeQuestLog,
+  getClaimedQuestRewardIds,
+  listCompletedUnclaimedQuestRewards,
+  reduceQuestEvent,
+  serializeQuestLog
+} from "./gameplay/quests/index.js";
 
 // ── Boot setup ────────────────────────────────────────────────────────────────
 
@@ -46,7 +74,10 @@ let isDisposed = false;
 let embers = 0;
 let loadedChar = null;
 let loadedStats = null;
-let bossActive = false;
+
+const EMPTY_PLACEMENT_SOURCE = Object.freeze({
+  getPlacementsForChunk: () => Object.freeze([])
+});
 
 // Bridge GameContext → UIBus
 ctx.onTransition((from, to) => {
@@ -106,47 +137,162 @@ async function boot() {
     const renderer = createRenderer(sceneRoot);
     if (!addCleanup(() => { renderer.dispose(); renderer.domElement.remove(); })) return;
 
-    setBootStatus("Loading biome map…", false);
-    const biomeSource = new BiomeMap(WORLD_SEED_DEFAULT);
+    setBootStatus(USE_AUTHORED_MAP ? "Loading authored map…" : "Loading world…", false);
+    const authoredMapSource = USE_AUTHORED_MAP ? new AuthoredMapSource() : null;
+    const biomeSource = authoredMapSource;
+    const heightSource = authoredMapSource;
 
     const scene = createScene();
     addCleanup(() => { disposeSceneGraph(scene); scene.clear(); });
     const sceneBiomeAtmosphere = getSceneBiomeAtmosphere(scene);
 
     const { camera, target: initialTarget } = createCamera(sceneRoot);
+    const savedRunState = loadedChar ? runState.load(loadedChar.characterId) : null;
+    const defeatedBossIds = new Set(savedRunState?.bossSnapshot?.defeatedBossIds ?? []);
+    let chunkManager = null;
+    let player = null;
+    const groundAt = (x, z) => chunkManager?.sampleHeight(x, z) ?? authoredMapSource?.heightAt?.(x, z) ?? 0;
+    const persistBossSnapshot = () => {
+      if (loadedChar) {
+        runState.saveBossSnapshot(loadedChar.characterId, {
+          defeatedBossIds: [...defeatedBossIds].sort()
+        });
+      }
+    };
 
-    // ── Procedural world (W-01/W-03) ─────────────────────────────────────
-    const prefabRegistry = new PrefabRegistry(WORLD_SEED_DEFAULT, { biomeSource });
+    // ── Procedural world (W-01/W-03) / Authored registry (WM-06) ─────────
+    const prefabRegistry = authoredMapSource
+      ? new AuthoredPrefabRegistry({
+          regionRegistry: authoredMapSource.regionRegistry,
+          heightSource: authoredMapSource
+        })
+      : new PrefabRegistry(WORLD_SEED_DEFAULT, { biomeSource, heightSource });
     const prefabLoader = new PrefabLoader(scene, rapier, prefabRegistry, {
       onHearthlightRest: () => {
         ctx.transition(AppMode.Menu);
         uiBus.emit("hearthlight:opened", {});
+      },
+      groundAt,
+      isBossDefeated: (bossId) => defeatedBossIds.has(bossId),
+      bossArenaCallbacks: {
+        onArmed: () => {
+          uiBus.emit("world:prompt", { message: "The crypt stirs..." });
+        },
+        onEntered: ({ name }) => {
+          uiBus.emit("boss:entered", { name });
+        },
+        onHpChanged: (bossHp, max, phase) => {
+          uiBus.emit("boss:hpChanged", { current: bossHp, max, phase });
+        },
+        onPhaseChanged: (phase, boss) => {
+          uiBus.emit("boss:phaseChanged", {
+            current: Math.round((boss?.hpRatio ?? 1) * BOSS_MAX_HP),
+            max: BOSS_MAX_HP,
+            phase,
+          });
+          uiBus.emit("boss:hpChanged", {
+            current: Math.round((boss?.hpRatio ?? 1) * BOSS_MAX_HP),
+            max: BOSS_MAX_HP,
+            phase,
+          });
+        },
+        onAttack: (_type, damage) => {
+          if (damage > 0) player?.takeDamage(damage);
+        },
+        onStaggered: () => {
+          uiBus.emit("boss:staggered", {});
+        },
+        onBossDied: (emberReward, bossEvent = {}) => {
+          const bossId = bossEvent.bossId ?? bossEvent.id ?? bossEvent.arenaId ?? null;
+          const bossName = bossEvent.bossName ?? bossEvent.name ?? "Unknown Boss";
+
+          embers += emberReward;
+          uiBus.emit("embers:changed", { amount: embers });
+          uiBus.emit("boss:defeated", {
+            bossId,
+            arenaId: bossEvent.arenaId ?? bossId,
+            encounterId: bossEvent.encounterId ?? bossId,
+            name: bossName,
+            bossName
+          });
+
+          if (bossId) {
+            defeatedBossIds.add(bossId);
+            persistBossSnapshot();
+          }
+
+        }
       }
     });
     addCleanup(() => { prefabLoader.dispose(); });
 
-    const chunkManager = new ChunkManager(scene, rapier, WORLD_SEED_DEFAULT, {
-      biomeSource,
-      prefabSource: prefabRegistry,
-      prefabLoader
-    });
-    chunkManager.ensureSpawnArea(0, 3, 1); // solid ground under the spawn before the loop
-    addCleanup(() => { chunkManager.dispose(); });
-    const groundAt = (x, z) => chunkManager.sampleHeight(x, z);
-
     // ── Resources + Gathering (W-04) ────────────────────────────────────
-    const resourceScatter = new ResourceScatter({ worldSeed: WORLD_SEED_DEFAULT, biomeMap: biomeSource });
+    const resourceScatter = new ResourceScatter({
+      worldSeed: WORLD_SEED_DEFAULT,
+      biomeMap: biomeSource,
+      prefabSource: prefabRegistry
+    });
+
+    // ── Inventory (W-05) ─────────────────────────────────────────────────
+    const inventory = new Inventory();
     const gatheringSystem = new GatheringSystem({
       scene,
       rapier,
       resourceScatter,
-      chunkManager,
+      placementSource: authoredMapSource,
+      canAcceptHarvest: ({ itemId, count }) => {
+        let canAccept = false;
+        try {
+          canAccept = Inventory.fromJSON(inventory.toJSON()).addItem(itemId, count);
+        } catch {
+          canAccept = false;
+        }
+
+        if (!canAccept) {
+          uiBus.emit("inventory:full", { itemId, count });
+        }
+        return canAccept;
+      },
       uiBus
     });
-    // Register gatheringSystem with chunkManager so existing chunks can notify it
-    chunkManager.gatheringSystem = gatheringSystem;
+
+    chunkManager = new ChunkManager(scene, rapier, WORLD_SEED_DEFAULT, {
+      biomeSource,
+      heightSource,
+      prefabSource: prefabRegistry,
+      prefabLoader,
+      gatheringSystem
+    });
+
+    // ── Wandering enemies (W-07) ─────────────────────────────────────────
+    const enemySpawner = new EnemySpawner({
+      scene,
+      worldSeed: WORLD_SEED_DEFAULT,
+      biomeMap: biomeSource,
+      placementSource: authoredMapSource,
+      uiBus,
+    });
+    chunkManager.enemySpawner = enemySpawner;
+
+    // ── NPC spawner (W-09) ───────────────────────────────────────────────
+    const npcSpawner = new NpcSpawner({
+      scene,
+      placementSource: authoredMapSource ?? EMPTY_PLACEMENT_SOURCE,
+      uiBus,
+      heightAt: (x, z) => authoredMapSource?.heightAt(x, z) ?? chunkManager.sampleHeight(x, z),
+    });
+    chunkManager.npcSpawner = npcSpawner;
+
+    const authoredSpawn = resolveAuthoredSpawnPoint({
+      authoredMapSource,
+      heightAt: groundAt
+    });
+    chunkManager.ensureSpawnArea(authoredSpawn.x, authoredSpawn.z, 1); // solid ground under the spawn before the loop
+    addCleanup(() => { chunkManager.dispose(); });
     addCleanup(() => { gatheringSystem.dispose(); });
-    sceneBiomeAtmosphere?.applyBiome(chunkManager.sampleBiome(0, 3));
+    addCleanup(() => { enemySpawner.dispose(); });
+    addCleanup(() => { npcSpawner.dispose(); });
+    sceneBiomeAtmosphere?.applyBiome(chunkManager.sampleAtmosphereBiome(authoredSpawn.x, authoredSpawn.z));
 
     // ── Input ────────────────────────────────────────────────────────────
     const input = new InputMap();
@@ -167,7 +313,7 @@ async function boot() {
     const fp = new ResourceBar(stats?.maxFp ?? 60);
 
     // ── Player ───────────────────────────────────────────────────────────
-    const player = new PlayerController(
+    player = new PlayerController(
       scene,
       rapier,
       {
@@ -191,7 +337,7 @@ async function boot() {
       stamina,
       hp,
       fp,
-      { x: 0, y: groundAt(0, 3) + 1.5, z: 3 },
+      authoredSpawn,
     );
     addCleanup(() => { player.dispose(); });
 
@@ -213,6 +359,278 @@ async function boot() {
       },
     });
 
+    const craftingSystem = new CraftingSystem({ inventory, hearthlightTier: 1 });
+    const getInventorySlots = () => buildInventoryViewSlots(inventory);
+    const getCraftingRecipes = () => buildCraftingRecipeViews(craftingSystem);
+    const emitInventoryUpdate = () => {
+      uiBus.emit("inventory:set", { slots: getInventorySlots() });
+    };
+    const emitCraftingUpdate = (selectedRecipeId = null) => {
+      uiBus.emit("crafting:set", { recipes: getCraftingRecipes(), selectedRecipeId });
+    };
+    const persistInventory = () => {
+      if (loadedChar) {
+        runState.saveInventory(loadedChar.characterId, inventory.toJSON());
+      }
+    };
+
+    if (savedRunState?.resourceSnapshot) {
+      gatheringSystem.restoreDepletionSnapshot(savedRunState.resourceSnapshot);
+    }
+
+    const persistResourceSnapshot = () => {
+      if (loadedChar) {
+        runState.saveResourceSnapshot(
+          loadedChar.characterId,
+          gatheringSystem.serializeDepletionSnapshot()
+        );
+      }
+    };
+
+    let questLog = savedRunState?.questSnapshot
+      ? deserializeQuestLog(savedRunState.questSnapshot)
+      : createQuestLog();
+    let questSnapshotJson = JSON.stringify(serializeQuestLog(questLog));
+    let questRewardSnapshot = savedRunState?.questRewardSnapshot ?? null;
+
+    const getQuestRewardIds = () => getClaimedQuestRewardIds(questRewardSnapshot);
+
+    const buildCurrentQuestLogView = () => buildQuestLogView(
+      serializeQuestLog(questLog),
+      { questRewardSnapshot }
+    );
+
+    const emitQuestUpdate = () => {
+      const questView = buildQuestObjectiveView(questLog);
+      if (questView) {
+        uiBus.emit("quest:set", questView);
+      } else {
+        uiBus.emit("quest:clear", {});
+      }
+      uiBus.emit("questlog:set", buildCurrentQuestLogView());
+    };
+
+    const persistQuestLog = () => {
+      if (loadedChar) {
+        runState.saveQuestSnapshot(loadedChar.characterId, serializeQuestLog(questLog));
+      }
+    };
+
+    const persistQuestRewardSnapshot = () => {
+      if (loadedChar) {
+        runState.saveQuestRewardSnapshot(loadedChar.characterId, questRewardSnapshot);
+      }
+    };
+
+    const markQuestRewardClaimed = (claim) => {
+      questRewardSnapshot = addClaimedQuestRewardIds(questRewardSnapshot, [claim.rewardId]);
+      persistQuestRewardSnapshot();
+      emitQuestUpdate();
+    };
+
+    const applyClaimedCharacter = (claimResult) => {
+      const updatedCharacter = claimResult?.character ?? null;
+      if (!updatedCharacter) return;
+
+      const previousLevel = loadedChar?.level ?? updatedCharacter.level;
+      loadedChar = { ...loadedChar, ...updatedCharacter };
+      loadedStats = deriveStats(loadedChar);
+
+      if (claimResult?.awarded && updatedCharacter.level > previousLevel) {
+        uiBus.emit("character:levelUp", {
+          newLevel: updatedCharacter.level,
+          xpTotal: updatedCharacter.xp
+        });
+      }
+    };
+
+    const claimQuestReward = async (claim) => {
+      if (!loadedChar || !claim?.questId || !claim?.rewardId) return;
+      if (getQuestRewardIds().includes(claim.rewardId)) return;
+
+      if (typeof authService.claimQuestCompletionReward !== "function") {
+        console.warn("[Quest] Quest completion reward endpoint is unavailable.");
+        uiBus.emit("quest:reward_failed", {
+          questId: claim.questId,
+          rewardId: claim.rewardId,
+          message: "Quest reward persistence is unavailable."
+        });
+        return;
+      }
+
+      try {
+        const response = await authService.claimQuestCompletionReward(
+          loadedChar.characterId,
+          claim.questId
+        );
+        if (response?.ok === false) {
+          throw new Error(response.message ?? "Quest reward claim failed.");
+        }
+
+        const claimResult = response?.claim ?? response;
+        applyClaimedCharacter(claimResult);
+        markQuestRewardClaimed(claim);
+        uiBus.emit("quest:reward_claimed", {
+          questId: claim.questId,
+          rewardId: claim.rewardId,
+          awarded: Boolean(claimResult?.awarded),
+          rewards: claimResult?.rewards ?? null,
+          characterProgression: claimResult?.characterProgression ?? null
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Quest reward claim failed.";
+        console.warn("[Quest] Failed to claim quest reward", error);
+        uiBus.emit("quest:reward_failed", {
+          questId: claim.questId,
+          rewardId: claim.rewardId,
+          message
+        });
+      }
+    };
+
+    const claimQuestRewards = (claims) => {
+      for (const claim of claims) {
+        void claimQuestReward(claim);
+      }
+    };
+
+    const retryCompletedQuestRewards = () => {
+      claimQuestRewards(listCompletedUnclaimedQuestRewards({
+        questLog,
+        claimedRewardIds: getQuestRewardIds()
+      }));
+    };
+
+    const applyQuestEvent = (event) => {
+      const previousQuestLog = questLog;
+      const nextQuestLog = reduceQuestEvent(questLog, event);
+      const nextSnapshot = serializeQuestLog(nextQuestLog);
+      const nextSnapshotJson = JSON.stringify(nextSnapshot);
+      if (nextSnapshotJson === questSnapshotJson) {
+        return;
+      }
+      const rewardClaims = detectNewlyCompletedQuestRewards({
+        previousQuestLog,
+        nextQuestLog: nextSnapshot,
+        claimedRewardIds: getQuestRewardIds()
+      });
+
+      questLog = nextSnapshot;
+      questSnapshotJson = nextSnapshotJson;
+      persistQuestLog();
+      emitQuestUpdate();
+      uiBus.emit("quest:changed", { questLog: nextSnapshot });
+      claimQuestRewards(rewardClaims);
+    };
+
+    // ── Loot drop handler (W-07) ──────────────────────────────────────────
+    uiBus.on("enemy:died", ({ enemyId, enemyTypeId, enemyName, lootTable, position }) => {
+      applyQuestEvent({
+        type: QUEST_EVENT_TYPES.ENEMY_DIED,
+        enemyId,
+        enemyTypeId,
+        enemyName,
+        count: 1
+      });
+
+      const rng = mulberry32(Math.floor(position.x * 1000 + position.z));
+      const granted = rollLoot(lootTable, rng);
+      let inventoryChanged = false;
+
+      for (const { itemId, count } of granted) {
+        if (!inventory.addItem(itemId, count)) {
+          uiBus.emit("inventory:full", { itemId, count });
+          continue;
+        }
+
+        inventoryChanged = true;
+        uiBus.emit("inventory:item_added", { itemId, count });
+      }
+
+      if (inventoryChanged) {
+        emitInventoryUpdate();
+        emitCraftingUpdate();
+        persistInventory();
+      }
+    });
+
+    uiBus.on("gathering:harvested", ({ itemId, count, nodeDef }) => {
+      if (!inventory.addItem(itemId, count)) {
+        uiBus.emit("inventory:full", { itemId, count });
+        return;
+      }
+
+      applyQuestEvent({
+        type: QUEST_EVENT_TYPES.GATHERING_HARVESTED,
+        itemId,
+        count,
+        nodeDef
+      });
+      emitInventoryUpdate();
+      emitCraftingUpdate();
+      persistInventory();
+    });
+
+    uiBus.on("gathering:depleted", () => {
+      persistResourceSnapshot();
+    });
+
+    uiBus.on("hearthlight:crafting", () => {
+      uiBus.emit("crafting:open", { recipes: getCraftingRecipes() });
+    });
+
+    uiBus.on("crafting:requested", ({ recipeId }) => {
+      let result;
+
+      try {
+        result = craftingSystem.craft(recipeId);
+      } catch (error) {
+        uiBus.emit("crafting:failed", {
+          recipeId: "",
+          reason: "invalid_recipe",
+          message: error instanceof Error ? error.message : "Crafting request is invalid."
+        });
+        return;
+      }
+
+      const message = describeCraftingResult(result);
+
+      if (!result.ok) {
+        uiBus.emit("crafting:failed", {
+          recipeId: result.recipeId,
+          reason: result.code,
+          message,
+          result
+        });
+        return;
+      }
+
+      emitInventoryUpdate();
+      emitCraftingUpdate(result.recipeId);
+      persistInventory();
+      uiBus.emit("crafting:crafted", {
+        recipeId: result.recipeId,
+        message,
+        result
+      });
+    });
+
+    uiBus.on("crafting:crafted", ({ recipeId, result }) => {
+      applyQuestEvent({
+        type: QUEST_EVENT_TYPES.CRAFTING_CRAFTED,
+        recipeId,
+        output: result?.produced
+      });
+    });
+
+    uiBus.on("dialogue:effect", ({ effect, npcId }) => {
+      applyQuestEvent({
+        type: QUEST_EVENT_TYPES.DIALOGUE_EFFECT,
+        effect,
+        npcId
+      });
+    });
+
     // Hearthlight rest action (from menu button)
     uiBus.on("hearthlight:rested", () => {
       const hearthlight = prefabLoader.getPrimaryHearthlight();
@@ -222,60 +640,17 @@ async function boot() {
       player.setRespawnPoint(hearthlight.group.position);
       enemy.respawn();
       gatheringSystem?.respawnAll();
+      const resourceSnapshot = gatheringSystem?.serializeDepletionSnapshot();
       ctx.transition(AppMode.Exploration);
       uiBus.emit("menu:closed", {});
       // Persist run-state
       if (loadedChar) {
-        runState.save(loadedChar.characterId, embers, 4, hearthlight.group.position);
+        runState.save(loadedChar.characterId, embers, 4, hearthlight.group.position, {
+          inventorySlots: inventory.toJSON(),
+          resourceSnapshot
+        });
       }
     });
-
-    // ── Fog gate + Boss ───────────────────────────────────────────────────
-    const fogGate = new FogGate(scene, { x: 0, y: groundAt(0, -14), z: -14 }, () => {
-      bossActive = true;
-      uiBus.emit("boss:entered", { name: "Hollowbound Caravan Guard" });
-    });
-    addCleanup(() => { fogGate.dispose(); });
-
-    const boss = new BossController(
-      scene,
-      rapier,
-      { x: 0, y: groundAt(0, -20), z: -20 },
-      {
-        onHpChanged: (bossHp, max, phase) => {
-          uiBus.emit("boss:hpChanged", { current: bossHp, max, phase });
-        },
-        onPhaseChanged: (phase) => {
-          uiBus.emit("boss:hpChanged", {
-            current: Math.round(boss.hpRatio * BOSS_MAX_HP),
-            max: BOSS_MAX_HP,
-            phase,
-          });
-        },
-        onAttack: (_type, damage) => {
-          if (damage > 0) player.takeDamage(damage);
-        },
-        onStaggered: () => {
-          uiBus.emit("boss:staggered", {});
-        },
-        onDied: (emberReward) => {
-          embers += emberReward;
-          uiBus.emit("embers:changed", { amount: embers });
-          uiBus.emit("boss:defeated", { name: "Hollowbound Caravan Guard" });
-          bossActive = false;
-          // Persist XP gain to backend
-          if (loadedChar) {
-            const xpGain = 300;
-            const newXp = loadedChar.xp + xpGain;
-            const newLvl = loadedChar.level + 1;
-            void authService.saveXpGain(loadedChar.characterId, xpGain, loadedChar.xp, newLvl);
-            loadedChar = { ...loadedChar, xp: newXp, level: newLvl };
-            uiBus.emit("character:levelUp", { newLevel: newLvl, xpTotal: newXp });
-          }
-        },
-      },
-    );
-    addCleanup(() => { boss.dispose(); });
 
     // ── Audio ─────────────────────────────────────────────────────────────
     const audio = new AudioManager();
@@ -288,25 +663,48 @@ async function boot() {
     uiBus.on("hearthlight:rested", () => { audio.play("hearthlight"); });
     uiBus.on("player:died", () => { audio.play("unmade"); });
     uiBus.on("boss:staggered", () => { audio.play("bossHit"); });
-    uiBus.on("boss:hpChanged", ({ phase }) => { if (phase > 1) audio.play("bossPhase"); });
+    uiBus.on("boss:phaseChanged", ({ phase }) => { if (phase > 1) audio.play("bossPhase"); });
     uiBus.on("boss:defeated", () => { audio.play("bossDefeat"); });
     uiBus.on("embers:recovered", () => { audio.play("embers"); });
+    uiBus.on("boss:defeated", ({ bossId, arenaId, bossName, name }) => {
+      applyQuestEvent({
+        type: QUEST_EVENT_TYPES.BOSS_DEFEATED,
+        bossId,
+        arenaId,
+        bossName,
+        name
+      });
+    });
 
     // ── Run-state restore ─────────────────────────────────────────────────
-    if (loadedChar) {
-      const saved = runState.load(loadedChar.characterId);
-      if (saved) {
-        embers = saved.embers;
-        uiBus.emit("embers:changed", { amount: embers });
-      }
+    if (loadedChar && savedRunState) {
+      embers = savedRunState.embers;
+      inventory.fromJSON(savedRunState.inventorySlots);
+      uiBus.emit("embers:changed", { amount: embers });
     }
 
     // ── HUD ──────────────────────────────────────────────────────────────
     const hud = new HUD(uiBus);
     addCleanup(() => { hud.dispose(); });
+    emitQuestUpdate();
 
     const bossHUD = new BossHUD(uiBus);
     addCleanup(() => { bossHUD.dispose(); });
+
+    const inventoryUI = new InventoryUI(uiBus, { mount: appRoot, slots: getInventorySlots() });
+    addCleanup(() => { inventoryUI.dispose(); });
+
+    const craftingMenu = new CraftingMenu(uiBus, { mount: appRoot, recipes: getCraftingRecipes() });
+    addCleanup(() => { craftingMenu.dispose(); });
+
+    const questLogUI = new QuestLogUI(uiBus, { mount: appRoot, view: buildCurrentQuestLogView() });
+    addCleanup(() => { questLogUI.dispose(); });
+    emitQuestUpdate();
+    retryCompletedQuestRewards();
+
+    // ── Dialogue UI (W-09) ────────────────────────────────────────────────
+    const dialogueUI = new DialogueUI(uiBus, { mount: appRoot });
+    addCleanup(() => { dialogueUI.dispose(); });
 
     // ── Options menu (Phase 5) ────────────────────────────────────────────
     const optionsMenu = new OptionsMenu(appRoot, audio, () => {
@@ -336,7 +734,135 @@ async function boot() {
         uiBus.emit("menu:opened", { type: "pause" });
       }
     });
+    let inventoryOpen = false;
+    let craftingOpen = false;
+    let questLogOpen = false;
+    let dialogueOpen = false;
+    let activeDialogue = null;
+    let activeDialogueNpcId = null;
+
+    uiBus.on("inventory:opened", () => {
+      if (dialogueOpen) return;
+      inventoryOpen = true;
+      if (ctx.mode === AppMode.Exploration) {
+        ctx.transition(AppMode.Menu);
+        uiBus.emit("menu:opened", { type: "inventory" });
+      }
+    });
+    uiBus.on("inventory:closed", () => {
+      inventoryOpen = false;
+      uiBus.emit("menu:closed", { type: "inventory" });
+    });
+    uiBus.on("crafting:opened", () => {
+      if (dialogueOpen) return;
+      craftingOpen = true;
+      if (ctx.mode === AppMode.Exploration) {
+        ctx.transition(AppMode.Menu);
+        uiBus.emit("menu:opened", { type: "crafting" });
+      }
+    });
+    uiBus.on("crafting:closed", () => {
+      craftingOpen = false;
+    });
+    uiBus.on("questlog:opened", () => {
+      if (dialogueOpen) {
+        uiBus.emit("questlog:close", {});
+        return;
+      }
+
+      questLogOpen = true;
+      if (ctx.mode === AppMode.Exploration) {
+        ctx.transition(AppMode.Menu);
+        uiBus.emit("menu:opened", { type: "questlog" });
+      }
+    });
+    uiBus.on("questlog:closed", () => {
+      questLogOpen = false;
+      uiBus.emit("menu:closed", { type: "questlog" });
+    });
+
+    // ── Dialogue lifecycle (W-09) ─────────────────────────────────────────
+    uiBus.on("npc:interact", ({ npcId, name, dialogueId }) => {
+      const tree = getDialogueTree(dialogueId);
+      if (!tree) return;
+      activeDialogue = new DialogueEngine({ tree });
+      activeDialogueNpcId = npcId;
+      dialogueOpen = true;
+      if (ctx.mode === AppMode.Exploration) ctx.transition(AppMode.Menu);
+      const node = activeDialogue.currentNode;
+      uiBus.emit("dialogue:open", {
+        speaker: node.speaker,
+        text: node.text,
+        choices: activeDialogue.availableChoices(),
+        npcName: name,
+      });
+    });
+
+    uiBus.on("dialogue:choose", ({ index }) => {
+      if (!activeDialogue) return;
+      const result = activeDialogue.choose(index);
+      if (result.effect) {
+        uiBus.emit("dialogue:effect", { effect: result.effect, npcId: activeDialogueNpcId });
+      }
+      if (result.ended || activeDialogue.isComplete) {
+        uiBus.emit("dialogue:close", {});
+      } else {
+        const node = activeDialogue.currentNode;
+        uiBus.emit("dialogue:render", {
+          speaker: node.speaker,
+          text: node.text,
+          choices: activeDialogue.availableChoices(),
+        });
+      }
+    });
+
+    uiBus.on("dialogue:close", () => {
+      if (!dialogueOpen) return;
+      dialogueOpen = false;
+      const endedNpcId = activeDialogueNpcId;
+      activeDialogue = null;
+      activeDialogueNpcId = null;
+      npcSpawner.onDialogueEnded(endedNpcId);
+      if (ctx.mode === AppMode.Menu) {
+        ctx.transition(AppMode.Exploration);
+        uiBus.emit("menu:closed", { type: "dialogue" });
+      }
+    });
+
+    // If an in-dialogue NPC's chunk unloads, Module 1 emits npc:dialogue_ended
+    uiBus.on("npc:dialogue_ended", () => {
+      if (dialogueOpen) uiBus.emit("dialogue:close", {});
+    });
+
+    // NPC nearby / left → interact prompt
+    uiBus.on("npc:nearby", ({ name }) => {
+      hud.setInteractPromptVisible(true, `Talk to ${name}`);
+    });
+    uiBus.on("npc:left", () => {
+      hud.setInteractPromptVisible(false);
+    });
+
     uiBus.on("menu:closed", () => {
+      if (dialogueOpen) {
+        uiBus.emit("dialogue:close", {});
+        return;
+      }
+
+      if (craftingOpen) {
+        uiBus.emit("crafting:close", {});
+        return;
+      }
+
+      if (inventoryOpen) {
+        uiBus.emit("inventory:close", {});
+        return;
+      }
+
+      if (questLogOpen) {
+        uiBus.emit("questlog:close", {});
+        return;
+      }
+
       if (ctx.mode === AppMode.Menu) {
         ctx.transition(AppMode.Exploration);
       }
@@ -390,17 +916,45 @@ async function boot() {
 
         // ── Handle pause ─────────────────────────────────────────────────
         if (input.isJustPressed(Action.Pause)) {
-          if (ctx.mode === AppMode.Exploration) {
+          if (dialogueOpen) {
+            uiBus.emit("dialogue:close", {});
+          } else if (craftingOpen) {
+            uiBus.emit("crafting:close", {});
+          } else if (inventoryOpen) {
+            uiBus.emit("inventory:close", {});
+          } else if (questLogOpen) {
+            uiBus.emit("questlog:close", {});
+          } else if (ctx.mode === AppMode.Exploration) {
             uiBus.emit("pause:opened", {});
           } else if (ctx.mode === AppMode.Menu) {
             uiBus.emit("menu:closed", {});
           }
         }
 
+        // ── Inventory (W-05) ──────────────────────────────────────────────
+        if (input.isJustPressed(Action.Inventory)) {
+          if (inventoryOpen) {
+            uiBus.emit("inventory:close", {});
+          } else if (!dialogueOpen && ctx.mode === AppMode.Exploration) {
+            uiBus.emit("inventory:open", { slots: getInventorySlots() });
+          }
+        }
+
+        // ── Quest log (W-10) ──────────────────────────────────────────────
+        if (input.isJustPressed(Action.QuestLog)) {
+          if (questLogOpen) {
+            uiBus.emit("questlog:close", {});
+          } else if (!dialogueOpen && ctx.mode === AppMode.Exploration) {
+            uiBus.emit("questlog:open", buildCurrentQuestLogView());
+          }
+        }
+
+        let activeBossArena = prefabLoader.getActiveBossArena?.() ?? null;
+
         // ── Lock-on toggle ────────────────────────────────────────────────
         if (input.isJustPressed(Action.LockOn) && !controlLocked) {
           lockedOn = !lockedOn;
-          const lockTarget = bossActive ? boss.position : enemy.position;
+          const lockTarget = activeBossArena?.active ? activeBossArena.bossPosition : enemy.position;
           if (lockedOn) {
             followCam.setLockOn(lockTarget);
           } else {
@@ -409,7 +963,7 @@ async function boot() {
           uiBus.emit("lockon:changed", { active: lockedOn });
         }
         if (lockedOn) {
-          followCam.updateLockOnTarget(bossActive ? boss.position : enemy.position);
+          followCam.updateLockOnTarget(activeBossArena?.active ? activeBossArena.bossPosition : enemy.position);
         }
 
         // ── Player update ─────────────────────────────────────────────────
@@ -418,24 +972,32 @@ async function boot() {
         // ── Stream procedural world chunks around the player (W-01) ───────
         chunkManager.update(player.position.x, player.position.z);
         sceneBiomeAtmosphere?.applyBiome(
-          chunkManager.sampleBiome(player.position.x, player.position.z),
+          chunkManager.sampleAtmosphereBiome(player.position.x, player.position.z),
           dt
         );
 
+        // ── Authored prefab updates (W-03/W-08 Hearthmere camp + crypt) ──
+        prefabLoader.update(
+          dt,
+          player.position,
+          !controlLocked && input.isJustPressed(Action.Interact),
+          { playerHasIframes: player.hasIframes }
+        );
+        activeBossArena = prefabLoader.getActiveBossArena?.() ?? null;
+        hud.setInteractPromptVisible(prefabLoader.isPlayerNearInteractable() && !controlLocked);
+
         // ── Combat ────────────────────────────────────────────────────────
         // Exploration: attack the training dummy. Boss arena: attack the boss.
-        const combatEnemies = bossActive ? [] : [enemy];
+        const combatEnemies = activeBossArena?.active ? [] : [enemy];
         combat.update(dt, input, player.position, playerForward, combatEnemies, controlLocked);
 
         // Boss combat (in-arena only)
-        if (bossActive && boss.isAlive && !controlLocked) {
+        if (activeBossArena?.active && activeBossArena.boss.isAlive && !controlLocked) {
           if (input.isJustPressed(Action.LightAttack)) {
-            const toB = new THREE.Vector3().subVectors(boss.position, player.position);
-            if (toB.length() < 3.0) boss.hit(22, 0);
+            activeBossArena.tryHit(22, 0, player.position);
           }
           if (input.isJustPressed(Action.HeavyAttack)) {
-            const toB = new THREE.Vector3().subVectors(boss.position, player.position);
-            if (toB.length() < 3.0) boss.hit(48, 40);
+            activeBossArena.tryHit(48, 40, player.position);
           }
         }
 
@@ -452,16 +1014,6 @@ async function boot() {
           }
         }
 
-        // ── Boss update ───────────────────────────────────────────────────
-        if (bossActive) {
-          boss.update(dt, player.position, player.hasIframes);
-        }
-
-        // ── Fog gate ──────────────────────────────────────────────────────
-        if (!bossActive) {
-          fogGate.update(player.position);
-        }
-
         // ── Embers orb pickup ─────────────────────────────────────────────
         if (emberOrb && !emberOrb.collected) {
           if (emberOrb.update(dt, player.position)) {
@@ -472,14 +1024,18 @@ async function boot() {
           }
         }
 
-        // ── Authored prefab updates (W-03 Hearthmere camp) ───────────────
-        prefabLoader.update(dt, player.position, input.isJustPressed(Action.Interact));
-        hud.setInteractPromptVisible(prefabLoader.isPlayerNearInteractable() && !controlLocked);
-
         // ── Gathering (W-04) ──────────────────────────────────────────────
         if (!controlLocked) {
           gatheringSystem.update(player.position, playerForward, input);
         }
+
+        // ── NPC proximity + interact (W-09) ───────────────────────────────
+        if (!controlLocked) {
+          npcSpawner.update(dt, player.position, playerForward, input);
+        }
+
+        // ── Wandering enemies (W-07) ──────────────────────────────────────
+        enemySpawner.update(dt, player);
 
         // ── HUD i-frame indicator ─────────────────────────────────────────
         hud.setIFrameIndicator(player.hasIframes);
@@ -548,6 +1104,29 @@ function setBootStatus(message, ready) {
   if (!bootStatus) return;
   bootStatus.textContent = message;
   bootStatus.dataset.ready = String(ready);
+}
+
+function buildInventoryViewSlots(inventory) {
+  return inventory.getSlots().map((slot) => {
+    if (!slot.itemId) return slot;
+
+    const definition = getItemDefinition(slot.itemId);
+    if (!definition) return slot;
+
+    return {
+      ...slot,
+      name: definition.name,
+      category: titleCase(definition.category),
+      rarity: titleCase(definition.rarity),
+      description: definition.description,
+      flavor: definition.flavorText
+    };
+  });
+}
+
+function titleCase(value) {
+  if (typeof value !== "string" || value.length === 0) return "";
+  return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function disposeSceneGraph(root) {

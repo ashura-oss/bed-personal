@@ -159,7 +159,10 @@ describe("terrain seam safety", () => {
     expect(terrainHeightAt(12.5, -7.25, seed)).toBe(terrainHeightAt(12.5, -7.25, seed));
   });
 
-  it("different seeds yield different terrain", () => {
-    expect(terrainHeightAt(12.5, -7.25, 1)).not.toBe(terrainHeightAt(12.5, -7.25, 2));
+  it("returns flat base height when no height source is provided (authored-only world)", () => {
+    // Without an authored height source the procedural fBm path is gone;
+    // the out-of-bounds fallback returns biome.terrain.baseHeight (0 by default).
+    expect(terrainHeightAt(12.5, -7.25, 1)).toBe(0);
+    expect(terrainHeightAt(12.5, -7.25, 2)).toBe(0);
   });
 });
