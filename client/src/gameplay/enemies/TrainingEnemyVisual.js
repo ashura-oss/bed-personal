@@ -9,7 +9,7 @@ const WEAK_POINT_COLOR = 0xf0e8a0;
 const EYE_COLOR = 0x9fe7d4;
 
 /**
- * TrainingEnemyVisual — an articulated greybox enemy: breathing idle, swaying
+ * TrainingEnemyVisual - an articulated tutorial foe: breathing idle, swaying
  * cloth tatters, glowing eyes, and a pulsing chest weak-point that flares on
  * hit and as HP drops. Driven each frame by hit-flash / death progress.
  */

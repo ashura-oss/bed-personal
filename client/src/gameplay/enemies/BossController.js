@@ -25,8 +25,8 @@ const CAPSULE_HALF_HEIGHT = 0.65;
 /**
  * BossController — the Hollowbound Caravan Guard. A 3-phase boss with an
  * approach → windup → attack → recovery state machine, poise/stagger, and a
- * loop-driven death dissolve. Built from readable greybox primitives (cloak,
- * helm, shield, broken blade, glowing Worldheart wound).
+ * loop-driven death dissolve. Built from generated Hearthmere primitives:
+ * cloak, helm, shield, broken blade, binding runes, and a Worldheart wound.
  */
 export class BossController {
   phase = 1;
@@ -38,6 +38,9 @@ export class BossController {
   attackCD = PHASE1_ATTACK_COOLDOWN;
   pendingAttack = "sweep";
   tmp = new THREE.Vector3();
+  toPlayer = new THREE.Vector3();
+  attackVector = new THREE.Vector3();
+  visualTime = 0;
 
   constructor(scene, rapier, position, callbacks = {}) {
     this.scene = scene;
@@ -56,6 +59,25 @@ export class BossController {
     const darkIronMat = new THREE.MeshStandardMaterial({ color: 0x35323a, roughness: 0.64, metalness: 0.52 });
     const shoulderMat = new THREE.MeshStandardMaterial({ color: 0x4a3820, roughness: 0.65, metalness: 0.5 });
     const brassMat = new THREE.MeshStandardMaterial({ color: 0x7c5a24, roughness: 0.66, metalness: 0.42 });
+    const boneMat = new THREE.MeshStandardMaterial({ color: 0xb8ab8d, roughness: 0.82, metalness: 0.03 });
+    this.bindingRuneMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff8a2a,
+      emissive: 0xff5a18,
+      emissiveIntensity: 1.2,
+      roughness: 0.38,
+      metalness: 0.05,
+    });
+    this.phaseAuraMaterial = new THREE.MeshStandardMaterial({
+      color: 0xff7a22,
+      emissive: 0xff3a14,
+      emissiveIntensity: 1.0,
+      transparent: true,
+      opacity: 0,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      roughness: 0.5,
+      metalness: 0.02,
+    });
     this.bladeMaterial = new THREE.MeshStandardMaterial({ color: 0x5f6870, roughness: 0.46, metalness: 0.74 });
     this.shardMaterial = new THREE.MeshStandardMaterial({
       color: 0xff9b31, emissive: 0xff4a0f, emissiveIntensity: 2.2, roughness: 0.42, metalness: 0.0,
@@ -83,6 +105,23 @@ export class BossController {
     helmCrest.position.set(0, 1.16, 0.0);
     helmCrest.castShadow = true;
 
+    const leftAntler = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.54, 5), boneMat);
+    leftAntler.name = "guard-left-bone-antler";
+    leftAntler.position.set(-0.24, 1.2, 0.03);
+    leftAntler.rotation.z = 0.62;
+    leftAntler.castShadow = true;
+
+    const rightAntler = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.54, 5), boneMat);
+    rightAntler.name = "guard-right-bone-antler";
+    rightAntler.position.set(0.24, 1.2, 0.03);
+    rightAntler.rotation.z = -0.62;
+    rightAntler.castShadow = true;
+
+    const facePlate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.035), brassMat);
+    facePlate.name = "guard-split-visor";
+    facePlate.position.set(0, 0.97, 0.245);
+    facePlate.castShadow = true;
+
     // Shoulder armour plates
     const shoulderGeo = new THREE.BoxGeometry(0.48, 0.24, 0.44);
     const leftShoulder = new THREE.Mesh(shoulderGeo, shoulderMat);
@@ -107,6 +146,21 @@ export class BossController {
     rightArm.rotation.z = 0.18;
     rightArm.castShadow = true;
 
+    const chainLinkGeo = new THREE.TorusGeometry(0.14, 0.018, 5, 10);
+    const chestChainLeft = new THREE.Mesh(chainLinkGeo, darkIronMat);
+    chestChainLeft.name = "guard-chest-chain-left";
+    chestChainLeft.position.set(-0.18, 0.31, 0.45);
+    chestChainLeft.rotation.set(Math.PI / 2, 0.4, 0.82);
+    chestChainLeft.scale.set(1, 0.62, 1);
+    chestChainLeft.castShadow = true;
+
+    const chestChainRight = new THREE.Mesh(chainLinkGeo.clone(), darkIronMat);
+    chestChainRight.name = "guard-chest-chain-right";
+    chestChainRight.position.set(0.22, 0.31, 0.45);
+    chestChainRight.rotation.set(Math.PI / 2, -0.4, -0.82);
+    chestChainRight.scale.set(1, 0.62, 1);
+    chestChainRight.castShadow = true;
+
     const shield = new THREE.Mesh(new THREE.CylinderGeometry(0.46, 0.46, 0.16, 8), darkIronMat);
     shield.name = "guard-caravan-shield";
     shield.position.set(-1.02, 0.08, 0.42);
@@ -119,6 +173,12 @@ export class BossController {
     shieldRim.position.copy(shield.position);
     shieldRim.rotation.copy(shield.rotation);
     shieldRim.castShadow = true;
+
+    const shieldRune = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.5, 0.035), this.bindingRuneMaterial);
+    shieldRune.name = "guard-shield-binding-rune";
+    shieldRune.position.set(-1.08, 0.08, 0.58);
+    shieldRune.rotation.set(0, 0.18, 0.2);
+    shieldRune.castShadow = false;
 
     const blade = new THREE.Mesh(new THREE.BoxGeometry(0.16, 1.42, 0.12), this.bladeMaterial);
     blade.name = "guard-broken-blade";
@@ -146,19 +206,72 @@ export class BossController {
     chestShard.name = "guard-worldheart-wound";
     chestShard.position.set(0.04, 0.24, 0.43);
 
+    const woundCrackGeo = new THREE.BoxGeometry(0.035, 0.38, 0.028);
+    const woundCrackTop = new THREE.Mesh(woundCrackGeo, this.bindingRuneMaterial);
+    woundCrackTop.name = "guard-worldheart-crack-top";
+    woundCrackTop.position.set(0.02, 0.47, 0.435);
+    woundCrackTop.rotation.z = -0.36;
+    woundCrackTop.castShadow = false;
+
+    const woundCrackLow = new THREE.Mesh(woundCrackGeo.clone(), this.bindingRuneMaterial);
+    woundCrackLow.name = "guard-worldheart-crack-low";
+    woundCrackLow.position.set(0.12, 0.02, 0.435);
+    woundCrackLow.rotation.z = 0.44;
+    woundCrackLow.scale.y = 0.72;
+    woundCrackLow.castShadow = false;
+
     // Hollow eye glow
     const eyeGeo = new THREE.SphereGeometry(0.09, 6, 4);
     const eyeMat = new THREE.MeshStandardMaterial({ color: 0x00ffcc, emissive: 0x00ddaa, emissiveIntensity: 3 });
+    this.eyeMaterial = eyeMat;
     const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
     const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
     leftEye.position.set(-0.13, 0.96, 0.25);
     rightEye.position.set(0.13, 0.96, 0.25);
 
+    const cloakStripGeo = new THREE.BoxGeometry(0.24, 0.92, 0.075);
+    const leftCloakStrip = new THREE.Mesh(cloakStripGeo, clothMat);
+    leftCloakStrip.name = "guard-left-torn-cloak-strip";
+    leftCloakStrip.position.set(-0.36, -0.58, -0.5);
+    leftCloakStrip.rotation.set(-0.15, 0.08, 0.08);
+    leftCloakStrip.castShadow = true;
+
+    const rightCloakStrip = new THREE.Mesh(cloakStripGeo.clone(), clothMat);
+    rightCloakStrip.name = "guard-right-torn-cloak-strip";
+    rightCloakStrip.position.set(0.38, -0.6, -0.5);
+    rightCloakStrip.rotation.set(-0.18, -0.08, -0.1);
+    rightCloakStrip.castShadow = true;
+
+    const backSpikeGeo = new THREE.ConeGeometry(0.08, 0.38, 5);
+    const upperBackSpike = new THREE.Mesh(backSpikeGeo, boneMat);
+    upperBackSpike.name = "guard-upper-spine-splinter";
+    upperBackSpike.position.set(0, 0.58, -0.55);
+    upperBackSpike.rotation.x = -1.15;
+    upperBackSpike.castShadow = true;
+
+    const lowerBackSpike = new THREE.Mesh(backSpikeGeo.clone(), boneMat);
+    lowerBackSpike.name = "guard-lower-spine-splinter";
+    lowerBackSpike.position.set(0.1, 0.14, -0.56);
+    lowerBackSpike.rotation.x = -1.05;
+    lowerBackSpike.rotation.z = 0.14;
+    lowerBackSpike.scale.setScalar(0.78);
+    lowerBackSpike.castShadow = true;
+
+    this.phaseAura = new THREE.Mesh(new THREE.TorusGeometry(1.32, 0.045, 8, 48), this.phaseAuraMaterial);
+    this.phaseAura.name = "guard-phase-aura-ring";
+    this.phaseAura.position.set(0, -1.39, 0);
+    this.phaseAura.rotation.x = Math.PI / 2;
+    this.phaseAura.visible = false;
+    this.phaseAura.castShadow = false;
+    this.phaseAura.receiveShadow = false;
+
     this.group = new THREE.Group();
     this.group.add(
-      cloak, this.bodyMesh, waist, head, helmCrest, leftShoulder, rightShoulder,
-      leftArm, rightArm, shield, shieldRim, blade, bladeTip, leftLeg, rightLeg,
-      chestShard, leftEye, rightEye,
+      this.phaseAura,
+      cloak, leftCloakStrip, rightCloakStrip, this.bodyMesh, waist, head, helmCrest, facePlate,
+      leftAntler, rightAntler, leftShoulder, rightShoulder, upperBackSpike, lowerBackSpike,
+      leftArm, rightArm, chestChainLeft, chestChainRight, shield, shieldRim, shieldRune, blade, bladeTip, leftLeg, rightLeg,
+      chestShard, woundCrackTop, woundCrackLow, leftEye, rightEye,
     );
     this.group.position.set(position.x, position.y + CAPSULE_RADIUS + CAPSULE_HALF_HEIGHT, position.z);
     scene.add(this.group);
@@ -251,11 +364,12 @@ export class BossController {
       this.group.scale.setScalar(Math.max(0.02, 1 - progress * 0.98));
       if (this.dissolveTimer <= 0) this.group.visible = false;
     }
+    this.updateVisuals(dt);
     if (this.state === "dead") return;
 
     this.timer -= dt;
 
-    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.group.position);
+    const toPlayer = this.toPlayer.subVectors(playerPos, this.group.position);
     const dist = toPlayer.length();
 
     // Always face the player
@@ -318,16 +432,20 @@ export class BossController {
     this.removePhysicsBody();
 
     this.scene.remove(this.group);
+    const geometries = new Set();
+    const materials = new Set();
     this.group.traverse((child) => {
       if (child instanceof THREE.Mesh) {
-        child.geometry.dispose();
+        geometries.add(child.geometry);
         if (Array.isArray(child.material)) {
-          for (const material of child.material) material.dispose();
+          for (const material of child.material) materials.add(material);
         } else {
-          child.material.dispose();
+          materials.add(child.material);
         }
       }
     });
+    for (const geometry of geometries) geometry.dispose();
+    for (const material of materials) material.dispose();
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
@@ -353,7 +471,7 @@ export class BossController {
   }
 
   fireAttack(playerPos, playerHasIFrames) {
-    const toPlayer = new THREE.Vector3().subVectors(playerPos, this.group.position);
+    const toPlayer = this.attackVector.subVectors(playerPos, this.group.position);
     const dist = toPlayer.length();
 
     let damage = 0;
@@ -374,6 +492,32 @@ export class BossController {
     this.shardMaterial.emissiveIntensity = this.phase === 1 ? 2.2 : this.phase === 2 ? 3.2 : 4.6;
   }
 
+  updateVisuals(dt) {
+    this.visualTime += dt;
+    const pulse = Math.sin(this.visualTime * (this.phase + 2.5)) * 0.5 + 0.5;
+    const auraActive = this.phase > 1 || this.state === "phaseTransition" || this.state === "windup" || this.state === "dead";
+
+    this.phaseAura.visible = auraActive;
+    if (auraActive) {
+      const phaseScale = this.phase === 3 ? 1.18 : this.phase === 2 ? 1.06 : 0.96;
+      const baseOpacity = this.state === "dead" ? 0.46 : this.phase === 3 ? 0.32 : this.phase === 2 ? 0.22 : 0.12;
+      this.phaseAura.rotation.z += dt * (0.45 + this.phase * 0.18);
+      this.phaseAura.scale.setScalar(phaseScale + pulse * 0.045);
+      this.phaseAuraMaterial.opacity = baseOpacity + pulse * 0.08;
+    } else {
+      this.phaseAuraMaterial.opacity = 0;
+    }
+
+    this.bindingRuneMaterial.emissiveIntensity = this.state === "windup"
+      ? 2.2 + pulse * 0.8
+      : this.phase === 3
+        ? 1.8 + pulse * 0.45
+        : this.phase === 2
+          ? 1.35 + pulse * 0.32
+          : 1.0 + pulse * 0.18;
+    this.eyeMaterial.emissiveIntensity = this.phase === 3 ? 4.8 + pulse * 0.8 : this.phase === 2 ? 3.8 + pulse * 0.5 : 3.0;
+  }
+
   enterStagger() {
     this.state = "staggered";
     this.timer = STAGGER_DURATION;
@@ -388,9 +532,12 @@ export class BossController {
     this.timer = 1.8;
     this.poise = STAGGER_POISE;
     this.attackCD = this.phaseAttackCooldown();
-    this.material.color = new THREE.Color(this.phaseColor());
+    this.material.color.setHex(this.phaseColor());
     this.material.emissive.setHex(this.phaseEmissive());
     this.material.emissiveIntensity = this.phaseEmissiveIntensity();
+    this.phaseAuraMaterial.color.setHex(phase === 2 ? 0xff7a22 : 0xff2d5f);
+    this.phaseAuraMaterial.emissive.setHex(phase === 2 ? 0xff3a14 : 0xff1144);
+    this.phaseAuraMaterial.emissiveIntensity = phase === 2 ? 1.2 : 1.7;
     this.shardMaterial.emissiveIntensity = phase === 2 ? 3.2 : 4.6;
     this.callbacks.onPhaseChanged?.(phase, this.combatContext());
     this.callbacks.onHpChanged?.(this.hp, BOSS_MAX_HP, phase);
@@ -402,6 +549,9 @@ export class BossController {
     this.removePhysicsBody();
     this.material.emissive.setHex(0xffd080);
     this.material.emissiveIntensity = 2;
+    this.phaseAuraMaterial.color.setHex(0xffd080);
+    this.phaseAuraMaterial.emissive.setHex(0xff6a20);
+    this.phaseAuraMaterial.emissiveIntensity = 2.2;
     this.callbacks.onDied?.(EMBERS_REWARD, this.combatContext());
   }
 

@@ -74,6 +74,29 @@ export class PrefabLoader {
     return null;
   }
 
+  getHearthlights() {
+    const hearthlights = [];
+
+    for (const [instanceId, instance] of this.instances.entries()) {
+      const instanceHearthlights = instance.hearthlights ?? [];
+      for (let index = 0; index < instanceHearthlights.length; index += 1) {
+        const hearthlight = instanceHearthlights[index];
+        const position = hearthlight?.group?.position ?? null;
+        hearthlights.push(Object.freeze({
+          id: `${instanceId}:hearthlight:${index}`,
+          instanceId,
+          name: formatHearthlightName(instanceId, index),
+          hearthlight,
+          position: position
+            ? Object.freeze({ x: position.x, y: position.y, z: position.z })
+            : null
+        }));
+      }
+    }
+
+    return Object.freeze(hearthlights);
+  }
+
   getBossArenas() {
     const bossArenas = [];
 
@@ -199,6 +222,16 @@ function isActiveBossArena(arena) {
   if (arena.state === "active") return true;
   if (typeof arena.isActive === "function") return arena.isActive();
   return false;
+}
+
+function formatHearthlightName(instanceId, index) {
+  const label = String(instanceId)
+    .split(/[_\-.:]+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
+  return index === 0 ? `${label} Hearthlight` : `${label} Hearthlight ${index + 1}`;
 }
 
 function prefabChunkKey(cx, cz) {

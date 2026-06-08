@@ -147,6 +147,9 @@ describe("NpcSpawner", () => {
     const playerFacing  = { x: 1, y: 0, z: 0 };
     const inputMap      = makeInputMap(false);
 
+    expect(spawner.hasInteractable(playerPos, playerFacing)).toBe(true);
+    expect(spawner.hasInteractable({ x: 8, y: 0, z: 10 }, { x: -1, y: 0, z: 0 })).toBe(false);
+
     spawner.update(0.016, playerPos, playerFacing, inputMap);
 
     const nearby = bus.eventsOf("npc:nearby");
@@ -251,10 +254,12 @@ describe("NpcSpawner", () => {
     // Open dialogue
     spawner.update(0.016, playerPos, playerFacing, makeInputMap(true));
     expect(spawner.activeDialogueNpcId).toBe("npc.tessa");
+    expect(spawner.hasInteractable(playerPos, playerFacing)).toBe(false);
 
     // End dialogue
     spawner.onDialogueEnded("npc.tessa");
     expect(spawner.activeDialogueNpcId).toBeNull();
+    expect(spawner.hasInteractable(playerPos, playerFacing)).toBe(true);
 
     // Interact again — should re-fire
     bus.clear();

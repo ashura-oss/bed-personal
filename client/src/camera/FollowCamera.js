@@ -52,6 +52,7 @@ export class FollowCamera {
   upAxis = new THREE.Vector3(0, 1, 0);
   lockOnTarget = null;
   lockedOn = false;
+  overrideActive = false;
   activePointerId = null;
   lastPointerX = 0;
   lastPointerY = 0;
@@ -98,7 +99,47 @@ export class FollowCamera {
     return this.lockedOn;
   }
 
+  get isOverridden() {
+    return this.overrideActive;
+  }
+
+  beginOverride() {
+    this.overrideActive = true;
+    this.activePointerId = null;
+  }
+
+  setOverridePose({ position, target, fov } = {}) {
+    this.beginOverride();
+
+    if (position) {
+      this.camera.position.set(position.x, position.y, position.z);
+    }
+
+    if (Number.isFinite(fov)) {
+      this.camera.fov = fov;
+      this.camera.updateProjectionMatrix();
+    }
+
+    if (target) {
+      this.camera.lookAt(target.x, target.y, target.z);
+    }
+  }
+
+  clearOverride() {
+    if (!this.overrideActive) return;
+
+    this.overrideActive = false;
+    this.hasVelocitySample = false;
+    this.lastUpdateMs = 0;
+    if (Math.abs(this.camera.fov - this.baseFov) > 0.01) {
+      this.camera.fov = this.baseFov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
   update() {
+    if (this.overrideActive) return;
+
     const dt = this.sampleDeltaSeconds();
     this.sampleFollowVelocity(dt);
     this.composeTargetFraming();

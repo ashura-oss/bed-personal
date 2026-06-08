@@ -11,7 +11,7 @@ const SPRINT_SPEED = 8.0;
 const GRAVITY = -22;
 const DODGE_SPEED = 13;
 const DODGE_DURATION = 0.38;
-const DODGE_IFRAME_RATIO = 0.68; // first 68% of dodge has i-frames
+const DODGE_IFRAME_RATIO = 0.68; // first 68% of dodge grants phase invulnerability
 const DODGE_STAMINA_COST = 25;
 const SPRINT_STAMINA_RATE = 12; // per second while sprinting
 const FLASK_HEAL = 45;
@@ -23,7 +23,7 @@ const SPAWN_HEIGHT = CAPSULE_RADIUS + CAPSULE_HALF_HEIGHT + 0.05;
 
 /**
  * PlayerController — kinematic character (Rapier KCC) with camera-relative
- * movement, sprint, dodge + i-frames, flask healing, gravity, and the
+ * movement, sprint, dodge invulnerability, flask healing, gravity, and the
  * death → respawn loop. Visuals are delegated to PlayerVisual; resource state
  * lives in the injected StaminaSystem / ResourceBars.
  */
@@ -111,10 +111,30 @@ export class PlayerController {
     this.callbacks.onFlaskUsed(this.flaskCharges);
   }
 
+  teleportTo(pos) {
+    const target = {
+      x: pos.x,
+      y: pos.y + SPAWN_HEIGHT,
+      z: pos.z
+    };
+
+    this.velocityY = 0;
+    this.state = "idle";
+    this.hasIFrames = false;
+
+    if (typeof this.body.setTranslation === "function") {
+      this.body.setTranslation(target, true);
+    }
+    this.body.setNextKinematicTranslation(target);
+    this.group.position.set(target.x, target.y, target.z);
+    this.visual.reset();
+    this.visual.update(0, this.state, this.hp.ratio, this.hasIFrames);
+  }
+
   /** Called externally when the player takes damage (from an enemy, trap, etc.). */
   takeDamage(amount) {
     if (!this.isAlive) return;
-    if (this.hasIFrames) return; // i-frames block damage
+    if (this.hasIFrames) return; // phase invulnerability blocks damage
 
     this.hp.damage(amount);
     this.visual.flashDamage();
@@ -288,7 +308,7 @@ export class PlayerController {
       return;
     }
 
-    // i-frames end partway through the dodge
+    // Phase invulnerability ends partway through the dodge.
     const progress = 1 - this.dodgeTimer / DODGE_DURATION;
     this.hasIFrames = progress < DODGE_IFRAME_RATIO;
 

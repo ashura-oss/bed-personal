@@ -1,4 +1,5 @@
 export const HEARTHMERE_QUEST_EFFECTS = Object.freeze({
+  ROAD_STANDS_OFFER: "quest.road_that_still_stands.offer",
   TESSA_GATHER_OFFER: "quest.tessa_gather.offer",
   ALDRIC_HOLLOW_OFFER: "quest.aldric_hollow.offer",
   MARN_SUPPLY_NOTE: "quest.marn_supply.note",
@@ -74,6 +75,56 @@ function freezeQuestDefinition({
 }
 
 export const HEARTHMERE_QUEST_DEFINITIONS = Object.freeze([
+  freezeQuestDefinition({
+    id: "hearthmere.road_that_still_stands",
+    regionId: "hearthmere",
+    title: "The Road That Still Stands",
+    summary: "Restore the Ashfall Road from first shard to first boss so Hearthmere can breathe again.",
+    startEffect: HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER,
+    objectives: [
+      {
+        id: "clear_old_road",
+        type: QUEST_OBJECTIVE_TYPES.KILL_ENEMY,
+        targetId: "hollow_shambler",
+        requiredCount: 3,
+        label: "Clear Hollowborn from the old road"
+      },
+      {
+        id: "recover_caravan_timber",
+        type: QUEST_OBJECTIVE_TYPES.GATHER_ITEM,
+        targetId: "timber",
+        requiredCount: 3,
+        label: "Recover caravan timber"
+      },
+      {
+        id: "recover_iron_fittings",
+        type: QUEST_OBJECTIVE_TYPES.GATHER_ITEM,
+        targetId: "iron_ore",
+        requiredCount: 2,
+        label: "Recover iron fittings"
+      },
+      {
+        id: "forge_hearthlight_hatchet",
+        type: QUEST_OBJECTIVE_TYPES.CRAFT_ITEM,
+        targetId: "hearthlight_hatchet",
+        requiredCount: 1,
+        label: "Forge a Hearthlight Hatchet with Tessa"
+      },
+      {
+        id: "defeat_hollowbound_guard",
+        type: QUEST_OBJECTIVE_TYPES.DEFEAT_BOSS,
+        targetId: "hearthmere.boss.hollowbound_guard",
+        targetAliases: ["Hollowbound Caravan Guard"],
+        requiredCount: 1,
+        label: "Defeat the Hollowbound Caravan Guard"
+      }
+    ],
+    rewardMetadata: {
+      id: "hearthmere.road_that_still_stands.reward",
+      xp: 30
+    },
+    completionText: "The Ashfall Road still stands, and Hearthmere's region map opens at last."
+  }),
   freezeQuestDefinition({
     id: "hearthmere.tessa_gather",
     regionId: "hearthmere",

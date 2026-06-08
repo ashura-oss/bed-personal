@@ -170,7 +170,7 @@ const PREFABS = Object.freeze([
   })
 ]);
 
-// ── NPC spawn points (15) — W-09 NPC system placeholder  (WM-07) ─────────────
+// -- NPC spawn points (15) - authored Hearthmere cast (WM-07) -----------------
 
 const NPC_NAMED = Object.freeze([
   Object.freeze({

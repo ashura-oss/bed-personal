@@ -17,6 +17,7 @@ describe("QuestLog", () => {
 
     expect(questLog.version).toBe(1);
     expect(Object.keys(questLog.quests)).toEqual([
+      "hearthmere.road_that_still_stands",
       "hearthmere.tessa_gather",
       "hearthmere.aldric_hollow",
       "hearthmere.marn_supply",
@@ -28,6 +29,28 @@ describe("QuestLog", () => {
       objectives: {
         gather_timber: { current: 0, requiredCount: 3, complete: false },
         gather_iron_ore: { current: 0, requiredCount: 2, complete: false }
+      }
+    });
+  });
+
+  test("reduces the Act 1 main quest from road cleanup through boss defeat", () => {
+    const questLog = reduceQuestEvents(createQuestLog(), [
+      { type: QUEST_EVENT_TYPES.QUEST_EFFECT, effect: "quest.road_that_still_stands.offer" },
+      { type: QUEST_EVENT_TYPES.ENEMY_DIED, enemyTypeId: "hollow_shambler", count: 3 },
+      { type: QUEST_EVENT_TYPES.GATHERING_HARVESTED, itemId: "timber", count: 3 },
+      { type: QUEST_EVENT_TYPES.GATHERING_HARVESTED, itemId: "iron_ore", count: 2 },
+      { type: QUEST_EVENT_TYPES.CRAFTING_CRAFTED, output: { itemId: "hearthlight_hatchet", count: 1 } },
+      { type: QUEST_EVENT_TYPES.BOSS_DEFEATED, bossId: "hearthmere.boss.hollowbound_guard" }
+    ]);
+
+    expect(questLog.quests["hearthmere.road_that_still_stands"]).toMatchObject({
+      status: QUEST_STATUS.COMPLETED,
+      objectives: {
+        clear_old_road: { current: 3, requiredCount: 3, complete: true },
+        recover_caravan_timber: { current: 3, requiredCount: 3, complete: true },
+        recover_iron_fittings: { current: 2, requiredCount: 2, complete: true },
+        forge_hearthlight_hatchet: { current: 1, requiredCount: 1, complete: true },
+        defeat_hollowbound_guard: { current: 1, requiredCount: 1, complete: true }
       }
     });
   });

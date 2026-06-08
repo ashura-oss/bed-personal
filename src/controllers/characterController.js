@@ -8,7 +8,13 @@ import {
 } from "../models/characterModel.js";
 import { findUserById } from "../models/userModel.js";
 import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
-import { calculateCharacterStats, validateAffinity, validateClassName, validateOrigin } from "../utils/gameRules.js";
+import {
+  calculateCharacterStats,
+  validateAffinity,
+  validateCharacterName,
+  validateClassName,
+  validateOrigin
+} from "../utils/gameRules.js";
 import { createHttpError } from "../utils/httpError.js";
 import { getOptionalString, getRequiredString } from "../utils/validate.js";
 
@@ -76,6 +82,7 @@ export async function postCharacter(req, res, next) {
     }
 
     assertOwnsUserResource(req, userId);
+    validateCharacterName(characterName);
 
     const stats = calculateCharacterStats({ origin, className, affinity });
     const character = await createCharacter({
@@ -138,6 +145,7 @@ function buildCharacterUpdates(body, existingCharacter) {
   const affinity = getOptionalString(body, "affinity");
 
   if (characterName !== undefined) {
+    validateCharacterName(characterName);
     updates.characterName = characterName;
   }
 

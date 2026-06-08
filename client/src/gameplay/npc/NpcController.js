@@ -57,7 +57,7 @@ export class NpcController {
   /**
    * Per-frame update. If the player is within FACE_RADIUS, rotate to face them.
    *
-   * @param {number} _dt  — delta time (unused in greybox; accepted for API consistency)
+   * @param {number} _dt - delta time (accepted for API consistency)
    * @param {{ x: number, y: number, z: number }} playerPosition
    */
   update(_dt, playerPosition) {

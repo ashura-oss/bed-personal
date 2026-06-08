@@ -44,8 +44,8 @@ const HEAVY_CONFIG = {
  * CombatSystem — manages attack timing (startup / active / recovery) and
  * hit detection.
  *
- * Hit detection: simple distance + dot-product check — no Rapier shape cast
- * needed for greybox. Good enough to feel the "commitment" of attacks.
+ * Hit detection: simple distance + dot-product check, tuned to preserve
+ * attack commitment without requiring a Rapier shape cast each swing.
  */
 export class CombatSystem {
   phase = "none";

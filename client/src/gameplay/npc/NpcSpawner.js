@@ -126,36 +126,14 @@ export class NpcSpawner {
    * @param {object} inputMap  — InputMap instance
    */
   update(dt, playerPosition, playerFacing, inputMap) {
-    const px = playerPosition.x;
-    const pz = playerPosition.z;
-    const r2 = INTERACT_RADIUS * INTERACT_RADIUS;
-
-    let closest = null;
-    let closestDist2 = Infinity;
-
-    // Update all controllers + visuals, then proximity-scan
     for (const npcs of this._npcsByChunk.values()) {
       for (const { controller, visual } of npcs) {
         controller.update(dt, playerPosition);
         visual.update(dt);
-
-        const dx = controller.position.x - px;
-        const dz = controller.position.z - pz;
-        const dist2 = dx * dx + dz * dz;
-
-        if (dist2 > r2) continue;
-
-        // Dot-product facing check
-        const len = Math.sqrt(dist2) || 1;
-        const dot = (dx / len) * playerFacing.x + (dz / len) * playerFacing.z;
-        if (dot < FACING_DOT_MIN) continue;
-
-        if (dist2 < closestDist2) {
-          closestDist2 = dist2;
-          closest = { controller, visual };
-        }
       }
     }
+
+    const closest = this._findClosestInteractableNpc(playerPosition, playerFacing);
 
     // Proximity change events + highlight
     const newNearbyId = closest ? closest.controller.id : null;
@@ -192,6 +170,11 @@ export class NpcSpawner {
         dialogueId: def.dialogueId
       });
     }
+  }
+
+  hasInteractable(playerPosition, playerFacing) {
+    return this._activeDialogueNpcId === null
+      && this._findClosestInteractableNpc(playerPosition, playerFacing) !== null;
   }
 
   // ── Dialogue lifecycle ────────────────────────────────────────────────────
@@ -236,5 +219,35 @@ export class NpcSpawner {
         }
       }
     }
+  }
+
+  _findClosestInteractableNpc(playerPosition, playerFacing) {
+    const px = playerPosition.x;
+    const pz = playerPosition.z;
+    const r2 = INTERACT_RADIUS * INTERACT_RADIUS;
+
+    let closest = null;
+    let closestDist2 = Infinity;
+
+    for (const npcs of this._npcsByChunk.values()) {
+      for (const { controller, visual } of npcs) {
+        const dx = controller.position.x - px;
+        const dz = controller.position.z - pz;
+        const dist2 = dx * dx + dz * dz;
+
+        if (dist2 > r2) continue;
+
+        const len = Math.sqrt(dist2) || 1;
+        const dot = (dx / len) * playerFacing.x + (dz / len) * playerFacing.z;
+        if (dot < FACING_DOT_MIN) continue;
+
+        if (dist2 < closestDist2) {
+          closestDist2 = dist2;
+          closest = { controller, visual };
+        }
+      }
+    }
+
+    return closest;
   }
 }

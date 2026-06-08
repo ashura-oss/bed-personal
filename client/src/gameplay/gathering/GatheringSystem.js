@@ -137,35 +137,7 @@ export class GatheringSystem {
    * @param {object} inputMap  — InputMap instance (isJustPressed)
    */
   update(playerPosition, playerFacing, inputMap) {
-    const px = playerPosition.x;
-    const pz = playerPosition.z;
-    const r2 = INTERACT_RADIUS * INTERACT_RADIUS;
-
-    let closest = null;
-    let closestDist2 = Infinity;
-
-    for (const nodes of this._nodesByChunk.values()) {
-      for (const node of nodes) {
-        if (node.isDepleted) continue;
-
-        const { x: nx, z: nz } = node.position;
-        const dx = nx - px;
-        const dz = nz - pz;
-        const dist2 = dx * dx + dz * dz;
-
-        if (dist2 > r2) continue;
-
-        // Dot-product facing check (ignore Y component)
-        const len = Math.sqrt(dist2) || 1;
-        const dot = (dx / len) * playerFacing.x + (dz / len) * playerFacing.z;
-        if (dot < FACING_DOT_MIN) continue;
-
-        if (dist2 < closestDist2) {
-          closestDist2 = dist2;
-          closest = node;
-        }
-      }
-    }
+    const closest = this._findClosestInteractableNode(playerPosition, playerFacing);
 
     // Emit proximity change events
     const newNearbyId = closest ? closest.id : null;
@@ -219,6 +191,10 @@ export class GatheringSystem {
         }
       }
     }
+  }
+
+  hasInteractable(playerPosition, playerFacing) {
+    return this._findClosestInteractableNode(playerPosition, playerFacing) !== null;
   }
 
   // ── Resource depletion persistence ───────────────────────────────────────
@@ -284,6 +260,39 @@ export class GatheringSystem {
     while (!node.isDepleted) {
       node.harvest();
     }
+  }
+
+  _findClosestInteractableNode(playerPosition, playerFacing) {
+    const px = playerPosition.x;
+    const pz = playerPosition.z;
+    const r2 = INTERACT_RADIUS * INTERACT_RADIUS;
+
+    let closest = null;
+    let closestDist2 = Infinity;
+
+    for (const nodes of this._nodesByChunk.values()) {
+      for (const node of nodes) {
+        if (node.isDepleted) continue;
+
+        const { x: nx, z: nz } = node.position;
+        const dx = nx - px;
+        const dz = nz - pz;
+        const dist2 = dx * dx + dz * dz;
+
+        if (dist2 > r2) continue;
+
+        const len = Math.sqrt(dist2) || 1;
+        const dot = (dx / len) * playerFacing.x + (dz / len) * playerFacing.z;
+        if (dot < FACING_DOT_MIN) continue;
+
+        if (dist2 < closestDist2) {
+          closestDist2 = dist2;
+          closest = node;
+        }
+      }
+    }
+
+    return closest;
   }
 
   _applyPersistedDepletionToLoadedNodes() {

@@ -1,6 +1,12 @@
 import * as THREE from "three";
 import { createBossArena } from "../../BossArena.js";
 import { HEARTHMERE_BOSS_ARENA } from "../../regions/hearthmere/placements.js";
+import {
+  HEARTHMERE_PALETTE,
+  addMesh,
+  createArtTracker,
+  makeMaterialSet
+} from "../../art/HearthmereArtKit.js";
 
 export const HEARTHMERE_CRYPT_PREFAB = Object.freeze({
   id: "hearthmere_crypt",
@@ -28,158 +34,12 @@ export function buildHearthmere_crypt({ scene, rapier, origin, callbacks = {}, a
     definition: bossEncounter
   });
 
-  const stoneMaterial = new THREE.MeshStandardMaterial({
-    color: 0x504848,
-    roughness: 0.96,
-    metalness: 0.03
-  });
-  const darkDoorMaterial = new THREE.MeshStandardMaterial({
-    color: 0x282020,
-    roughness: 0.98,
-    metalness: 0.05
-  });
-  const flagstoneMaterial = new THREE.MeshStandardMaterial({
-    color: 0x444040,
-    roughness: 0.94,
-    metalness: 0.02
-  });
-  const plinthMaterial = new THREE.MeshStandardMaterial({
-    color: 0x3c3838,
-    roughness: 0.97,
-    metalness: 0.02
-  });
-  const markerMaterial = new THREE.MeshStandardMaterial({
-    color: 0x1e1414,
-    roughness: 0.92,
-    metalness: 0.06
-  });
-
-  // Flagstone floor — flat plane slightly above terrain
-  const floorGeo = new THREE.PlaneGeometry(14, 10);
-  const floor = new THREE.Mesh(floorGeo, flagstoneMaterial);
-  floor.name = "crypt-flagstone-floor";
-  floor.rotation.x = -Math.PI / 2;
-  floor.position.set(0, 0.04, 2);
-  floor.receiveShadow = true;
-  group.add(floor);
-
-  // Left pillar of doorframe — 1.5 × 7 × 1 box
-  const pillarGeo = new THREE.BoxGeometry(1.5, 7, 1);
-
-  const pillarLeft = new THREE.Mesh(pillarGeo, stoneMaterial);
-  pillarLeft.name = "crypt-pillar-left";
-  pillarLeft.position.set(-2.5, 3.5, 0);
-  pillarLeft.castShadow = true;
-  pillarLeft.receiveShadow = true;
-  group.add(pillarLeft);
-
-  const pillarRight = new THREE.Mesh(pillarGeo, stoneMaterial);
-  pillarRight.name = "crypt-pillar-right";
-  pillarRight.position.set(2.5, 3.5, 0);
-  pillarRight.castShadow = true;
-  pillarRight.receiveShadow = true;
-  group.add(pillarRight);
-
-  // Keystone arch blocks — 3 wedge-ish boxes forming a rough arch
-  const archCentreGeo = new THREE.BoxGeometry(2.2, 1.2, 1.2);
-  const archCentre = new THREE.Mesh(archCentreGeo, stoneMaterial);
-  archCentre.name = "crypt-arch-keystone";
-  archCentre.position.set(0, 7.6, 0);
-  archCentre.castShadow = true;
-  group.add(archCentre);
-
-  const archLeftGeo = new THREE.BoxGeometry(1.5, 1.0, 1.1);
-  const archLeft = new THREE.Mesh(archLeftGeo, stoneMaterial);
-  archLeft.position.set(-1.75, 7.1, 0);
-  archLeft.rotation.z = 0.25;
-  archLeft.castShadow = true;
-  group.add(archLeft);
-
-  const archRightGeo = new THREE.BoxGeometry(1.5, 1.0, 1.1);
-  const archRight = new THREE.Mesh(archRightGeo, stoneMaterial);
-  archRight.position.set(1.75, 7.1, 0);
-  archRight.rotation.z = -0.25;
-  archRight.castShadow = true;
-  group.add(archRight);
-
-  // Heavy sealed door — 4u wide × 6u tall × 0.5u deep
-  const doorGeo = new THREE.BoxGeometry(4, 6, 0.5);
-  const sealedDoor = new THREE.Mesh(doorGeo, darkDoorMaterial);
-  sealedDoor.name = "crypt-sealed-door";
-  sealedDoor.position.set(0, 3, 0.1);
-  sealedDoor.castShadow = true;
-  group.add(sealedDoor);
-
-  // Door detail — iron band strips (2 horizontal boxes across the door)
-  const bandMat = new THREE.MeshStandardMaterial({ color: 0x181010, roughness: 0.85, metalness: 0.3 });
-  for (const bandY of [1.5, 4.5]) {
-    const bandGeo = new THREE.BoxGeometry(4.1, 0.22, 0.55);
-    const band = new THREE.Mesh(bandGeo, bandMat);
-    band.position.set(0, bandY, 0.08);
-    group.add(band);
-  }
-
-  // Carved steps descending — 3 platforms, each slightly lower and further back
-  const stepData = [
-    { z: 2.5, y: -0.1, w: 9, d: 1.5 },
-    { z: 4.0, y: -0.35, w: 9, d: 1.5 },
-    { z: 5.5, y: -0.6, w: 9, d: 1.5 }
-  ];
-  for (const step of stepData) {
-    const stepGeo = new THREE.BoxGeometry(step.w, 0.25, step.d);
-    const stepMesh = new THREE.Mesh(stepGeo, flagstoneMaterial);
-    stepMesh.position.set(0, step.y, step.z);
-    stepMesh.receiveShadow = true;
-    group.add(stepMesh);
-  }
-
-  // Skull/rune marker plinths — cylinder base flanking the door
-  const plinthCylGeo = new THREE.CylinderGeometry(0.4, 0.5, 0.9, 8);
-
-  const plinthLeft = new THREE.Mesh(plinthCylGeo, plinthMaterial);
-  plinthLeft.name = "crypt-plinth-left";
-  plinthLeft.position.set(-5, 0.45, 0.5);
-  plinthLeft.castShadow = true;
-  group.add(plinthLeft);
-
-  const plinthRight = new THREE.Mesh(plinthCylGeo, plinthMaterial);
-  plinthRight.name = "crypt-plinth-right";
-  plinthRight.position.set(5, 0.45, 0.5);
-  plinthRight.castShadow = true;
-  group.add(plinthRight);
-
-  // Marker boxes on top of plinths — represent carved rune stones / skulls
-  const markerGeo = new THREE.BoxGeometry(0.6, 0.6, 0.5);
-
-  const markerLeft = new THREE.Mesh(markerGeo, markerMaterial);
-  markerLeft.name = "crypt-marker-left";
-  markerLeft.position.set(-5, 1.2, 0.5);
-  markerLeft.rotation.y = 0.15;
-  markerLeft.castShadow = true;
-  group.add(markerLeft);
-
-  const markerRight = new THREE.Mesh(markerGeo, markerMaterial);
-  markerRight.name = "crypt-marker-right";
-  markerRight.position.set(5, 1.2, 0.5);
-  markerRight.rotation.y = -0.12;
-  markerRight.castShadow = true;
-  group.add(markerRight);
-
-  // Flanking rubble — rough stone chunks leaning against pillars
-  const rubbleData = [
-    [-3.8, 0.25, -0.5, 0.8, 0.5, 0.6],
-    [3.6, 0.2, -0.3, 0.7, 0.4, 0.55],
-    [-4.5, 0.18, 1.2, 0.6, 0.35, 0.5],
-    [4.2, 0.22, 1.0, 0.65, 0.4, 0.52]
-  ];
-  for (const [rx, ry, rz, rw, rh, rd] of rubbleData) {
-    const rGeo = new THREE.BoxGeometry(rw, rh, rd);
-    const rubble = new THREE.Mesh(rGeo, stoneMaterial);
-    rubble.position.set(rx, ry, rz);
-    rubble.rotation.y = rx * 0.22;
-    rubble.castShadow = true;
-    group.add(rubble);
-  }
+  const tracker = createArtTracker();
+  const materials = makeCryptMaterials(tracker);
+  addCryptFlagstoneApproach(group, tracker, materials);
+  addSealedCryptFacade(group, tracker, materials);
+  addCryptRunePlinths(group, tracker, materials);
+  addCryptRubbleAndWorldheart(group, tracker, materials);
 
   scene.add(group);
 
@@ -199,17 +59,326 @@ export function buildHearthmere_crypt({ scene, rapier, origin, callbacks = {}, a
     bossEncounter,
     bossArenas: bossArena ? [bossArena] : [],
     update(dt, playerPosition, _interactJustPressed, runtime = {}) {
+      if (runtime.controlLocked && bossArena?.active) return;
+
       bossArena?.update(dt, playerPosition, Boolean(runtime.playerHasIframes));
     },
     isPlayerNearInteractable() { return false; },
     dispose() {
       bossArena?.dispose();
-      disposeGroup(scene, group);
+      scene.remove(group);
+      tracker.dispose();
       for (const body of bodies) {
         rapier?.world?.removeRigidBody(body);
       }
     }
   };
+}
+
+function makeCryptMaterials(tracker) {
+  const base = makeMaterialSet(tracker, {
+    ash: 0x4e4943,
+    soot: 0x151111,
+    mud: 0x2a2422,
+    cloth: 0x27282d,
+    bone: 0xc9bfa7,
+    iron: 0x26292b,
+    tarnishedIron: 0x3c4242,
+    ember: HEARTHMERE_PALETTE.ember,
+    emberGold: HEARTHMERE_PALETTE.emberGold,
+    focusBlue: 0x6fd2cc
+  });
+
+  return {
+    ...base,
+    cryptStone: tracker.material({ color: 0x504848, roughness: 0.97, metalness: 0.03 }),
+    darkDoor: tracker.material({ color: 0x221b1b, roughness: 0.98, metalness: 0.05 }),
+    flagstone: tracker.material({ color: 0x444040, roughness: 0.95, metalness: 0.02 }),
+    plinth: tracker.material({ color: 0x3c3838, roughness: 0.97, metalness: 0.02 }),
+    runeGlow: tracker.material({
+      color: HEARTHMERE_PALETTE.emberGold,
+      emissive: HEARTHMERE_PALETTE.ember,
+      emissiveIntensity: 1.25,
+      roughness: 0.38,
+      metalness: 0.04
+    }),
+    worldheartGlow: tracker.material({
+      color: 0x84e7dc,
+      emissive: 0x74d6cc,
+      emissiveIntensity: 0.95,
+      roughness: 0.32,
+      metalness: 0.08
+    })
+  };
+}
+
+function addCryptFlagstoneApproach(group, tracker, materials) {
+  addMesh(group, tracker, new THREE.PlaneGeometry(15, 10.5), materials.flagstone, {
+    position: [0, 0.035, 2.1],
+    rotation: [-Math.PI / 2, 0, 0],
+    receiveShadow: true,
+    castShadow: false,
+    name: "crypt-flagstone-floor"
+  });
+
+  const slabGeo = new THREE.BoxGeometry(1.6, 0.08, 1.15);
+  const slabs = [
+    [-5.4, 1.95, 0.9, -0.06],
+    [-3.5, 2.1, 1.05, 0.04],
+    [-1.55, 2.0, 0.92, -0.03],
+    [0.55, 2.12, 1.12, 0.02],
+    [2.65, 1.95, 0.86, 0.06],
+    [4.85, 2.05, 1.0, -0.08],
+    [-4.6, 3.75, 0.72, 0.12],
+    [-2.3, 3.95, 1.0, -0.1],
+    [0.0, 3.85, 0.82, 0.04],
+    [2.15, 4.1, 1.08, 0.08],
+    [4.45, 3.8, 0.78, -0.12]
+  ];
+
+  for (const [x, z, scale, rot] of slabs) {
+    addMesh(group, tracker, slabGeo.clone(), materials.flagstone, {
+      position: [x, 0.09, z],
+      rotation: [0, rot, 0],
+      scale: [scale, 1, 0.82 + scale * 0.15],
+      receiveShadow: true,
+      castShadow: false,
+      name: "broken-crypt-flagstone"
+    });
+  }
+
+  const stepData = [
+    { z: 2.5, y: -0.1, w: 9.2, d: 1.5 },
+    { z: 4.0, y: -0.35, w: 9.0, d: 1.5 },
+    { z: 5.5, y: -0.6, w: 8.8, d: 1.5 }
+  ];
+
+  for (const step of stepData) {
+    addMesh(group, tracker, new THREE.BoxGeometry(step.w, 0.25, step.d), materials.flagstone, {
+      position: [0, step.y, step.z],
+      receiveShadow: true,
+      castShadow: false,
+      name: "crypt-descending-carved-step"
+    });
+  }
+
+  const crackGeo = new THREE.BoxGeometry(0.05, 0.025, 1.15);
+  for (const [x, z, rot] of [
+    [-3.4, 0.78, 0.35],
+    [-0.45, 2.95, -0.25],
+    [2.85, 1.1, 0.12],
+    [4.8, 4.25, -0.4]
+  ]) {
+    addMesh(group, tracker, crackGeo.clone(), materials.soot, {
+      position: [x, 0.13, z],
+      rotation: [0, rot, 0],
+      castShadow: false,
+      receiveShadow: false,
+      name: "crypt-flagstone-black-crack"
+    });
+  }
+}
+
+function addSealedCryptFacade(group, tracker, materials) {
+  addMesh(group, tracker, new THREE.BoxGeometry(1.5, 7, 1), materials.cryptStone, {
+    position: [-2.5, 3.5, 0],
+    name: "crypt-pillar-left"
+  });
+  addMesh(group, tracker, new THREE.BoxGeometry(1.5, 7, 1), materials.cryptStone, {
+    position: [2.5, 3.5, 0],
+    name: "crypt-pillar-right"
+  });
+
+  const pillarChipGeo = new THREE.BoxGeometry(0.4, 0.18, 0.08);
+  for (const [x, y, side, rot] of [
+    [-3.26, 2.1, -1, -0.12],
+    [-3.26, 4.9, -1, 0.16],
+    [3.26, 1.6, 1, 0.1],
+    [3.26, 5.4, 1, -0.18]
+  ]) {
+    addMesh(group, tracker, pillarChipGeo.clone(), materials.soot, {
+      position: [x, y, 0.54],
+      rotation: [0, 0, rot * side],
+      castShadow: false,
+      receiveShadow: false,
+      name: "chiseled-pillar-shadow-cut"
+    });
+  }
+
+  const archBlocks = [
+    [0, 7.6, 0, 2.25, 1.2, 1.2, 0],
+    [-1.75, 7.1, 0, 1.5, 1.0, 1.1, 0.25],
+    [1.75, 7.1, 0, 1.5, 1.0, 1.1, -0.25],
+    [-2.8, 6.45, 0, 1.0, 0.8, 1.0, 0.48],
+    [2.8, 6.45, 0, 1.0, 0.8, 1.0, -0.48]
+  ];
+
+  for (const [x, y, z, w, h, d, rz] of archBlocks) {
+    addMesh(group, tracker, new THREE.BoxGeometry(w, h, d), materials.cryptStone, {
+      position: [x, y, z],
+      rotation: [0, 0, rz],
+      name: x === 0 ? "crypt-arch-keystone" : "crypt-arch-voussoir-stone"
+    });
+  }
+
+  addMesh(group, tracker, new THREE.BoxGeometry(4, 6, 0.5), materials.darkDoor, {
+    position: [0, 3, 0.1],
+    name: "crypt-sealed-door"
+  });
+
+  for (const [x, name] of [
+    [-1.08, "left-carved-door-slab"],
+    [0, "center-carved-door-slab"],
+    [1.08, "right-carved-door-slab"]
+  ]) {
+    addMesh(group, tracker, new THREE.BoxGeometry(0.72, 5.55, 0.08), materials.soot, {
+      position: [x, 3, 0.39],
+      castShadow: false,
+      receiveShadow: false,
+      name
+    });
+  }
+
+  for (const bandY of [1.5, 3.02, 4.5]) {
+    addMesh(group, tracker, new THREE.BoxGeometry(4.18, 0.22, 0.58), materials.iron, {
+      position: [0, bandY, 0.05],
+      name: "crypt-door-black-iron-band"
+    });
+  }
+
+  addMesh(group, tracker, new THREE.CylinderGeometry(0.34, 0.42, 0.14, 10), materials.runeGlow, {
+    position: [0, 3.02, 0.48],
+    rotation: [Math.PI / 2, 0, 0],
+    castShadow: false,
+    receiveShadow: false,
+    name: "sealed-door-worldheart-ember-sigil"
+  });
+
+  const runeGeo = new THREE.BoxGeometry(0.045, 0.42, 0.035);
+  for (const [x, y, rz] of [
+    [-1.55, 2.35, -0.28],
+    [-0.85, 4.02, 0.22],
+    [0.9, 2.18, -0.14],
+    [1.48, 4.0, 0.3],
+    [0, 5.2, 0]
+  ]) {
+    addMesh(group, tracker, runeGeo.clone(), materials.runeGlow, {
+      position: [x, y, 0.48],
+      rotation: [0, 0, rz],
+      castShadow: false,
+      receiveShadow: false,
+      name: "crypt-door-glowing-rune-cut"
+    });
+  }
+}
+
+function addCryptRunePlinths(group, tracker, materials) {
+  for (const [x, side, ry] of [
+    [-5, -1, 0.15],
+    [5, 1, -0.12]
+  ]) {
+    addMesh(group, tracker, new THREE.CylinderGeometry(0.42, 0.55, 0.9, 8), materials.plinth, {
+      position: [x, 0.45, 0.5],
+      rotation: [0, ry, 0],
+      name: side < 0 ? "crypt-plinth-left" : "crypt-plinth-right"
+    });
+    addMesh(group, tracker, new THREE.BoxGeometry(0.72, 0.42, 0.5), materials.cryptStone, {
+      position: [x, 1.05, 0.5],
+      rotation: [0, ry, 0],
+      name: "crypt-rune-plinth-capstone"
+    });
+    addMesh(group, tracker, new THREE.BoxGeometry(0.04, 0.32, 0.035), materials.runeGlow, {
+      position: [x + side * 0.12, 1.08, 0.78],
+      rotation: [0.2, 0, side * 0.28],
+      castShadow: false,
+      receiveShadow: false,
+      name: "plinth-active-rune-mark"
+    });
+
+    addCryptSkull(group, tracker, materials, {
+      x: x - side * 0.12,
+      y: 1.42,
+      z: 0.46,
+      rotationY: ry + side * 0.28,
+      name: side < 0 ? "crypt-skull-marker-left" : "crypt-skull-marker-right"
+    });
+  }
+}
+
+function addCryptSkull(group, tracker, materials, { x, y, z, rotationY, name }) {
+  addMesh(group, tracker, new THREE.SphereGeometry(0.24, 10, 8), materials.bone, {
+    position: [x, y, z],
+    rotation: [0.08, rotationY, 0],
+    scale: [0.82, 1, 0.72],
+    name
+  });
+  for (const eyeX of [-0.075, 0.075]) {
+    addMesh(group, tracker, new THREE.BoxGeometry(0.05, 0.05, 0.025), materials.soot, {
+      position: [x + eyeX, y + 0.03, z + 0.18],
+      rotation: [0, rotationY, 0],
+      castShadow: false,
+      receiveShadow: false,
+      name: "crypt-skull-hollow-eye"
+    });
+  }
+  addMesh(group, tracker, new THREE.BoxGeometry(0.18, 0.08, 0.05), materials.bone, {
+    position: [x, y - 0.22, z + 0.03],
+    rotation: [0, rotationY, 0],
+    scale: [0.82, 1, 0.72],
+    name: "crypt-skull-jawbone"
+  });
+}
+
+function addCryptRubbleAndWorldheart(group, tracker, materials) {
+  const rubbleData = [
+    [-3.8, 0.25, -0.5, 0.8, 0.5, 0.6, -0.5],
+    [3.6, 0.2, -0.3, 0.7, 0.4, 0.55, 0.42],
+    [-4.5, 0.18, 1.2, 0.6, 0.35, 0.5, 0.2],
+    [4.2, 0.22, 1.0, 0.65, 0.4, 0.52, -0.3],
+    [-5.7, 0.16, 2.2, 0.5, 0.32, 0.46, 0.8],
+    [5.55, 0.14, 2.35, 0.48, 0.28, 0.42, -0.75]
+  ];
+
+  for (const [rx, ry, rz, rw, rh, rd, rot] of rubbleData) {
+    addMesh(group, tracker, new THREE.BoxGeometry(rw, rh, rd), materials.cryptStone, {
+      position: [rx, ry, rz],
+      rotation: [0.08, rot, -0.06],
+      name: "crypt-leaning-rubble-block"
+    });
+  }
+
+  const shardGeo = new THREE.ConeGeometry(0.12, 0.55, 5);
+  for (const [x, y, z, scale, material, name] of [
+    [-0.72, 0.26, 1.05, 0.72, materials.runeGlow, "worldheart-ember-shard"],
+    [0.82, 0.22, 1.35, 0.58, materials.worldheartGlow, "worldheart-focus-shard"],
+    [0.15, 0.2, 0.72, 0.46, materials.runeGlow, "worldheart-ember-shard"]
+  ]) {
+    addMesh(group, tracker, shardGeo.clone(), material, {
+      position: [x, y, z],
+      rotation: [0.42, x * 0.6, z * 0.4],
+      scale: [scale, scale, scale],
+      castShadow: false,
+      receiveShadow: false,
+      name
+    });
+  }
+
+  const emberGeo = new THREE.DodecahedronGeometry(0.07, 0);
+  for (const [x, z, s] of [
+    [-1.2, 1.75, 0.8],
+    [1.15, 1.9, 0.65],
+    [-4.8, 0.95, 0.55],
+    [4.65, 0.9, 0.52]
+  ]) {
+    addMesh(group, tracker, emberGeo.clone(), materials.runeGlow, {
+      position: [x, 0.15, z],
+      rotation: [0.2, x, z],
+      scale: [s, s * 0.65, s],
+      castShadow: false,
+      receiveShadow: false,
+      name: "crypt-smoldering-ember-detail"
+    });
+  }
 }
 
 function createCryptBossArena({ scene, rapier, origin, callbacks, definition }) {
@@ -342,20 +511,4 @@ function createStaticColliders(rapier, origin) {
   }
 
   return bodies;
-}
-
-function disposeGroup(scene, group) {
-  const geometries = new Set();
-  const materials = new Set();
-  scene.remove(group);
-  group.traverse((child) => {
-    if (child.geometry) geometries.add(child.geometry);
-    if (Array.isArray(child.material)) {
-      for (const mat of child.material) materials.add(mat);
-    } else if (child.material) {
-      materials.add(child.material);
-    }
-  });
-  for (const geo of geometries) geo.dispose();
-  for (const mat of materials) mat.dispose();
 }

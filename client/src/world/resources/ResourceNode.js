@@ -1,10 +1,7 @@
-import * as THREE from "three";
+import { createResourceNodeVisual, setObjectOpacity } from "../art/HearthmereArtKit.js";
 
 /**
  * ResourceNode — a single harvestable node in the world.
- *
- * Greybox: BoxGeometry for wood, SphereGeometry for ore, CylinderGeometry
- * for herb (and all other types). No textures, no loaded assets.
  *
  * Owns its own Rapier fixed-cuboid collider so the player's kinematic character
  * controller is blocked by it (and it can be cleaned up on unload without a
@@ -15,28 +12,6 @@ const DEPLETED_OPACITY = 0.25;
 const INTERACT_HALF_EXTENTS = { x: 0.5, y: 0.8, z: 0.5 };
 
 let _nextNodeId = 1;
-
-function buildGeometry(meshType) {
-  switch (meshType) {
-    case "box":
-      return new THREE.BoxGeometry(0.6, 1.6, 0.6);
-    case "sphere":
-      return new THREE.SphereGeometry(0.55, 8, 6);
-    case "cylinder":
-      return new THREE.CylinderGeometry(0.18, 0.22, 0.7, 7);
-    default:
-      return new THREE.BoxGeometry(0.6, 1.2, 0.6);
-  }
-}
-
-function getVisualHalfHeight(geometry) {
-  const params = geometry.parameters ?? {};
-
-  if (typeof params.height === "number") return params.height / 2;
-  if (typeof params.radius === "number") return params.radius;
-
-  return 0.6;
-}
 
 export class ResourceNode {
   constructor({ scene, rapier, worldX, worldZ, heightAt, definition }) {
@@ -49,23 +24,12 @@ export class ResourceNode {
     this._hitsRemaining = definition.hitPoints;
     this._depleted = false;
 
-    // ── Visual mesh ────────────────────────────────────────────────────────
+    // ── Generated visual ───────────────────────────────────────────────────
     const y = heightAt(worldX, worldZ);
-    const geometry = buildGeometry(definition.meshType);
-    const material = new THREE.MeshStandardMaterial({
-      color: definition.meshColor,
-      roughness: 0.88,
-      metalness: 0.04,
-      transparent: true,
-      opacity: 1
-    });
-    this._mesh = new THREE.Mesh(geometry, material);
-
-    // Centre the mesh so its base sits on the terrain surface
-    this._mesh.position.set(worldX, y + getVisualHalfHeight(geometry), worldZ);
-    this._mesh.castShadow = true;
-    this._mesh.receiveShadow = false;
-    scene.add(this._mesh);
+    this._visual = createResourceNodeVisual(definition);
+    this._visualRoot = this._visual.root;
+    this._visualRoot.position.set(worldX, y, worldZ);
+    scene.add(this._visualRoot);
 
     // ── Physics collider ──────────────────────────────────────────────────
     const bodyDesc = rapier.module.RigidBodyDesc.fixed()
@@ -97,7 +61,7 @@ export class ResourceNode {
     if (this._hitsRemaining <= 0) {
       this._hitsRemaining = 0;
       this._depleted = true;
-      this._mesh.material.opacity = DEPLETED_OPACITY;
+      setObjectOpacity(this._visualRoot, DEPLETED_OPACITY);
       // Disable the collider so the player can walk through the stump
       this._collider.setSensor(true);
     }
@@ -111,7 +75,7 @@ export class ResourceNode {
   respawn() {
     this._hitsRemaining = this._definition.hitPoints;
     this._depleted = false;
-    this._mesh.material.opacity = 1;
+    setObjectOpacity(this._visualRoot, 1);
     this._collider.setSensor(false);
   }
 
@@ -120,9 +84,8 @@ export class ResourceNode {
    * Must be called when the owning chunk is unloaded.
    */
   dispose() {
-    this._scene.remove(this._mesh);
-    this._mesh.geometry.dispose();
-    this._mesh.material.dispose();
+    this._scene.remove(this._visualRoot);
+    this._visual.dispose();
     this._rapier.world.removeRigidBody(this._body);
   }
 

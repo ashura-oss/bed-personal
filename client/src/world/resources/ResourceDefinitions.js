@@ -2,9 +2,11 @@
  * ResourceDefinitions — authored resource tables keyed by world biome.
  *
  * Each entry describes one harvestable resource type: which biomes it appears
- * in, what greybox mesh to use, how many hits to deplete, and what items drop.
+ * in, which generated visual profile to use, how many hits to deplete, and
+ * what items drop.
  *
- * Pure data — no Three.js, no DOM. Fully Jest-testable.
+ * Pure data — no Three.js, no DOM. Fully Jest-testable. The legacy mesh
+ * fields remain as compact art-profile hints for generated visuals and tests.
  */
 
 export const RESOURCE_DEFINITIONS = Object.freeze([

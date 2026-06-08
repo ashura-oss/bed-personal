@@ -31,6 +31,48 @@ function calculateLevelFromXp(xp) {
   return Math.floor(normalizeNonNegativeInteger(xp) / 100) + 1;
 }
 
+function buildAbilityQuery(filters = {}) {
+  const params = [];
+
+  for (const key of ["className", "affinity"]) {
+    const value = typeof filters?.[key] === "string" ? filters[key].trim() : "";
+    if (value) {
+      params.push(`${encodeURIComponent(key)}=${encodeURIComponent(value)}`);
+    }
+  }
+
+  const query = params.join("&");
+  return query ? `?${query}` : "";
+}
+
+function buildNeedsCharacterCreationResult(user) {
+  localStorage.removeItem(KEY_CHAR_ID);
+  return {
+    ok: true,
+    user,
+    needsCharacterCreation: true
+  };
+}
+
+function buildCharacterResult(user, character) {
+  localStorage.setItem(KEY_CHAR_ID, character.characterId);
+  return {
+    ok: true,
+    user,
+    character,
+    stats: deriveStats(character)
+  };
+}
+
+async function loadFirstCharacterForUser(user) {
+  const chars = await api.get(`/users/${user.userId}/characters`);
+  if (chars.length === 0) {
+    return buildNeedsCharacterCreationResult(user);
+  }
+
+  return buildCharacterResult(user, chars[0]);
+}
+
 // ── AuthService ────────────────────────────────────────────────────────────────
 
 export class AuthService {
@@ -41,22 +83,7 @@ export class AuthService {
       api.setToken(res.token);
       localStorage.setItem(KEY_USER_ID, res.user.userId);
 
-      const chars = await api.get(`/users/${res.user.userId}/characters`);
-      if (chars.length === 0) {
-        return {
-          ok: false,
-          message: "No characters found for this account."
-        };
-      }
-
-      const char = chars[0];
-      localStorage.setItem(KEY_CHAR_ID, char.characterId);
-      return {
-        ok: true,
-        user: res.user,
-        character: char,
-        stats: deriveStats(char)
-      };
+      return await loadFirstCharacterForUser(res.user);
     } catch (err) {
       if (err instanceof ApiError) {
         return {
@@ -85,25 +112,48 @@ export class AuthService {
       const charId = localStorage.getItem(KEY_CHAR_ID);
       let char;
       if (charId) {
-        char = await api.get(`/characters/${charId}`);
-      } else {
-        const chars = await api.get(`/users/${user.userId}/characters`);
-        if (chars.length === 0) {
-          return null;
+        try {
+          char = await api.get(`/characters/${charId}`);
+        } catch (err) {
+          if (!(err instanceof ApiError) || (err.status !== 403 && err.status !== 404)) {
+            throw err;
+          }
+
+          localStorage.removeItem(KEY_CHAR_ID);
         }
-        char = chars[0];
-        localStorage.setItem(KEY_CHAR_ID, char.characterId);
       }
 
-      return {
-        ok: true,
-        user,
-        character: char,
-        stats: deriveStats(char)
-      };
+      return char ? buildCharacterResult(user, char) : await loadFirstCharacterForUser(user);
     } catch {
       api.clearToken();
       return null;
+    }
+  }
+
+  /** Create and select a character for an authenticated user. */
+  async createCharacter({ userId, characterName, origin, className, affinity }) {
+    try {
+      const character = await api.post("/characters", {
+        userId,
+        characterName,
+        origin,
+        className,
+        affinity
+      });
+      localStorage.setItem(KEY_CHAR_ID, character.characterId);
+
+      return {
+        ok: true,
+        character,
+        stats: deriveStats(character)
+      };
+    } catch (err) {
+      return {
+        ok: false,
+        message: err instanceof ApiError
+          ? err.payload.message
+          : "Could not reach the server. Is the backend running?"
+      };
     }
   }
 
@@ -138,6 +188,24 @@ export class AuthService {
   async claimQuestCompletionReward(characterId, questId) {
     return api.put(
       `/progression/characters/${characterId}/quest-completions/${encodeURIComponent(questId)}`
+    );
+  }
+
+  /** Load the backend ability catalog, optionally filtered by className/affinity. */
+  async listAbilities(filters = {}) {
+    return api.get(`/abilities${buildAbilityQuery(filters)}`);
+  }
+
+  /** Load the backend-owned ability unlocks for a character. */
+  async getCharacterAbilities(characterId) {
+    return api.get(`/characters/${encodeURIComponent(characterId)}/abilities`);
+  }
+
+  /** Unlock an ability for a character through the existing backend route. */
+  async unlockCharacterAbility(characterId, abilityId) {
+    return api.post(
+      `/characters/${encodeURIComponent(characterId)}/unlock-ability`,
+      { abilityId }
     );
   }
 

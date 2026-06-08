@@ -8,7 +8,7 @@ import { initRapier } from "./physics/initRapier.js";
 import { ChunkManager } from "./world/chunk/ChunkManager.js";
 import { AuthoredMapSource } from "./world/authored/AuthoredMapSource.js";
 import { resolveAuthoredSpawnPoint } from "./world/authored/AuthoredSpawn.js";
-import { USE_AUTHORED_MAP, WORLD_SEED_DEFAULT } from "./world/gen/WorldConfig.js";
+import { CHUNK_SIZE, USE_AUTHORED_MAP, WORLD_SEED_DEFAULT } from "./world/gen/WorldConfig.js";
 import { PrefabLoader } from "./world/prefab/PrefabLoader.js";
 import { PrefabRegistry } from "./world/prefab/PrefabRegistry.js";
 import { AuthoredPrefabRegistry } from "./world/authored/AuthoredPrefabRegistry.js";
@@ -21,15 +21,32 @@ import { FollowCamera } from "./camera/FollowCamera.js";
 import { StaminaSystem } from "./gameplay/player/StaminaSystem.js";
 import { ResourceBar } from "./gameplay/player/ResourceBar.js";
 import { PlayerController } from "./gameplay/player/PlayerController.js";
+import { AbilitySystem } from "./gameplay/player/AbilitySystem.js";
+import { ABILITY_SLOT_IDS, getAbilityDefinitions } from "./gameplay/player/AbilityDefinitions.js";
+import {
+  buildMinimapViewModel,
+  createMinimapState,
+  discoverHearthlightMarker,
+  serializeMinimapState,
+  updateMinimapFromPlayer,
+  worldToChunkPosition
+} from "./gameplay/minimap/index.js";
 import { DummyEnemy } from "./gameplay/enemies/DummyEnemy.js";
 import { BOSS_MAX_HP } from "./gameplay/enemies/BossController.js";
 import { CombatSystem } from "./gameplay/combat/CombatSystem.js";
 import { EmberOrb } from "./world/EmberOrb.js";
 import { BossHUD } from "./ui/BossHUD.js";
 import { LoginScreen } from "./ui/LoginScreen.js";
+import { CharacterCreation } from "./ui/CharacterCreation.js";
 import { authService, deriveStats } from "./net/AuthService.js";
 import { runState } from "./progression/RunState.js";
 import { AudioManager } from "./audio/AudioManager.js";
+import { MusicManager } from "./audio/MusicManager.js";
+import {
+  MUSIC_TRACK_DEFINITIONS,
+  getMusicTrackDefinition,
+  resolveMusicTrack
+} from "./audio/MusicRegistry.js";
 import { OptionsMenu } from "./ui/OptionsMenu.js";
 import { ResourceScatter } from "./world/resources/ResourceScatter.js";
 import { GatheringSystem } from "./gameplay/gathering/GatheringSystem.js";
@@ -39,7 +56,22 @@ import { CraftingSystem } from "./gameplay/crafting/CraftingSystem.js";
 import { buildCraftingRecipeViews, describeCraftingResult } from "./gameplay/crafting/CraftingViewModel.js";
 import { InventoryUI } from "./ui/InventoryUI.js";
 import { CraftingMenu } from "./ui/CraftingMenu.js";
+import { Hotbar } from "./ui/Hotbar.js";
+import { AbilityMenu } from "./ui/AbilityMenu.js";
+import { Minimap } from "./ui/Minimap.js";
+import { Letterbox } from "./ui/Letterbox.js";
+import { SubtitleLine } from "./ui/SubtitleLine.js";
 import { QuestLogUI } from "./ui/QuestLogUI.js";
+import {
+  BOSS_INTRO_PLAYED_FLAG,
+  CinematicPlayer,
+  FIRST_SHARD_ABSORBED_FLAG,
+  HEARTHMERE_REACHED_FLAG,
+  OPENING_ASHFALL_ROAD_FLAG,
+  createBossIntroFlag,
+  createHollowboundBossIntroSequence,
+  createOpeningAshfallRoadSequence
+} from "./cinematic/index.js";
 import { EnemySpawner } from "./gameplay/enemies/EnemySpawner.js";
 import { rollLoot } from "./gameplay/enemies/LootResolver.js";
 import { mulberry32 } from "./world/gen/Rng.js";
@@ -47,7 +79,22 @@ import { NpcSpawner } from "./gameplay/npc/NpcSpawner.js";
 import { DialogueUI } from "./ui/DialogueUI.js";
 import { DialogueEngine } from "./gameplay/dialogue/DialogueEngine.js";
 import { getDialogueTree } from "./gameplay/dialogue/DialogueDefinitions.js";
+import { createCharacterWorldSeed } from "./gameplay/characters/CharacterRules.js";
 import {
+  ACT1_EVENTS,
+  ACT1_FLAGS,
+  ACT1_HOLLOWBOUND_GUARD_BOSS_ID,
+  ACT1_HOLLOWBOUND_GUARD_BOSS_NAME,
+  ACT1_MAIN_QUEST_ID,
+  createAct1Progression,
+  hasAct1Flag,
+  isAct1WorldMapUnlocked,
+  isHollowboundGuardDefeatEvent,
+  reduceAct1Event,
+  serializeAct1Progression
+} from "./gameplay/story/Act1Progression.js";
+import {
+  HEARTHMERE_QUEST_EFFECTS,
   QUEST_EVENT_TYPES,
   addClaimedQuestRewardIds,
   buildQuestLogView,
@@ -72,12 +119,16 @@ const ctx = new GameContext();
 const cleanups = [];
 let isDisposed = false;
 let embers = 0;
+let loadedUser = null;
 let loadedChar = null;
 let loadedStats = null;
+let hasEmittedCharacterLoaded = false;
+let hasBootStarted = false;
 
 const EMPTY_PLACEMENT_SOURCE = Object.freeze({
   getPlacementsForChunk: () => Object.freeze([])
 });
+const BOSS_INTRO_MUSIC_WINDOW_MS = 1400;
 
 // Bridge GameContext → UIBus
 ctx.onTransition((from, to) => {
@@ -92,6 +143,92 @@ uiBus.on("boot:error", ({ message }) => setBootStatus(message, false));
 window.addEventListener("beforeunload", teardown, { once: true });
 getWebpackHotContext()?.dispose(teardown);
 
+function emitCharacterLoadedOnce(character) {
+  if (!character || hasEmittedCharacterLoaded) return;
+
+  hasEmittedCharacterLoaded = true;
+  uiBus.emit("character:loaded", {
+    name: character.characterName,
+    level: character.level,
+    className: character.className,
+  });
+}
+
+function bootWithCharacter(result) {
+  if (!result?.character) {
+    if (result?.user) {
+      showCharacterCreation(result.user);
+      return;
+    }
+
+    setBootStatus("No character was selected.", false);
+    return;
+  }
+
+  if (hasBootStarted) return;
+  hasBootStarted = true;
+  loadedUser = result.user ?? loadedUser;
+  loadedChar = result.character;
+  loadedStats = result.stats ?? deriveStats(result.character);
+  emitCharacterLoadedOnce(result.character);
+  void boot();
+}
+
+function showCharacterCreation(user) {
+  loadedUser = user ?? loadedUser;
+  if (!loadedUser?.userId) {
+    setBootStatus("Could not load account details for character creation.", false);
+    return;
+  }
+
+  setBootStatus("Create a character to enter Ashfall Road.", false);
+
+  let characterCreation = null;
+  const handleCreated = (result) => {
+    if (!result || result.ok === false || !result.character) return result;
+
+    characterCreation?.dispose?.();
+    bootWithCharacter({
+      user: loadedUser,
+      character: result.character,
+      stats: result.stats
+    });
+    return result;
+  };
+
+  characterCreation = new CharacterCreation(appRoot, {
+    user: loadedUser,
+    authService,
+    createCharacter: async (characterOptions) => {
+      const result = await authService.createCharacter({
+        userId: loadedUser.userId,
+        ...characterOptions
+      });
+      return handleCreated(result);
+    },
+    onCreate: async (characterOptions) => {
+      const result = await authService.createCharacter({
+        userId: loadedUser.userId,
+        ...characterOptions
+      });
+      return handleCreated(result);
+    },
+    onSubmit: async (characterOptions) => {
+      const result = await authService.createCharacter({
+        userId: loadedUser.userId,
+        ...characterOptions
+      });
+      return handleCreated(result);
+    },
+    onCreated: handleCreated,
+    onSuccess: handleCreated
+  });
+
+  addCleanup(() => {
+    characterCreation?.dispose?.();
+  });
+}
+
 // ── Phase 3: login gate ───────────────────────────────────────────────────────
 // Try to resume a session silently; if that fails, show the login screen.
 void (async () => {
@@ -99,25 +236,21 @@ void (async () => {
   const resumed = await authService.tryResume();
 
   if (resumed?.ok) {
-    loadedChar = resumed.character;
-    loadedStats = resumed.stats;
-    uiBus.emit("character:loaded", {
-      name: resumed.character.characterName,
-      level: resumed.character.level,
-      className: resumed.character.className,
-    });
-    void boot();
+    if (resumed.needsCharacterCreation || !resumed.character) {
+      showCharacterCreation(resumed.user);
+      return;
+    }
+
+    bootWithCharacter(resumed);
   } else {
     // Show login screen — boot is called from its onSuccess callback
     const loginScreen = new LoginScreen(appRoot, (result) => {
-      loadedChar = result.character;
-      loadedStats = result.stats;
-      uiBus.emit("character:loaded", {
-        name: result.character.characterName,
-        level: result.character.level,
-        className: result.character.className,
-      });
-      void boot();
+      if (result?.needsCharacterCreation || !result?.character) {
+        showCharacterCreation(result?.user);
+        return;
+      }
+
+      bootWithCharacter(result);
     });
     addCleanup(() => {
       loginScreen.dispose();
@@ -148,10 +281,36 @@ async function boot() {
 
     const { camera, target: initialTarget } = createCamera(sceneRoot);
     const savedRunState = loadedChar ? runState.load(loadedChar.characterId) : null;
+    const runtimeWorldSeed = loadedChar
+      ? (Number.isFinite(savedRunState?.worldSeed)
+          ? savedRunState.worldSeed
+          : createCharacterWorldSeed(loadedChar))
+      : WORLD_SEED_DEFAULT;
+    if (loadedChar) {
+      runState.saveWorldSeed(loadedChar.characterId, runtimeWorldSeed);
+    }
     const defeatedBossIds = new Set(savedRunState?.bossSnapshot?.defeatedBossIds ?? []);
+    const cinematicFlags = new Set(savedRunState?.cinematicSnapshot?.playedFlags ?? []);
+    let act1Progression = createAct1Progression(savedRunState?.storySnapshot);
     let chunkManager = null;
     let player = null;
+    let activeHearthlight = null;
     const groundAt = (x, z) => chunkManager?.sampleHeight(x, z) ?? authoredMapSource?.heightAt?.(x, z) ?? 0;
+    const hasCinematicFlag = (flagId) => cinematicFlags.has(flagId);
+    const serializeCinematicFlags = () => ({
+      playedFlags: [...cinematicFlags].sort()
+    });
+    const persistCinematicFlags = () => {
+      if (!loadedChar) return;
+      runState.saveCinematicSnapshot(loadedChar.characterId, serializeCinematicFlags());
+    };
+    const markCinematicFlag = (flagId) => {
+      const normalized = typeof flagId === "string" ? flagId.trim() : "";
+      if (!normalized || cinematicFlags.has(normalized)) return;
+
+      cinematicFlags.add(normalized);
+      persistCinematicFlags();
+    };
     const persistBossSnapshot = () => {
       if (loadedChar) {
         runState.saveBossSnapshot(loadedChar.characterId, {
@@ -166,9 +325,10 @@ async function boot() {
           regionRegistry: authoredMapSource.regionRegistry,
           heightSource: authoredMapSource
         })
-      : new PrefabRegistry(WORLD_SEED_DEFAULT, { biomeSource, heightSource });
+      : new PrefabRegistry(runtimeWorldSeed, { biomeSource, heightSource });
     const prefabLoader = new PrefabLoader(scene, rapier, prefabRegistry, {
-      onHearthlightRest: () => {
+      onHearthlightRest: (hearthlight) => {
+        activeHearthlight = hearthlight ?? null;
         ctx.transition(AppMode.Menu);
         uiBus.emit("hearthlight:opened", {});
       },
@@ -178,8 +338,8 @@ async function boot() {
         onArmed: () => {
           uiBus.emit("world:prompt", { message: "The crypt stirs..." });
         },
-        onEntered: ({ name }) => {
-          uiBus.emit("boss:entered", { name });
+        onEntered: (bossEvent) => {
+          handleBossArenaEntered(bossEvent);
         },
         onHpChanged: (bossHp, max, phase) => {
           uiBus.emit("boss:hpChanged", { current: bossHp, max, phase });
@@ -205,6 +365,14 @@ async function boot() {
         onBossDied: (emberReward, bossEvent = {}) => {
           const bossId = bossEvent.bossId ?? bossEvent.id ?? bossEvent.arenaId ?? null;
           const bossName = bossEvent.bossName ?? bossEvent.name ?? "Unknown Boss";
+          if (bossId && defeatedBossIds.has(bossId)) {
+            return;
+          }
+
+          if (bossId) {
+            defeatedBossIds.add(bossId);
+            persistBossSnapshot();
+          }
 
           embers += emberReward;
           uiBus.emit("embers:changed", { amount: embers });
@@ -215,12 +383,6 @@ async function boot() {
             name: bossName,
             bossName
           });
-
-          if (bossId) {
-            defeatedBossIds.add(bossId);
-            persistBossSnapshot();
-          }
-
         }
       }
     });
@@ -228,7 +390,7 @@ async function boot() {
 
     // ── Resources + Gathering (W-04) ────────────────────────────────────
     const resourceScatter = new ResourceScatter({
-      worldSeed: WORLD_SEED_DEFAULT,
+      worldSeed: runtimeWorldSeed,
       biomeMap: biomeSource,
       prefabSource: prefabRegistry
     });
@@ -256,7 +418,7 @@ async function boot() {
       uiBus
     });
 
-    chunkManager = new ChunkManager(scene, rapier, WORLD_SEED_DEFAULT, {
+    chunkManager = new ChunkManager(scene, rapier, runtimeWorldSeed, {
       biomeSource,
       heightSource,
       prefabSource: prefabRegistry,
@@ -267,7 +429,7 @@ async function boot() {
     // ── Wandering enemies (W-07) ─────────────────────────────────────────
     const enemySpawner = new EnemySpawner({
       scene,
-      worldSeed: WORLD_SEED_DEFAULT,
+      worldSeed: runtimeWorldSeed,
       biomeMap: biomeSource,
       placementSource: authoredMapSource,
       uiBus,
@@ -302,6 +464,217 @@ async function boot() {
     const followCam = new FollowCamera(camera, renderer.domElement);
     addCleanup(() => { followCam.dispose(); });
 
+    // ── Cutscenes (W-13) ─────────────────────────────────────────────────
+    const cinematicPlayer = new CinematicPlayer({ gameContext: ctx, uiBus });
+    let pendingBossIntroEvent = null;
+    let pendingBossIntroRevealed = false;
+
+    const emitBossEntered = (bossEvent = {}) => {
+      const name = bossEvent.name ?? bossEvent.bossName ?? "Unknown Boss";
+      uiBus.emit("boss:entered", { ...bossEvent, name, bossName: bossEvent.bossName ?? name });
+    };
+
+    const revealPendingBossIntro = () => {
+      if (!pendingBossIntroEvent) return;
+
+      emitBossEntered(pendingBossIntroEvent);
+      pendingBossIntroRevealed = true;
+    };
+
+    const createCameraAnchor = (position, target, fov = camera.fov) => ({
+      position: { x: position.x, y: position.y, z: position.z },
+      target: { x: target.x, y: target.y, z: target.z },
+      fov
+    });
+
+    const createCurrentCameraAnchor = () => createCameraAnchor(
+      camera.position,
+      {
+        x: player?.position?.x ?? authoredSpawn.x,
+        y: (player?.position?.y ?? authoredSpawn.y) + 1.1,
+        z: player?.position?.z ?? authoredSpawn.z
+      }
+    );
+
+    const createOpeningCameraAnchors = () => {
+      const target = {
+        x: authoredSpawn.x,
+        y: authoredSpawn.y + 1.2,
+        z: authoredSpawn.z - 6
+      };
+
+      return {
+        cameraFrom: createCameraAnchor(
+          { x: authoredSpawn.x + 12, y: authoredSpawn.y + 7, z: authoredSpawn.z + 16 },
+          target
+        ),
+        cameraTo: createCameraAnchor(
+          { x: authoredSpawn.x + 5, y: authoredSpawn.y + 4.4, z: authoredSpawn.z + 7 },
+          { x: authoredSpawn.x, y: authoredSpawn.y + 1.1, z: authoredSpawn.z - 10 }
+        )
+      };
+    };
+
+    const createBossCameraAnchors = () => {
+      const arena = prefabLoader.getActiveBossArena?.() ?? null;
+      const bossPosition = arena?.bossPosition ?? player?.position ?? authoredSpawn;
+      const playerPosition = player?.position ?? authoredSpawn;
+      const toBoss = new THREE.Vector3(
+        bossPosition.x - playerPosition.x,
+        0,
+        bossPosition.z - playerPosition.z
+      );
+      if (toBoss.lengthSq() < 0.001) {
+        toBoss.set(0, 0, -1);
+      } else {
+        toBoss.normalize();
+      }
+      const side = new THREE.Vector3(-toBoss.z, 0, toBoss.x);
+      const bossTarget = {
+        x: bossPosition.x,
+        y: bossPosition.y + 1.35,
+        z: bossPosition.z
+      };
+
+      return {
+        cameraFrom: createCurrentCameraAnchor(),
+        cameraTo: createCameraAnchor(
+          {
+            x: bossPosition.x - toBoss.x * 7 + side.x * 3,
+            y: bossPosition.y + 3.2,
+            z: bossPosition.z - toBoss.z * 7 + side.z * 3
+          },
+          bossTarget,
+          54
+        )
+      };
+    };
+
+    const playOpeningCinematic = () => {
+      if (hasCinematicFlag(OPENING_ASHFALL_ROAD_FLAG) || ctx.mode !== AppMode.Exploration) return;
+
+      cinematicPlayer.play(createOpeningAshfallRoadSequence(createOpeningCameraAnchors()));
+    };
+
+    function handleBossArenaEntered(bossEvent = {}) {
+      const bossName = bossEvent.name ?? bossEvent.bossName ?? "Hollowbound Caravan Guard";
+      const bossId = bossEvent.bossId ?? bossEvent.id ?? bossEvent.arenaId ?? bossName;
+      const flagId = createBossIntroFlag(bossId);
+
+      if (hasCinematicFlag(flagId) || cinematicPlayer.isPlaying || ctx.mode !== AppMode.Exploration) {
+        emitBossEntered({ ...bossEvent, name: bossName, bossName });
+        return;
+      }
+
+      pendingBossIntroEvent = { ...bossEvent, name: bossName, bossName };
+      pendingBossIntroRevealed = false;
+      markCinematicFlag(BOSS_INTRO_PLAYED_FLAG);
+      markCinematicFlag(flagId);
+      cinematicPlayer.play(createHollowboundBossIntroSequence({
+        bossId,
+        bossName,
+        subtitle: "Last shield of the Ashfall Road",
+        ...createBossCameraAnchors()
+      }));
+    }
+
+    const readPoint = (value, fallback = { x: 0, y: 0, z: 0 }) => ({
+      x: Number.isFinite(value?.x) ? value.x : fallback.x,
+      y: Number.isFinite(value?.y) ? value.y : fallback.y,
+      z: Number.isFinite(value?.z) ? value.z : fallback.z
+    });
+
+    const resolveCameraAnchor = (anchor, fallback) => {
+      const source = anchor && typeof anchor === "object" ? anchor : {};
+      const fallbackPoint = readPoint(fallback?.position, camera.position);
+      const position = readPoint(source.position ?? source, fallbackPoint);
+      const target = readPoint(source.target, readPoint(fallback?.target, {
+        x: player?.position?.x ?? authoredSpawn.x,
+        y: (player?.position?.y ?? authoredSpawn.y) + 1.1,
+        z: player?.position?.z ?? authoredSpawn.z
+      }));
+      const fov = Number.isFinite(source.fov) ? source.fov : fallback?.fov;
+
+      return { position, target, fov };
+    };
+
+    const interpolatePoint = (from, to, progress) => ({
+      x: from.x + (to.x - from.x) * progress,
+      y: from.y + (to.y - from.y) * progress,
+      z: from.z + (to.z - from.z) * progress
+    });
+
+    const easeCinematicProgress = (progress, easing) => {
+      const t = Math.max(0, Math.min(1, progress));
+      return easing === "ease-in-out" ? t * t * (3 - 2 * t) : t;
+    };
+
+    uiBus.on("cinematic:cameraPan", (payload = {}) => {
+      if (payload.phase === "cleanup" || payload.active === false) {
+        followCam.clearOverride();
+        return;
+      }
+
+      const from = resolveCameraAnchor(payload.from, createCurrentCameraAnchor());
+      const to = resolveCameraAnchor(payload.to, from);
+      const progress = easeCinematicProgress(payload.progress ?? 0, payload.easing);
+      const fov = Number.isFinite(from.fov) && Number.isFinite(to.fov)
+        ? from.fov + (to.fov - from.fov) * progress
+        : undefined;
+
+      followCam.setOverridePose({
+        position: interpolatePoint(from.position, to.position, progress),
+        target: interpolatePoint(from.target, to.target, progress),
+        fov
+      });
+    });
+
+    uiBus.on("cinematic:subtitle", (payload = {}) => {
+      if (payload.clear || payload.phase === "cleanup" || payload.phase === "end") {
+        uiBus.emit("subtitle:hide", {});
+        return;
+      }
+
+      if (payload.text) {
+        uiBus.emit("subtitle:show", {
+          text: payload.text,
+          position: payload.position === "lower-third" ? "lower" : payload.position
+        });
+      }
+    });
+
+    uiBus.on("cinematic:bossReveal", (payload = {}) => {
+      if (payload.phase === "start" && payload.visible !== false) {
+        revealPendingBossIntro();
+      }
+    });
+
+    uiBus.on("cinematic:setFlag", (payload = {}) => {
+      if (payload.phase === "start") {
+        markCinematicFlag(payload.flagId);
+        if (payload.flagId === FIRST_SHARD_ABSORBED_FLAG) {
+          applyAct1Event({ type: ACT1_EVENTS.SHARD_ABSORBED });
+        }
+        if (payload.flagId === HEARTHMERE_REACHED_FLAG) {
+          applyAct1Event({ type: ACT1_EVENTS.HEARTHMERE_REACHED });
+        }
+      }
+    });
+
+    uiBus.on("cinematic:ended", (payload = {}) => {
+      if (pendingBossIntroEvent && !pendingBossIntroRevealed) {
+        revealPendingBossIntro();
+      }
+
+      if (payload.id === OPENING_ASHFALL_ROAD_FLAG) {
+        applyAct1Event({ type: ACT1_EVENTS.OPENING_COMPLETED });
+      }
+
+      pendingBossIntroEvent = null;
+      pendingBossIntroRevealed = false;
+      followCam.clearOverride();
+    });
+
     // ── Player resources — use backend-derived stats if available ─────────
     const stats = loadedStats;
     const stamina = new StaminaSystem({
@@ -311,6 +684,7 @@ async function boot() {
     });
     const hp = new ResourceBar(stats?.maxHp ?? 120);
     const fp = new ResourceBar(stats?.maxFp ?? 60);
+    const abilitySystem = new AbilitySystem({ fp });
 
     // ── Player ───────────────────────────────────────────────────────────
     player = new PlayerController(
@@ -521,6 +895,625 @@ async function boot() {
       emitQuestUpdate();
       uiBus.emit("quest:changed", { questLog: nextSnapshot });
       claimQuestRewards(rewardClaims);
+
+      if (event?.type === QUEST_EVENT_TYPES.QUEST_EFFECT && event.effect === HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER) {
+        applyAct1Event({ type: ACT1_EVENTS.ROAD_QUEST_STARTED });
+      }
+    };
+
+    let act1SnapshotJson = JSON.stringify(serializeAct1Progression(act1Progression));
+
+    const persistAct1Progression = () => {
+      if (!loadedChar) return;
+
+      runState.saveStorySnapshot(
+        loadedChar.characterId,
+        serializeAct1Progression(act1Progression)
+      );
+    };
+
+    const emitAct1ProgressionUpdate = (previousProgression, event) => {
+      const snapshot = serializeAct1Progression(act1Progression);
+      uiBus.emit("story:act1", {
+        ...snapshot,
+        eventType: typeof event === "string" ? event : event?.type ?? null,
+        mainQuestId: ACT1_MAIN_QUEST_ID
+      });
+
+      if (!isAct1WorldMapUnlocked(previousProgression) && isAct1WorldMapUnlocked(act1Progression)) {
+        uiBus.emit("worldmap:unlocked", {
+          questId: ACT1_MAIN_QUEST_ID,
+          bossId: ACT1_HOLLOWBOUND_GUARD_BOSS_ID,
+          bossName: ACT1_HOLLOWBOUND_GUARD_BOSS_NAME,
+          story: snapshot
+        });
+      }
+    };
+
+    const applyAct1Event = (event) => {
+      const previousProgression = act1Progression;
+      const nextProgression = reduceAct1Event(act1Progression, event);
+      const nextSnapshotJson = JSON.stringify(serializeAct1Progression(nextProgression));
+      if (nextSnapshotJson === act1SnapshotJson) {
+        return;
+      }
+
+      act1Progression = nextProgression;
+      act1SnapshotJson = nextSnapshotJson;
+      persistAct1Progression();
+      emitAct1ProgressionUpdate(previousProgression, event);
+
+      const startedRoadQuest = !hasAct1Flag(previousProgression, ACT1_FLAGS.QUEST_ROAD_STARTED)
+        && hasAct1Flag(act1Progression, ACT1_FLAGS.QUEST_ROAD_STARTED);
+      const eventType = typeof event === "string" ? event : event?.type;
+      if (startedRoadQuest && eventType !== ACT1_EVENTS.ROAD_QUEST_STARTED) {
+        applyQuestEvent({
+          type: QUEST_EVENT_TYPES.QUEST_EFFECT,
+          effect: HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER
+        });
+      }
+    };
+
+    const reconcileAct1Progression = () => {
+      if (hasCinematicFlag(FIRST_SHARD_ABSORBED_FLAG)) {
+        applyAct1Event({ type: ACT1_EVENTS.SHARD_ABSORBED });
+      }
+
+      if (hasCinematicFlag(HEARTHMERE_REACHED_FLAG)) {
+        applyAct1Event({ type: ACT1_EVENTS.HEARTHMERE_REACHED });
+      }
+
+      if (hasCinematicFlag(OPENING_ASHFALL_ROAD_FLAG)) {
+        applyAct1Event({ type: ACT1_EVENTS.OPENING_COMPLETED });
+      }
+
+      if (defeatedBossIds.has(ACT1_HOLLOWBOUND_GUARD_BOSS_ID)) {
+        applyQuestEvent({
+          type: QUEST_EVENT_TYPES.BOSS_DEFEATED,
+          bossId: ACT1_HOLLOWBOUND_GUARD_BOSS_ID,
+          bossName: ACT1_HOLLOWBOUND_GUARD_BOSS_NAME
+        });
+        applyAct1Event({ type: ACT1_EVENTS.BOSS_GUARD_DEFEATED });
+      }
+    };
+
+    reconcileAct1Progression();
+
+    // ── Abilities + hotbar (W-11) ────────────────────────────────────────
+    let abilityCatalog = getAbilityDefinitions();
+    let abilityMenuOpen = false;
+    let returnToHearthlightAfterAbilityMenu = false;
+    let nearbyResourceNodeId = null;
+    let nearbyNpcName = null;
+    let lastHotbarSnapshot = "";
+
+    const loadAbilityState = async () => {
+      const backendCatalog = await safeLoadAbilityCatalog();
+      if (backendCatalog.length > 0) {
+        abilityCatalog = mergeAbilityCatalog(backendCatalog);
+      }
+
+      const unlocked = await safeLoadUnlockedAbilityIds();
+      abilitySystem.unlockAbilities(unlocked.abilityIds);
+
+      const savedSlots = normalizeSavedAbilitySlots(savedRunState?.abilityLoadoutSnapshot?.slots);
+      if (savedSlots) {
+        abilitySystem.loadEquippedSlots(savedSlots);
+      }
+
+      autoEquipUnlockedAbilities();
+      if (unlocked.ok) {
+        persistAbilityLoadoutOnly();
+      }
+    };
+
+    const safeLoadAbilityCatalog = async () => {
+      if (typeof authService.listAbilities !== "function") return [];
+
+      try {
+        const abilities = await authService.listAbilities();
+        return Array.isArray(abilities) ? abilities : [];
+      } catch (error) {
+        console.warn("[Abilities] Ability catalog could not be loaded", error);
+        return [];
+      }
+    };
+
+    const safeLoadUnlockedAbilityIds = async () => {
+      if (!loadedChar || typeof authService.getCharacterAbilities !== "function") {
+        return { ok: false, abilityIds: [] };
+      }
+
+      try {
+        const abilities = await authService.getCharacterAbilities(loadedChar.characterId);
+        return { ok: true, abilityIds: extractAbilityIds(abilities) };
+      } catch (error) {
+        console.warn("[Abilities] Character unlocks could not be loaded", error);
+        return { ok: false, abilityIds: [] };
+      }
+    };
+
+    const mergeAbilityCatalog = (backendCatalog) => {
+      const backendById = new Map(
+        backendCatalog
+          .filter((ability) => typeof ability?.abilityId === "string")
+          .map((ability) => [ability.abilityId, ability])
+      );
+
+      return getAbilityDefinitions().map((definition) => ({
+        ...(backendById.get(definition.abilityId) ?? {}),
+        ...definition
+      }));
+    };
+
+    const extractAbilityIds = (abilities) => {
+      if (!Array.isArray(abilities)) return [];
+
+      return abilities
+        .map((ability) => typeof ability?.abilityId === "string" ? ability.abilityId.trim() : "")
+        .filter(Boolean);
+    };
+
+    const normalizeSavedAbilitySlots = (slots) => {
+      if (!slots || typeof slots !== "object") return null;
+
+      const normalized = {};
+      for (const [slotKey, abilityId] of Object.entries(slots)) {
+        const runtimeSlot = String(slotKey).trim().toUpperCase();
+        if (!ABILITY_SLOT_IDS.includes(runtimeSlot)) continue;
+        if (typeof abilityId !== "string" || !abilityId.trim()) continue;
+
+        normalized[runtimeSlot] = abilityId.trim();
+      }
+
+      return Object.keys(normalized).length > 0 ? normalized : null;
+    };
+
+    const autoEquipUnlockedAbilities = () => {
+      const slots = abilitySystem.getEquippedSlots();
+      const equippedAbilityIds = new Set(Object.values(slots).filter(Boolean));
+      const unlockedAbilityIds = abilitySystem.getUnlockedAbilityIds();
+
+      for (const slotKey of ABILITY_SLOT_IDS) {
+        if (slots[slotKey]) continue;
+
+        const abilityId = unlockedAbilityIds.find((id) => !equippedAbilityIds.has(id));
+        if (!abilityId) continue;
+
+        const result = abilitySystem.equipAbility(slotKey, abilityId);
+        if (result.ok) {
+          equippedAbilityIds.add(abilityId);
+        }
+      }
+    };
+
+    const getAbilityUnlockCost = (ability) => {
+      const powerCost = Math.ceil(Math.max(1, Number(ability?.power ?? 1)) / 2);
+      const levelCost = Math.max(0, Number(ability?.requiredLevel ?? 1) - 1) * 3;
+      return Math.max(1, powerCost + levelCost);
+    };
+
+    const getAbilityEligibility = (ability) => {
+      if (!loadedChar) return { ok: false, reason: "No character loaded." };
+
+      const requiredLevel = Number(ability?.requiredLevel ?? 1);
+      if (Number(loadedChar.level ?? 1) < requiredLevel) {
+        return { ok: false, reason: `Requires level ${requiredLevel}.` };
+      }
+
+      const requiredClass = ability?.className;
+      if (requiredClass && requiredClass !== loadedChar.className) {
+        return { ok: false, reason: `Requires ${requiredClass}.` };
+      }
+
+      const requiredAffinity = ability?.affinity;
+      if (requiredAffinity && requiredAffinity !== loadedChar.affinity) {
+        return { ok: false, reason: `Requires ${requiredAffinity} affinity.` };
+      }
+
+      return { ok: true, reason: "" };
+    };
+
+    const buildAbilityMenuPayload = (selection = {}) => {
+      const selectedAbilityId = typeof selection === "string" ? selection : selection.selectedAbilityId;
+      const selectedSlotKey = typeof selection === "object" ? selection.selectedSlotKey : null;
+      const catalogById = new Map(abilityCatalog.map((ability) => [ability.abilityId, ability]));
+      const abilities = abilitySystem.getAbilityMenuViewModel({ fp }).map((view) => {
+        const catalogAbility = catalogById.get(view.abilityId) ?? {};
+        const ability = { ...catalogAbility, ...view };
+        const eligibility = getAbilityEligibility(ability);
+        const unlockCost = getAbilityUnlockCost(ability);
+
+        return {
+          ...ability,
+          unlockCost,
+          unlocked: ability.isUnlocked,
+          equippedSlot: ability.slot,
+          canUnlock: !ability.isUnlocked && eligibility.ok && embers >= unlockCost,
+          notes: eligibility.ok
+            ? ability.description
+            : eligibility.reason
+        };
+      });
+
+      return {
+        abilities,
+        availableEmbers: embers,
+        equippedSlots: abilitySystem.getEquippedSlots(),
+        selectedAbilityId,
+        selectedSlotKey
+      };
+    };
+
+    const emitAbilityHotbarUpdate = (force = false) => {
+      const payload = {
+        slots: abilitySystem.getHotbarViewModel({ fp }),
+        currentFp: fp.value,
+        maxFp: fp.max
+      };
+      const snapshot = JSON.stringify(payload);
+      if (!force && snapshot === lastHotbarSnapshot) return;
+
+      lastHotbarSnapshot = snapshot;
+      uiBus.emit("hotbar:set", payload);
+    };
+
+    const emitAbilityMenuUpdate = (selection = {}) => {
+      if (!abilityMenuOpen) return;
+
+      uiBus.emit("abilitymenu:set", buildAbilityMenuPayload(selection));
+    };
+
+    const persistAbilityLoadoutOnly = () => {
+      if (!loadedChar) return;
+
+      runState.saveAbilityLoadoutSnapshot(loadedChar.characterId, {
+        slots: abilitySystem.getEquippedSlots()
+      });
+    };
+
+    const persistAbilityRunState = () => {
+      if (!loadedChar) return;
+
+      const hearthlight = prefabLoader.getPrimaryHearthlight();
+      const fallbackPosition = player?.position ?? authoredSpawn;
+      const savePosition = hearthlight?.group?.position ?? fallbackPosition;
+      runState.save(loadedChar.characterId, embers, player?.flaskCharges ?? 4, savePosition, {
+        inventorySlots: inventory.toJSON(),
+        questSnapshot: serializeQuestLog(questLog),
+        questRewardSnapshot,
+        resourceSnapshot: gatheringSystem.serializeDepletionSnapshot(),
+        bossSnapshot: {
+          defeatedBossIds: [...defeatedBossIds].sort()
+        },
+        abilityLoadoutSnapshot: {
+          slots: abilitySystem.getEquippedSlots()
+        },
+        minimapSnapshot: serializeMinimapState(minimapState),
+        storySnapshot: serializeAct1Progression(act1Progression)
+      });
+    };
+
+    const handleAbilityUnlockRequest = async ({ abilityId } = {}) => {
+      if (!loadedChar || typeof abilityId !== "string" || !abilityId.trim()) return;
+
+      const ability = abilitySystem.getAbility(abilityId);
+      if (!ability) {
+        uiBus.emit("ability:unlockFailed", { abilityId, reason: "Unknown ability." });
+        return;
+      }
+
+      const eligibility = getAbilityEligibility(ability);
+      const unlockCost = getAbilityUnlockCost(ability);
+      if (!eligibility.ok) {
+        uiBus.emit("ability:unlockFailed", { abilityId, reason: eligibility.reason });
+        return;
+      }
+
+      if (embers < unlockCost) {
+        uiBus.emit("ability:unlockFailed", {
+          abilityId,
+          reason: `${unlockCost - embers} more Embers required.`
+        });
+        return;
+      }
+
+      try {
+        await authService.unlockCharacterAbility(loadedChar.characterId, abilityId);
+        abilitySystem.unlockAbility(abilityId);
+        embers -= unlockCost;
+        uiBus.emit("embers:changed", { amount: embers });
+        persistAbilityRunState();
+        uiBus.emit("ability:unlocked", {
+          abilityId,
+          message: `${ability.name} unlocked.`
+        });
+      } catch (error) {
+        if (error?.status === 409) {
+          abilitySystem.unlockAbility(abilityId);
+          persistAbilityRunState();
+          uiBus.emit("ability:unlocked", {
+            abilityId,
+            message: `${ability.name} was already unlocked.`
+          });
+        } else {
+          const message = error?.payload?.message
+            || error?.message
+            || "Ability unlock failed.";
+          uiBus.emit("ability:unlockFailed", { abilityId, reason: message });
+        }
+      }
+
+      emitAbilityHotbarUpdate(true);
+      emitAbilityMenuUpdate({ selectedAbilityId: abilityId });
+    };
+
+    const handleAbilityEquipRequest = ({ abilityId, slotKey } = {}) => {
+      try {
+        const result = abilitySystem.equipAbility(slotKey, abilityId);
+        if (!result.ok) {
+          uiBus.emit("ability:equipFailed", {
+            abilityId,
+            slotKey,
+            reason: result.reason
+          });
+          return;
+        }
+
+        persistAbilityRunState();
+        uiBus.emit("ability:equipped", {
+          abilityId,
+          slotKey: result.slot,
+          message: `${result.ability.name} equipped to ${result.slot}.`
+        });
+        emitAbilityHotbarUpdate(true);
+        emitAbilityMenuUpdate({
+          selectedAbilityId: abilityId,
+          selectedSlotKey: result.slot
+        });
+      } catch (error) {
+        uiBus.emit("ability:equipFailed", {
+          abilityId,
+          slotKey,
+          reason: error instanceof Error ? error.message : "Ability equip failed."
+        });
+      }
+    };
+
+    const buildAbilityTargets = (activeBossArena) => {
+      const targets = [];
+
+      if (activeBossArena?.active && activeBossArena.boss?.isAlive) {
+        targets.push({
+          position: activeBossArena.bossPosition,
+          isAlive: true,
+          hit: (damage) => {
+            const didHit = activeBossArena.tryHit(
+              damage,
+              Math.max(1, Math.round(damage * 0.75)),
+              player.position,
+              999
+            );
+            return {
+              damage: didHit ? damage : 0,
+              died: activeBossArena.boss?.isAlive === false
+            };
+          }
+        });
+      }
+
+      if (enemy.alive) {
+        targets.push(enemy);
+      }
+
+      if (typeof enemySpawner.getCombatTargets === "function") {
+        targets.push(...enemySpawner.getCombatTargets());
+      }
+
+      return targets;
+    };
+
+    const tryUseAbilitySlot = (slotKey, activeBossArena) => {
+      let result;
+      try {
+        result = abilitySystem.useSlot(slotKey, {
+          fp,
+          origin: player.position,
+          direction: playerForward,
+          targets: buildAbilityTargets(activeBossArena),
+          coneDot: -0.25
+        });
+      } catch (error) {
+        uiBus.emit("ability:failed", {
+          slotKey,
+          reason: error instanceof Error ? error.message : "Ability failed."
+        });
+        return;
+      }
+
+      if (!result.ok) {
+        uiBus.emit("ability:failed", {
+          slotKey: result.slot,
+          abilityId: result.ability?.abilityId ?? null,
+          reason: result.reason
+        });
+        return;
+      }
+
+      const embersRewarded = Number(result.application?.embersRewarded ?? 0);
+      if (embersRewarded > 0) {
+        embers += embersRewarded;
+        uiBus.emit("embers:changed", { amount: embers });
+      }
+
+      uiBus.emit("player:fpChanged", { current: fp.value, max: fp.max });
+      uiBus.emit("ability:used", {
+        slotKey: result.slot,
+        abilityId: result.ability.abilityId,
+        ability: result.ability,
+        application: result.application
+      });
+      emitAbilityHotbarUpdate(true);
+      uiBus.emit("ability:activated", {
+        slotKey: result.slot,
+        abilityId: result.ability.abilityId
+      });
+      window.setTimeout(() => {
+        uiBus.emit("ability:deactivated", {
+          slotKey: result.slot,
+          abilityId: result.ability.abilityId
+        });
+      }, 160);
+    };
+
+    // ── Minimap + discovered Hearthlight fast travel (W-12) ──────────────
+    const HEARTHLIGHT_DISCOVERY_RADIUS = 10;
+    let minimapState = createMinimapState(savedRunState?.minimapSnapshot);
+    let lastMinimapPayloadJson = "";
+    let lastPersistedMinimapJson = JSON.stringify(serializeMinimapState(minimapState));
+
+    const getRuntimeHearthlightEntries = () => (
+      typeof prefabLoader.getHearthlights === "function" ? prefabLoader.getHearthlights() : []
+    ).filter((entry) => entry.position);
+
+    const discoverHearthlightEntry = (entry) => {
+      if (!entry?.position) return;
+
+      minimapState = discoverHearthlightMarker(minimapState, {
+        id: entry.id,
+        name: entry.name,
+        position: entry.position
+      });
+    };
+
+    const discoverNearbyHearthlights = () => {
+      for (const entry of getRuntimeHearthlightEntries()) {
+        const dx = player.position.x - entry.position.x;
+        const dz = player.position.z - entry.position.z;
+        const nearEnough = dx * dx + dz * dz <= HEARTHLIGHT_DISCOVERY_RADIUS * HEARTHLIGHT_DISCOVERY_RADIUS;
+        if (entry.hearthlight?.isPlayerNear || nearEnough) {
+          discoverHearthlightEntry(entry);
+        }
+      }
+    };
+
+    const updateMinimapStateFromPlayer = () => {
+      minimapState = updateMinimapFromPlayer(minimapState, {
+        playerPosition: player.position,
+        biomeSource: chunkManager,
+        exploreRadius: 1
+      });
+      discoverNearbyHearthlights();
+    };
+
+    const getBiomePayloadAt = (worldX, worldZ, fallback = null) => {
+      const biome = chunkManager.sampleAtmosphereBiome(worldX, worldZ) ?? fallback;
+      if (!biome) return null;
+
+      const id = biome.id ?? biome.key ?? biome.biomeId ?? "";
+      const name = biome.label ?? biome.name ?? id;
+      return id ? { id, name, label: name } : null;
+    };
+
+    const buildMinimapChunkPayloads = (view) => view.chunks
+      .filter((chunk) => chunk.explored)
+      .map((chunk) => {
+        const worldX = (chunk.chunkX + 0.5) * (view.chunkSize ?? CHUNK_SIZE);
+        const worldZ = (chunk.chunkZ + 0.5) * (view.chunkSize ?? CHUNK_SIZE);
+        const biome = getBiomePayloadAt(worldX, worldZ, view.currentBiome);
+
+        return {
+          id: chunk.key,
+          chunkX: chunk.chunkX,
+          chunkZ: chunk.chunkZ,
+          biome,
+          biomeId: biome?.id ?? "",
+          biomeName: biome?.name ?? ""
+        };
+      });
+
+    const buildMinimapHearthlightPayload = (marker, discovered = true) => {
+      const chunk = worldToChunkPosition(marker.position);
+      return {
+        id: marker.id,
+        type: "hearthlight",
+        name: marker.name,
+        position: marker.position,
+        chunkX: chunk.chunkX,
+        chunkZ: chunk.chunkZ,
+        discovered
+      };
+    };
+
+    const buildMinimapPayload = () => {
+      const view = buildMinimapViewModel(minimapState, player.position, { radius: 4 });
+      const discoveredIds = new Set(minimapState.hearthlights.map((marker) => marker.id));
+      const hearthlightsById = new Map();
+
+      for (const marker of view.hearthlights) {
+        hearthlightsById.set(marker.id, buildMinimapHearthlightPayload(marker, true));
+      }
+
+      for (const entry of getRuntimeHearthlightEntries()) {
+        hearthlightsById.set(entry.id, buildMinimapHearthlightPayload(entry, discoveredIds.has(entry.id)));
+      }
+
+      return {
+        currentBiome: view.currentBiome
+          ? { id: view.currentBiome.id, label: view.currentBiome.label, name: view.currentBiome.label }
+          : null,
+        exploredChunks: buildMinimapChunkPayloads(view),
+        player: {
+          chunkX: view.center.chunkX,
+          chunkZ: view.center.chunkZ
+        },
+        hearthlights: [...hearthlightsById.values()],
+        worldMapUnlocked: isAct1WorldMapUnlocked(act1Progression)
+      };
+    };
+
+    const persistMinimapSnapshotIfChanged = () => {
+      if (!loadedChar) return;
+
+      const snapshot = serializeMinimapState(minimapState);
+      const snapshotJson = JSON.stringify(snapshot);
+      if (snapshotJson === lastPersistedMinimapJson) return;
+
+      lastPersistedMinimapJson = snapshotJson;
+      runState.saveMinimapSnapshot(loadedChar.characterId, snapshot);
+    };
+
+    const emitMinimapUpdate = (force = false) => {
+      const payload = buildMinimapPayload();
+      const payloadJson = JSON.stringify(payload);
+      if (!force && payloadJson === lastMinimapPayloadJson) return;
+
+      lastMinimapPayloadJson = payloadJson;
+      uiBus.emit("minimap:set", payload);
+    };
+
+    const updateMinimap = (force = false) => {
+      updateMinimapStateFromPlayer();
+      emitMinimapUpdate(force);
+      persistMinimapSnapshotIfChanged();
+    };
+
+    const handleMinimapFastTravel = ({ hearthlightId, markerId, id } = {}) => {
+      if (prefabLoader.getActiveBossArena?.()?.active || ctx.mode !== AppMode.Exploration) {
+        uiBus.emit("world:prompt", { message: "Fast travel is unavailable right now." });
+        return;
+      }
+
+      const targetId = hearthlightId ?? markerId ?? id;
+      const marker = minimapState.hearthlights.find((candidate) => candidate.id === targetId);
+      if (!marker) return;
+
+      chunkManager.ensureSpawnArea(marker.position.x, marker.position.z, 1);
+      player.teleportTo(marker.position);
+      followCam.setFollowTarget(player.position);
+      followCam.update();
+      uiBus.emit("world:prompt", { message: `Travelled to ${marker.name}.` });
+      updateMinimap(true);
     };
 
     // ── Loot drop handler (W-07) ──────────────────────────────────────────
@@ -554,6 +1547,17 @@ async function boot() {
       }
     });
 
+    uiBus.on("gathering:node_nearby", ({ nodeId }) => {
+      nearbyResourceNodeId = nodeId ?? "__resource__";
+    });
+
+    uiBus.on("gathering:node_left", ({ nodeId }) => {
+      if (nearbyResourceNodeId !== null && nodeId !== undefined && nodeId !== nearbyResourceNodeId) {
+        return;
+      }
+      nearbyResourceNodeId = null;
+    });
+
     uiBus.on("gathering:harvested", ({ itemId, count, nodeDef }) => {
       if (!inventory.addItem(itemId, count)) {
         uiBus.emit("inventory:full", { itemId, count });
@@ -577,6 +1581,29 @@ async function boot() {
 
     uiBus.on("hearthlight:crafting", () => {
       uiBus.emit("crafting:open", { recipes: getCraftingRecipes() });
+    });
+
+    uiBus.on("hearthlight:abilities", () => {
+      returnToHearthlightAfterAbilityMenu = true;
+      uiBus.emit("hearthlight:hidden", {});
+      uiBus.emit("abilitymenu:open", buildAbilityMenuPayload());
+    });
+
+    uiBus.on("ability:unlockRequested", (payload) => {
+      void handleAbilityUnlockRequest(payload);
+    });
+
+    uiBus.on("ability:equipRequested", (payload) => {
+      handleAbilityEquipRequest(payload);
+    });
+
+    uiBus.on("ability:activateRequested", ({ slotKey }) => {
+      if (ctx.isControlLocked()) return;
+      tryUseAbilitySlot(slotKey, prefabLoader.getActiveBossArena?.() ?? null);
+    });
+
+    uiBus.on("minimap:fastTravelRequested", (payload) => {
+      handleMinimapFastTravel(payload);
     });
 
     uiBus.on("crafting:requested", ({ recipeId }) => {
@@ -621,6 +1648,10 @@ async function boot() {
         recipeId,
         output: result?.produced
       });
+
+      if (recipeId === "hearthlight_hatchet" || result?.produced?.itemId === "hearthlight_hatchet") {
+        applyAct1Event({ type: ACT1_EVENTS.TESSA_FORGE_TUTORIAL_COMPLETED });
+      }
     });
 
     uiBus.on("dialogue:effect", ({ effect, npcId }) => {
@@ -629,17 +1660,35 @@ async function boot() {
         effect,
         npcId
       });
+
+      if (effect === HEARTHMERE_QUEST_EFFECTS.TESSA_GATHER_OFFER) {
+        applyAct1Event({ type: ACT1_EVENTS.TESSA_MET });
+      }
+      if (effect === HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER) {
+        applyAct1Event({ type: ACT1_EVENTS.ROAD_QUEST_STARTED });
+      }
+      if (effect === "story.shard_absorbed_first") {
+        applyAct1Event({ type: ACT1_EVENTS.SHARD_ABSORBED });
+      }
     });
 
     // Hearthlight rest action (from menu button)
     uiBus.on("hearthlight:rested", () => {
-      const hearthlight = prefabLoader.getPrimaryHearthlight();
+      const hearthlight = activeHearthlight ?? prefabLoader.getPrimaryHearthlight();
       if (!hearthlight) return;
 
       player.fullRestore();
       player.setRespawnPoint(hearthlight.group.position);
       enemy.respawn();
       gatheringSystem?.respawnAll();
+      abilitySystem.resetCooldowns();
+      emitAbilityHotbarUpdate(true);
+      const activeHearthlightEntry = getRuntimeHearthlightEntries()
+        .find((entry) => entry.hearthlight === hearthlight);
+      if (activeHearthlightEntry) {
+        discoverHearthlightEntry(activeHearthlightEntry);
+      }
+      updateMinimap(true);
       const resourceSnapshot = gatheringSystem?.serializeDepletionSnapshot();
       ctx.transition(AppMode.Exploration);
       uiBus.emit("menu:closed", {});
@@ -647,7 +1696,12 @@ async function boot() {
       if (loadedChar) {
         runState.save(loadedChar.characterId, embers, 4, hearthlight.group.position, {
           inventorySlots: inventory.toJSON(),
-          resourceSnapshot
+          resourceSnapshot,
+          abilityLoadoutSnapshot: {
+            slots: abilitySystem.getEquippedSlots()
+          },
+          minimapSnapshot: serializeMinimapState(minimapState),
+          storySnapshot: serializeAct1Progression(act1Progression)
         });
       }
     });
@@ -655,8 +1709,105 @@ async function boot() {
     // ── Audio ─────────────────────────────────────────────────────────────
     const audio = new AudioManager();
     addCleanup(() => { audio.dispose(); });
+    const music = new MusicManager({
+      tracks: Object.fromEntries(MUSIC_TRACK_DEFINITIONS.map((track) => [track.id, track])),
+      masterVolume: 0.42,
+      defaultFadeSeconds: 1.1
+    });
+    addCleanup(() => { music.dispose(); });
+    let currentMusicBiome = chunkManager.sampleAtmosphereBiome(authoredSpawn.x, authoredSpawn.z);
+    let currentBossMusicPhase = null;
+    let bossMusicActive = false;
+    let hearthlightMusicActive = false;
+    let musicVictoryUntil = 0;
+    let musicUnmadeUntil = 0;
+    let bossIntroMusicUntil = 0;
+
+    const updateMusic = (options = {}) => {
+      const nowMs = performance.now();
+      const musicContext = {
+        appMode: ctx.mode,
+        biome: currentMusicBiome,
+        bossActive: bossMusicActive,
+        bossPhase: currentBossMusicPhase,
+        bossIntro: nowMs < bossIntroMusicUntil,
+        bossVictory: nowMs < musicVictoryUntil,
+        hearthlightResting: hearthlightMusicActive,
+        unmade: nowMs < musicUnmadeUntil
+      };
+      const trackId = resolveMusicTrack(musicContext);
+      const track = getMusicTrackDefinition(trackId);
+
+      if (!track) return;
+
+      music.setTrack(track, {
+        crossfade: options.crossfade ?? 1.1,
+        fadeIn: options.fadeIn,
+        fadeOut: options.fadeOut,
+        restart: options.restart === true
+      });
+    };
 
     // Wire audio to key game events
+    uiBus.on("mode:changed", ({ to }) => {
+      if (to !== AppMode.Menu) {
+        hearthlightMusicActive = false;
+      }
+      updateMusic();
+    });
+    uiBus.on("hearthlight:opened", () => {
+      hearthlightMusicActive = true;
+      updateMusic({ crossfade: 0.65 });
+    });
+    uiBus.on("hearthlight:hidden", () => {
+      hearthlightMusicActive = false;
+      updateMusic({ crossfade: 0.65 });
+    });
+    uiBus.on("menu:closed", () => {
+      hearthlightMusicActive = false;
+      updateMusic({ crossfade: 0.65 });
+    });
+    uiBus.on("boss:entered", () => {
+      bossMusicActive = true;
+      currentBossMusicPhase = 1;
+      updateMusic({ crossfade: 0.45 });
+    });
+    uiBus.on("boss:phaseChanged", ({ phase }) => {
+      bossMusicActive = true;
+      currentBossMusicPhase = phase;
+      updateMusic({ crossfade: 0.55 });
+    });
+    uiBus.on("boss:defeated", () => {
+      bossMusicActive = false;
+      currentBossMusicPhase = null;
+      bossIntroMusicUntil = 0;
+      musicVictoryUntil = performance.now() + 3200;
+      updateMusic({ crossfade: 0.35, restart: true });
+    });
+    uiBus.on("player:died", () => {
+      bossMusicActive = false;
+      currentBossMusicPhase = null;
+      bossIntroMusicUntil = 0;
+      musicUnmadeUntil = performance.now() + 2200;
+      updateMusic({ crossfade: 0.25, restart: true });
+    });
+    uiBus.on("cinematic:started", () => {
+      updateMusic({ crossfade: 0.75 });
+    });
+    uiBus.on("cinematic:bossReveal", ({ phase, visible }) => {
+      if (phase === "start" && visible !== false) {
+        bossIntroMusicUntil = Math.max(
+          bossIntroMusicUntil,
+          performance.now() + BOSS_INTRO_MUSIC_WINDOW_MS
+        );
+        bossMusicActive = true;
+        updateMusic({ crossfade: 0.2, restart: true });
+      }
+    });
+    uiBus.on("cinematic:ended", () => {
+      bossIntroMusicUntil = 0;
+      updateMusic({ crossfade: 0.75 });
+    });
     uiBus.on("combat:hitLanded", () => { audio.play("hit"); });
     uiBus.on("combat:missed", () => { audio.play("swing"); });
     uiBus.on("player:iframesChanged", ({ active }) => { if (active) audio.play("dodge"); });
@@ -664,16 +1815,26 @@ async function boot() {
     uiBus.on("player:died", () => { audio.play("unmade"); });
     uiBus.on("boss:staggered", () => { audio.play("bossHit"); });
     uiBus.on("boss:phaseChanged", ({ phase }) => { if (phase > 1) audio.play("bossPhase"); });
+    uiBus.on("cinematic:audio", ({ soundId, phase }) => {
+      if (phase !== "start") return;
+
+      audio.play(soundId === "bossIntro" ? "bossPhase" : soundId);
+    });
     uiBus.on("boss:defeated", () => { audio.play("bossDefeat"); });
     uiBus.on("embers:recovered", () => { audio.play("embers"); });
     uiBus.on("boss:defeated", ({ bossId, arenaId, bossName, name }) => {
-      applyQuestEvent({
+      const event = {
         type: QUEST_EVENT_TYPES.BOSS_DEFEATED,
         bossId,
         arenaId,
         bossName,
         name
-      });
+      };
+
+      applyQuestEvent(event);
+      if (isHollowboundGuardDefeatEvent(event)) {
+        applyAct1Event({ type: ACT1_EVENTS.BOSS_GUARD_DEFEATED });
+      }
     });
 
     // ── Run-state restore ─────────────────────────────────────────────────
@@ -683,10 +1844,20 @@ async function boot() {
       uiBus.emit("embers:changed", { amount: embers });
     }
 
+    await loadAbilityState();
+
     // ── HUD ──────────────────────────────────────────────────────────────
     const hud = new HUD(uiBus);
     addCleanup(() => { hud.dispose(); });
+    const letterbox = new Letterbox(uiBus, { mount: appRoot });
+    addCleanup(() => { letterbox.dispose(); });
+    const subtitleLine = new SubtitleLine(uiBus, { mount: appRoot });
+    addCleanup(() => { subtitleLine.dispose(); });
     emitQuestUpdate();
+
+    const minimap = new Minimap(uiBus, { mount: appRoot });
+    addCleanup(() => { minimap.dispose(); });
+    updateMinimap(true);
 
     const bossHUD = new BossHUD(uiBus);
     addCleanup(() => { bossHUD.dispose(); });
@@ -696,6 +1867,23 @@ async function boot() {
 
     const craftingMenu = new CraftingMenu(uiBus, { mount: appRoot, recipes: getCraftingRecipes() });
     addCleanup(() => { craftingMenu.dispose(); });
+
+    const hotbar = new Hotbar(uiBus, {
+      mount: appRoot,
+      slots: abilitySystem.getHotbarViewModel({ fp }),
+      currentFp: fp.value,
+      maxFp: fp.max
+    });
+    addCleanup(() => { hotbar.dispose(); });
+
+    const abilityMenu = new AbilityMenu(uiBus, {
+      mount: appRoot,
+      abilities: buildAbilityMenuPayload().abilities,
+      availableEmbers: embers,
+      equippedSlots: abilitySystem.getEquippedSlots()
+    });
+    addCleanup(() => { abilityMenu.dispose(); });
+    emitAbilityHotbarUpdate(true);
 
     const questLogUI = new QuestLogUI(uiBus, { mount: appRoot, view: buildCurrentQuestLogView() });
     addCleanup(() => { questLogUI.dispose(); });
@@ -707,7 +1895,7 @@ async function boot() {
     addCleanup(() => { dialogueUI.dispose(); });
 
     // ── Options menu (Phase 5) ────────────────────────────────────────────
-    const optionsMenu = new OptionsMenu(appRoot, audio, () => {
+    const optionsMenu = new OptionsMenu(appRoot, [audio, music], () => {
       // On close, return to pause menu if we came from there
       if (ctx.mode === AppMode.Menu) {
         uiBus.emit("pause:opened", {});
@@ -780,6 +1968,28 @@ async function boot() {
       questLogOpen = false;
       uiBus.emit("menu:closed", { type: "questlog" });
     });
+    uiBus.on("abilitymenu:opened", () => {
+      if (dialogueOpen) {
+        uiBus.emit("abilitymenu:close", {});
+        return;
+      }
+
+      abilityMenuOpen = true;
+      if (ctx.mode === AppMode.Exploration) {
+        ctx.transition(AppMode.Menu);
+      }
+      uiBus.emit("menu:opened", { type: "abilities" });
+    });
+    uiBus.on("abilitymenu:closed", () => {
+      abilityMenuOpen = false;
+      if (returnToHearthlightAfterAbilityMenu && ctx.mode === AppMode.Menu) {
+        returnToHearthlightAfterAbilityMenu = false;
+        uiBus.emit("hearthlight:opened", {});
+        return;
+      }
+
+      uiBus.emit("menu:closed", { type: "abilities" });
+    });
 
     // ── Dialogue lifecycle (W-09) ─────────────────────────────────────────
     uiBus.on("npc:interact", ({ npcId, name, dialogueId }) => {
@@ -836,9 +2046,11 @@ async function boot() {
 
     // NPC nearby / left → interact prompt
     uiBus.on("npc:nearby", ({ name }) => {
+      nearbyNpcName = name ?? "__npc__";
       hud.setInteractPromptVisible(true, `Talk to ${name}`);
     });
     uiBus.on("npc:left", () => {
+      nearbyNpcName = null;
       hud.setInteractPromptVisible(false);
     });
 
@@ -863,9 +2075,16 @@ async function boot() {
         return;
       }
 
+      if (abilityMenuOpen) {
+        returnToHearthlightAfterAbilityMenu = false;
+        uiBus.emit("abilitymenu:close", {});
+        return;
+      }
+
       if (ctx.mode === AppMode.Menu) {
         ctx.transition(AppMode.Exploration);
       }
+      activeHearthlight = null;
     });
 
     // ── Resize ───────────────────────────────────────────────────────────
@@ -897,11 +2116,14 @@ async function boot() {
     const camRight = new THREE.Vector3();
 
     const loop = startLoop({
-      fixedUpdate: () => {
+      fixedUpdate: (dt) => {
         rapier.world.step();
+        cinematicPlayer.update(dt);
       },
       render: (dt) => {
-        const controlLocked = ctx.isControlLocked();
+        let controlLocked = ctx.isControlLocked();
+        const interactJustPressed = input.isJustPressed(Action.Interact);
+        abilitySystem.update(dt);
 
         // ── Compute camera-relative axes ─────────────────────────────────
         camera.getWorldDirection(camForward);
@@ -914,10 +2136,19 @@ async function boot() {
         playerForward.set(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
         playerRight.set(playerForward.z, 0, -playerForward.x);
 
+        let cutsceneSkippedThisFrame = false;
+        if (cinematicPlayer.isPlaying && input.isJustPressed(Action.Pause)) {
+          cinematicPlayer.skip();
+          controlLocked = ctx.isControlLocked();
+          cutsceneSkippedThisFrame = true;
+        }
+
         // ── Handle pause ─────────────────────────────────────────────────
-        if (input.isJustPressed(Action.Pause)) {
+        if (!cutsceneSkippedThisFrame && input.isJustPressed(Action.Pause)) {
           if (dialogueOpen) {
             uiBus.emit("dialogue:close", {});
+          } else if (abilityMenuOpen) {
+            uiBus.emit("abilitymenu:close", {});
           } else if (craftingOpen) {
             uiBus.emit("crafting:close", {});
           } else if (inventoryOpen) {
@@ -949,6 +2180,10 @@ async function boot() {
           }
         }
 
+        if (!controlLocked && input.isJustPressed(Action.Minimap)) {
+          uiBus.emit("minimap:toggle", {});
+        }
+
         let activeBossArena = prefabLoader.getActiveBossArena?.() ?? null;
 
         // ── Lock-on toggle ────────────────────────────────────────────────
@@ -971,20 +2206,34 @@ async function boot() {
 
         // ── Stream procedural world chunks around the player (W-01) ───────
         chunkManager.update(player.position.x, player.position.z);
+        currentMusicBiome = chunkManager.sampleAtmosphereBiome(player.position.x, player.position.z);
         sceneBiomeAtmosphere?.applyBiome(
-          chunkManager.sampleAtmosphereBiome(player.position.x, player.position.z),
+          currentMusicBiome,
           dt
+        );
+        updateMusic();
+
+        const interactionTargetAtFrameStart = !controlLocked && (
+          prefabLoader.isPlayerNearInteractable()
+          || (typeof gatheringSystem.hasInteractable === "function"
+            ? gatheringSystem.hasInteractable(player.position, playerForward)
+            : nearbyResourceNodeId !== null)
+          || (typeof npcSpawner.hasInteractable === "function"
+            ? npcSpawner.hasInteractable(player.position, playerForward)
+            : nearbyNpcName !== null)
         );
 
         // ── Authored prefab updates (W-03/W-08 Hearthmere camp + crypt) ──
         prefabLoader.update(
           dt,
           player.position,
-          !controlLocked && input.isJustPressed(Action.Interact),
-          { playerHasIframes: player.hasIframes }
+          !controlLocked && interactJustPressed,
+          { controlLocked, playerHasIframes: player.hasIframes }
         );
+        controlLocked = ctx.isControlLocked();
         activeBossArena = prefabLoader.getActiveBossArena?.() ?? null;
         hud.setInteractPromptVisible(prefabLoader.isPlayerNearInteractable() && !controlLocked);
+        updateMinimap();
 
         // ── Combat ────────────────────────────────────────────────────────
         // Exploration: attack the training dummy. Boss arena: attack the boss.
@@ -1002,10 +2251,12 @@ async function boot() {
         }
 
         // ── Enemy update (training dummy) ─────────────────────────────────
-        enemy.update(dt);
+        if (!controlLocked) {
+          enemy.update(dt);
+        }
 
         // Simple proximity damage from the training dummy
-        if (enemy.alive) {
+        if (!controlLocked && enemy.alive) {
           const dx = player.position.x - enemy.position.x;
           const dz = player.position.z - enemy.position.z;
           if (dx * dx + dz * dz < 1.8 * 1.8) {
@@ -1034,10 +2285,32 @@ async function boot() {
           npcSpawner.update(dt, player.position, playerForward, input);
         }
 
-        // ── Wandering enemies (W-07) ──────────────────────────────────────
-        enemySpawner.update(dt, player);
+        // ── Abilities + hotbar (W-11) ────────────────────────────────────
+        if (!controlLocked) {
+          if (input.isJustPressed(Action.AbilityQ)) {
+            tryUseAbilitySlot("Q", activeBossArena);
+          }
 
-        // ── HUD i-frame indicator ─────────────────────────────────────────
+          if (input.isJustPressed(Action.AbilityR)) {
+            tryUseAbilitySlot("R", activeBossArena);
+          }
+
+          const interactHasPriority = interactionTargetAtFrameStart
+            || prefabLoader.isPlayerNearInteractable()
+            || nearbyResourceNodeId !== null
+            || nearbyNpcName !== null;
+          if (input.isJustPressed(Action.AbilityE) && !interactHasPriority) {
+            tryUseAbilitySlot("E", activeBossArena);
+          }
+        }
+        emitAbilityHotbarUpdate();
+
+        // ── Wandering enemies (W-07) ──────────────────────────────────────
+        if (!controlLocked) {
+          enemySpawner.update(dt, player);
+        }
+
+        // -- HUD dodge phase cue ------------------------------------------
         hud.setIFrameIndicator(player.hasIframes);
         hud.updateGhost(dt);
 
@@ -1057,6 +2330,8 @@ async function boot() {
     uiBus.emit("boot:ready", {
       message: "Ashfall Road  ·  Clear the Hollowborn  ·  Face the Caravan Guard",
     });
+    updateMusic({ fadeIn: 1.2, crossfade: 1.2 });
+    playOpeningCinematic();
     void initialTarget; // camera target is used by FollowCamera internally
   } catch (err) {
     if (isDisposed) return;

@@ -34,6 +34,23 @@ function completeTessaQuest(questLog) {
   });
 }
 
+function activateRoadQuest() {
+  return reduceQuestEvent(
+    createQuestLog(),
+    HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER
+  );
+}
+
+function completeRoadQuest(questLog) {
+  return [
+    { type: QUEST_EVENT_TYPES.ENEMY_DIED, enemyTypeId: "hollow_shambler", count: 3 },
+    { type: QUEST_EVENT_TYPES.GATHERING_HARVESTED, itemId: "timber", count: 3 },
+    { type: QUEST_EVENT_TYPES.GATHERING_HARVESTED, itemId: "iron_ore", count: 2 },
+    { type: QUEST_EVENT_TYPES.CRAFTING_CRAFTED, output: { itemId: "hearthlight_hatchet", count: 1 } },
+    { type: QUEST_EVENT_TYPES.BOSS_DEFEATED, bossId: "hearthmere.boss.hollowbound_guard" }
+  ].reduce((nextLog, event) => reduceQuestEvent(nextLog, event), questLog);
+}
+
 describe("QuestCompletionService", () => {
   it("detects rewards for quests that newly transition to completed", () => {
     const previousQuestLog = activateTessaQuest();
@@ -50,6 +67,26 @@ describe("QuestCompletionService", () => {
           id: "hearthmere.tessa_gather.reward",
           type: "xp",
           xp: 35
+        }
+      }
+    ]);
+  });
+
+  it("detects the Act 1 road quest reward with the backend-aligned client id", () => {
+    const previousQuestLog = activateRoadQuest();
+    const nextQuestLog = completeRoadQuest(previousQuestLog);
+
+    expect(detectNewlyCompletedQuestRewards({
+      previousQuestLog,
+      nextQuestLog
+    })).toEqual([
+      {
+        questId: "hearthmere.road_that_still_stands",
+        rewardId: "hearthmere.road_that_still_stands.reward",
+        rewardMetadata: {
+          id: "hearthmere.road_that_still_stands.reward",
+          type: "xp",
+          xp: 30
         }
       }
     ]);

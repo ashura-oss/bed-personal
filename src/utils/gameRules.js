@@ -1,5 +1,8 @@
 import { createHttpError } from "./httpError.js";
 
+const MIN_CHARACTER_NAME_LENGTH = 2;
+const MAX_CHARACTER_NAME_LENGTH = 40;
+
 export const allowedOrigins = [
   "Exiled Noble",
   "Street Thief",
@@ -103,6 +106,25 @@ export function validateClassName(className) {
 
 export function validateAffinity(affinity) {
   validateAllowedValue("affinity", affinity, allowedAffinities);
+}
+
+export function validateCharacterName(characterName) {
+  if (typeof characterName !== "string" || characterName.trim().length === 0) {
+    throw createHttpError(
+      400,
+      "Bad Request",
+      "characterName is required and must be a non-empty string."
+    );
+  }
+
+  const length = characterName.trim().length;
+  if (length < MIN_CHARACTER_NAME_LENGTH || length > MAX_CHARACTER_NAME_LENGTH) {
+    throw createHttpError(
+      400,
+      "Bad Request",
+      `characterName must be between ${MIN_CHARACTER_NAME_LENGTH} and ${MAX_CHARACTER_NAME_LENGTH} characters.`
+    );
+  }
 }
 
 export function validateRequiredStat(requiredStat) {

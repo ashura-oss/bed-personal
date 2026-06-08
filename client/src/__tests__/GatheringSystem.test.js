@@ -277,6 +277,8 @@ describe("GatheringSystem real ResourceNode integration", () => {
 
     expect(scene.added.length).toBe(1);
     expect(rapier.createdBodies.length).toBe(1);
+    expect(gs.hasInteractable({ x: 0, y: 0, z: 0 }, facingForward)).toBe(true);
+    expect(gs.hasInteractable({ x: 0, y: 0, z: 10 }, facingForward)).toBe(false);
 
     gs.update(
       { x: 0, y: 0, z: 0 },
@@ -361,6 +363,7 @@ describe("GatheringSystem real ResourceNode integration", () => {
     gs.update({ x: 0, y: 0, z: 0 }, facingForward, interact);
 
     expect(bus.events("gathering:harvested").length).toBe(1);
+    expect(gs.hasInteractable({ x: 0, y: 0, z: 0 }, facingForward)).toBe(false);
     const depleted = bus.events("gathering:depleted");
     expect(depleted.length).toBe(1);
     expect(depleted[0].payload.depletionKey).toBe("0,0:0:herb:0:2");

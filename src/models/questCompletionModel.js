@@ -11,6 +11,12 @@ export const HEARTHMERE_LOCAL_QUEST_REWARDS = Object.freeze({
     title: "Fuel for the Emberwright",
     rewardXp: 35
   }),
+  "hearthmere.road_that_still_stands": Object.freeze({
+    questId: "hearthmere.road_that_still_stands",
+    regionId: "hearthmere",
+    title: "The Road That Still Stands",
+    rewardXp: 30
+  }),
   "hearthmere.aldric_hollow": Object.freeze({
     questId: "hearthmere.aldric_hollow",
     regionId: "hearthmere",

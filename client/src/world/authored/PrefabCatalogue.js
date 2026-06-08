@@ -2,8 +2,7 @@
  * PrefabCatalogue — WM-06 / WM-07
  *
  * Maps authored prefab tag strings to their definition objects.
- * All 4 previously-greybox prefabs are now authored builds with
- * distinct primitive-geometry setpieces.
+ * All authored prefab tags resolve to distinct primitive-geometry setpieces.
  */
 
 import { HEARTHMERE_CAMP_PREFAB } from "../prefab/prefabs/hearthmereCamp.js";

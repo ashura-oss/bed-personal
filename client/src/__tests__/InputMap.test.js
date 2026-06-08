@@ -1,5 +1,15 @@
+/**
+ * @jest-environment jsdom
+ */
 import { describe, expect, it } from "@jest/globals";
-import { Action, actionForKeyCode, axesToDirection } from "../controls/InputMap.js";
+import {
+  Action,
+  InputMap,
+  actionForKeyCode,
+  actionsForKeyCode,
+  axesToDirection,
+  isGameMouseInputTarget
+} from "../controls/InputMap.js";
 
 // InputMap itself requires a DOM environment; we test only the pure helper.
 
@@ -57,7 +67,58 @@ describe("actionForKeyCode", () => {
     expect(actionForKeyCode("KeyJ")).toBe(Action.LightAttack);
   });
 
+  it("maps KeyM to the minimap action", () => {
+    expect(actionForKeyCode("KeyM")).toBe(Action.Minimap);
+  });
+
+  it("maps Q/R to ability slots and keeps KeyE as the primary interact action", () => {
+    expect(actionForKeyCode("KeyQ")).toBe(Action.AbilityQ);
+    expect(actionForKeyCode("KeyR")).toBe(Action.AbilityR);
+    expect(actionForKeyCode("KeyE")).toBe(Action.Interact);
+  });
+
+  it("also exposes AbilityE as a secondary KeyE action", () => {
+    expect(actionsForKeyCode("KeyE")).toEqual([Action.Interact, Action.AbilityE]);
+  });
+
   it("returns null for unmapped keys", () => {
     expect(actionForKeyCode("KeyP")).toBeNull();
+  });
+});
+
+describe("isGameMouseInputTarget", () => {
+  it("ignores interactive UI controls and explicit input blockers", () => {
+    const root = document.createElement("section");
+    root.dataset.gameInputBlocker = "true";
+    const button = document.createElement("button");
+    root.appendChild(button);
+    document.body.appendChild(root);
+
+    expect(isGameMouseInputTarget(button)).toBe(false);
+    expect(isGameMouseInputTarget(root)).toBe(false);
+    expect(isGameMouseInputTarget(document.body)).toBe(true);
+
+    root.remove();
+  });
+});
+
+describe("InputMap mouse input filtering", () => {
+  it("does not treat UI button clicks as light attacks", () => {
+    const input = new InputMap();
+    const button = document.createElement("button");
+    document.body.appendChild(button);
+
+    button.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
+
+    expect(input.isJustPressed(Action.LightAttack)).toBe(false);
+    expect(input.isHeld(Action.LightAttack)).toBe(false);
+
+    document.body.dispatchEvent(new MouseEvent("mousedown", { button: 0, bubbles: true }));
+
+    expect(input.isJustPressed(Action.LightAttack)).toBe(true);
+    expect(input.isHeld(Action.LightAttack)).toBe(true);
+
+    button.remove();
+    input.dispose();
   });
 });

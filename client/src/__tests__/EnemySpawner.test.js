@@ -229,8 +229,22 @@ describe("EnemySpawner", () => {
     expect(player.takeDamage).toHaveBeenCalledWith(8);
   });
 
-  // 5. Dead enemies are skipped in update()
-  it("dead enemies are skipped in update()", () => {
+  it("getCombatTargets returns live wandering enemies only", () => {
+    const spawner = makeSpawner();
+
+    spawner.spawnEnemiesForChunk(0, 0, "hearthmere", HEIGHT_AT);
+    const enemies = spawner._enemiesByChunk.get("0,0");
+    enemies[0]._isDead = true;
+
+    const targets = spawner.getCombatTargets();
+
+    expect(targets).toHaveLength(enemies.length - 1);
+    expect(targets).not.toContain(enemies[0]);
+    expect(targets.every((target) => typeof target.takeDamage === "function")).toBe(true);
+  });
+
+  // 5. Dead enemies skip AI but still update visuals so they can hide immediately.
+  it("dead enemies skip AI but still update visuals", () => {
     const scene = makeScene();
     const bus = makeBus();
     const spawner = new EnemySpawner({ scene, worldSeed: WORLD_SEED, uiBus: bus });
@@ -249,12 +263,14 @@ describe("EnemySpawner", () => {
 
     spawner.update(0.016, { x: 0, y: 0, z: 0 });
 
-    // enemy.update and visual.update should NOT have been called on dead enemies
+    // enemy.update should not run, but visual.update must still run so the
+    // visual can observe isDead and hide before chunk unload.
     for (const enemy of enemies) {
       expect(enemy.update).not.toHaveBeenCalled();
     }
     for (const visual of visualInstances) {
-      expect(visual.update).not.toHaveBeenCalled();
+      expect(visual.update).toHaveBeenCalledTimes(1);
+      expect(visual.update).toHaveBeenCalledWith(0.016);
     }
   });
 

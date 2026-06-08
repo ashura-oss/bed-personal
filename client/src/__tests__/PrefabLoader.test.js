@@ -257,6 +257,50 @@ describe("PrefabLoader", () => {
     expect(loader.isPlayerNearInteractable()).toBe(true);
   });
 
+  it("enumerates built Hearthlights for map markers", () => {
+    const instance = {
+      id: "hearthmere_camp",
+      hearthlights: [
+        {
+          group: {
+            position: { x: 4, y: 1, z: 8 }
+          }
+        }
+      ],
+      dispose() {}
+    };
+    const anchor = {
+      id: "hearthmere_camp",
+      build: () => instance
+    };
+    const registry = {
+      getAnchorById(id) {
+        return id === anchor.id ? anchor : null;
+      },
+      getPrefabAnchors() {
+        return [anchor];
+      },
+      getPlacementsOverlappingChunk() {
+        return [anchor];
+      }
+    };
+    const loader = new PrefabLoader({}, null, registry);
+
+    expect(loader.getHearthlights()).toEqual([]);
+
+    loader.ensureChunk(0, 0);
+
+    expect(loader.getHearthlights()).toEqual([
+      {
+        id: "hearthmere_camp:hearthlight:0",
+        instanceId: "hearthmere_camp",
+        name: "Hearthmere Camp Hearthlight",
+        hearthlight: instance.hearthlights[0],
+        position: { x: 4, y: 1, z: 8 }
+      }
+    ]);
+  });
+
   it("collects boss arenas and returns the active arena generically", () => {
     const inactiveArena = { active: false };
     const activeArena = { active: true };

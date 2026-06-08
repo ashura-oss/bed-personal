@@ -65,8 +65,8 @@ describe("QuestViewModel", () => {
     expect(view.summary).toEqual({
       activeCount: 1,
       completedCount: 1,
-      inactiveCount: 3,
-      totalCount: 5
+      inactiveCount: 4,
+      totalCount: 6
     });
     expect(view.active[0]).toMatchObject({
       questId: "hearthmere.tessa_gather",
@@ -111,6 +111,7 @@ describe("QuestViewModel", () => {
       }
     });
     expect(view.inactive.map((quest) => quest.status)).toEqual([
+      QUEST_STATUS.INACTIVE,
       QUEST_STATUS.INACTIVE,
       QUEST_STATUS.INACTIVE,
       QUEST_STATUS.INACTIVE

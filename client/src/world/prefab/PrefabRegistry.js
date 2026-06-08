@@ -15,7 +15,7 @@ const LEGACY_EXCLUSION_POINTS = Object.freeze([
   Object.freeze({ x: 0, z: 3 }),   // player spawn
   Object.freeze({ x: 0, z: -4 }),  // training dummy
   Object.freeze({ x: 0, z: -14 }), // current fog gate
-  Object.freeze({ x: 0, z: -20 })  // current boss placeholder
+  Object.freeze({ x: 0, z: -20 })  // current boss arena anchor
 ]);
 
 export class PrefabRegistry {

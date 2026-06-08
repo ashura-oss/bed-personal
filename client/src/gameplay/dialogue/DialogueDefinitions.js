@@ -25,6 +25,28 @@
 
 export const DIALOGUE_TREES = Object.freeze({
 
+  // ── First Shard Memory ───────────────────────────────────────────────────
+
+  "heart_remembers_you": Object.freeze({
+    start: "root",
+    nodes: Object.freeze({
+      root: Object.freeze({
+        speaker: "The Worldheart",
+        text: "The Heart remembers you.",
+        choices: Object.freeze([
+          Object.freeze({ label: "(Continue)", next: "echo" })
+        ])
+      }),
+      echo: Object.freeze({
+        speaker: "The Worldheart",
+        text: "Carry this light to Hearthmere. The road has not forgotten its oath.",
+        choices: Object.freeze([
+          Object.freeze({ label: "(Leave)", effect: "story.shard_absorbed_first", next: null })
+        ])
+      })
+    })
+  }),
+
   // ── Tessa the Emberwright ─────────────────────────────────────────────────
 
   "tessa.intro": Object.freeze({

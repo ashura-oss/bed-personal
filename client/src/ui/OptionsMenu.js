@@ -23,7 +23,8 @@ export class OptionsMenu {
   constructor(container, audio, onClose) {
     this.isOpen = false;
     this.container = container;
-    this.audio = audio;
+    this.audioTargets = (Array.isArray(audio) ? audio : [audio])
+      .filter((target) => typeof target?.setMasterVolume === "function");
     this.onClose = onClose;
     this.data = this.loadData();
     this.root = this.buildDOM();
@@ -75,7 +76,13 @@ export class OptionsMenu {
     root.style.setProperty("--rf-ui-scale", String(this.data.uiScale));
     root.style.setProperty("--rf-reduce-post", this.data.reducedPost ? "1" : "0");
     root.style.setProperty("--rf-reduce-shake", this.data.reducedShake ? "1" : "0");
-    this.audio.setMasterVolume(this.data.masterVolume);
+    this.applyMasterVolume(this.data.masterVolume);
+  }
+
+  applyMasterVolume(value) {
+    for (const target of this.audioTargets) {
+      target.setMasterVolume(value);
+    }
   }
 
   buildDOM() {
@@ -151,7 +158,7 @@ export class OptionsMenu {
         span.textContent = `${Math.round(value * 100)}%`;
       }
 
-      this.audio.setMasterVolume(value);
+      this.applyMasterVolume(value);
     });
 
     el.querySelector("#opt-reduce-post")?.addEventListener("change", (event) => {

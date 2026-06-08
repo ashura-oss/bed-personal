@@ -29,7 +29,9 @@
  * @typedef {object} RealmforgeCharacter
  * @property {string} characterId
  * @property {string} characterName
+ * @property {string} origin
  * @property {string} className
+ * @property {string} affinity
  * @property {number} level
  * @property {number} xp
  * @property {number} hp
@@ -44,9 +46,19 @@
  * @typedef {object} AuthResult
  * @property {boolean} ok
  * @property {string} [message]
+ * @property {boolean} [needsCharacterCreation]
  * @property {RealmforgeUser} [user]
  * @property {RealmforgeCharacter} [character]
  * @property {RuntimeCharacterStats} [stats]
+ */
+
+/**
+ * @typedef {object} CreateCharacterInput
+ * @property {string} userId
+ * @property {string} characterName
+ * @property {string} origin
+ * @property {string} className
+ * @property {string} affinity
  */
 
 export {};

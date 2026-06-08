@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { BossController } from "../gameplay/enemies/BossController.js";
+import { addMesh, createArtTracker, makeMaterialSet } from "./art/HearthmereArtKit.js";
 import { FogGate } from "./FogGate.js";
 
 // ── Pure state machine ─────────────────────────────────────────────────────────
@@ -38,8 +39,99 @@ export function computeArenaState(current, { distanceToGate, distanceToCenter, a
 // ── BossArena class ────────────────────────────────────────────────────────────
 
 const ARENA_FLOOR_RADIUS = 14;
-const ARENA_FLOOR_COLOR = 0x1a1215;
 const ARENA_FLOOR_Y_OFFSET = 0.02; // slightly above terrain to avoid z-fight
+const ARENA_RING_RUNE_COUNT = 12;
+
+function createArenaFloor(center) {
+  const tracker = createArtTracker();
+  const materials = makeMaterialSet(tracker, {
+    mud: 0x211817,
+    soot: 0x100d0c,
+    ash: 0x332d29,
+    ember: 0xff5a18,
+    emberGold: 0xffb15c,
+    focusBlue: 0x82d8d0,
+  });
+  const group = new THREE.Group();
+  group.name = "hearthmere-boss-arena-floor";
+
+  addMesh(group, tracker, new THREE.CylinderGeometry(ARENA_FLOOR_RADIUS, ARENA_FLOOR_RADIUS * 0.96, 0.08, 64), materials.soot, {
+    position: [0, 0, 0],
+    receiveShadow: true,
+    castShadow: false,
+    name: "sunken-crypt-arena-base",
+  });
+
+  addMesh(group, tracker, new THREE.CylinderGeometry(ARENA_FLOOR_RADIUS * 0.74, ARENA_FLOOR_RADIUS * 0.72, 0.045, 64), materials.mud, {
+    position: [0, 0.052, 0],
+    receiveShadow: true,
+    castShadow: false,
+    name: "worn-inner-fighting-stone",
+  });
+
+  const outerSlabGeo = new THREE.BoxGeometry(1.02, 0.11, 0.46);
+  tracker.trackGeometry(outerSlabGeo);
+  for (let i = 0; i < 32; i += 1) {
+    const angle = (i / 32) * Math.PI * 2;
+    const radius = ARENA_FLOOR_RADIUS * 0.94 + (i % 3) * 0.04;
+    addMesh(group, tracker, outerSlabGeo.clone(), i % 5 === 0 ? materials.ash : materials.mud, {
+      position: [Math.sin(angle) * radius, 0.105, Math.cos(angle) * radius],
+      rotation: [0, angle, 0],
+      scale: [1 + (i % 4) * 0.05, 1, 0.85 + (i % 2) * 0.2],
+      name: "uneven-arena-rim-stone",
+    });
+  }
+
+  const seamGeo = new THREE.BoxGeometry(0.055, 0.028, ARENA_FLOOR_RADIUS * 1.55);
+  tracker.trackGeometry(seamGeo);
+  for (let i = 0; i < 10; i += 1) {
+    const angle = (i / 10) * Math.PI * 2;
+    addMesh(group, tracker, seamGeo.clone(), materials.soot, {
+      position: [0, 0.128, 0],
+      rotation: [0, angle, 0],
+      receiveShadow: false,
+      castShadow: false,
+      name: "charred-arena-floor-seam",
+    });
+  }
+
+  for (const radius of [4.8, 8.6, 12.2]) {
+    addMesh(group, tracker, new THREE.TorusGeometry(radius, 0.035, 6, 80), materials.ash, {
+      position: [0, 0.155, 0],
+      rotation: [Math.PI / 2, 0, 0],
+      receiveShadow: false,
+      castShadow: false,
+      name: "inlaid-crypt-arena-ring",
+    });
+  }
+
+  const runeGeo = new THREE.BoxGeometry(0.14, 0.036, 0.74);
+  const chipGeo = new THREE.BoxGeometry(0.22, 0.034, 0.12);
+  tracker.trackGeometry(runeGeo);
+  tracker.trackGeometry(chipGeo);
+  for (let i = 0; i < ARENA_RING_RUNE_COUNT; i += 1) {
+    const angle = (i / ARENA_RING_RUNE_COUNT) * Math.PI * 2;
+    const radius = 7.15 + (i % 2) * 0.42;
+    addMesh(group, tracker, runeGeo.clone(), i % 3 === 0 ? materials.ember : materials.focus, {
+      position: [Math.sin(angle) * radius, 0.19, Math.cos(angle) * radius],
+      rotation: [0, angle, 0],
+      scale: [1, 1, 0.72 + (i % 4) * 0.08],
+      receiveShadow: false,
+      castShadow: false,
+      name: "low-burning-boss-arena-rune",
+    });
+    addMesh(group, tracker, chipGeo.clone(), materials.soot, {
+      position: [Math.sin(angle + 0.12) * (radius + 0.9), 0.18, Math.cos(angle + 0.12) * (radius + 0.9)],
+      rotation: [0, angle + 0.55, 0],
+      receiveShadow: false,
+      castShadow: false,
+      name: "broken-rune-fill-chip",
+    });
+  }
+
+  group.position.set(center.x, center.y + ARENA_FLOOR_Y_OFFSET, center.z);
+  return { group, tracker };
+}
 
 /**
  * BossArena — a modular, reusable fog-gated boss encounter placed at an
@@ -82,18 +174,11 @@ export class BossArena {
     this._state = ARENA_STATE.DORMANT;
     this._bossDefeated = false;
 
-    // ── Greybox arena floor ────────────────────────────────────────────────
-    const floorGeo = new THREE.CircleGeometry(ARENA_FLOOR_RADIUS, 32);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: ARENA_FLOOR_COLOR,
-      roughness: 0.95,
-      metalness: 0.0,
-    });
-    this._floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    this._floorMesh.rotation.x = -Math.PI / 2;
-    this._floorMesh.position.set(center.x, center.y + ARENA_FLOOR_Y_OFFSET, center.z);
-    this._floorMesh.receiveShadow = true;
-    scene.add(this._floorMesh);
+    // ── Hearthmere arena floor ─────────────────────────────────────────────
+    const arenaFloor = createArenaFloor(center);
+    this._floorGroup = arenaFloor.group;
+    this._floorTracker = arenaFloor.tracker;
+    scene.add(this._floorGroup);
 
     // ── Fog gate (visual-only; BossArena drives sealing via distance) ─────
     // Pass a no-op onCrossed — BossArena activates via computeArenaState, not
@@ -200,9 +285,8 @@ export class BossArena {
   dispose() {
     this._fogGate.dispose();
     this._boss.dispose();
-    this._scene.remove(this._floorMesh);
-    this._floorMesh.geometry.dispose();
-    this._floorMesh.material.dispose();
+    this._scene.remove(this._floorGroup);
+    this._floorTracker.dispose();
   }
 
   // ── Private ────────────────────────────────────────────────────────────────

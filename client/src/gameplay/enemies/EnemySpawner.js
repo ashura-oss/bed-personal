@@ -171,7 +171,12 @@ export class EnemySpawner {
 
       for (let i = 0; i < enemies.length; i += 1) {
         const enemy = enemies[i];
-        if (enemy.isDead) continue;
+        if (enemy.isDead) {
+          if (visuals && visuals[i]) {
+            visuals[i].update(dt);
+          }
+          continue;
+        }
 
         enemy.update(dt, enemyTarget);
         if (visuals && visuals[i]) {
@@ -195,6 +200,26 @@ export class EnemySpawner {
       count += enemies.length;
     }
     return count;
+  }
+
+  /**
+   * Live, damage-capable enemies for player combat systems.
+   * Dead enemies are omitted; loot/death side effects remain owned by each enemy.
+   *
+   * @returns {WanderingEnemy[]}
+   */
+  getCombatTargets() {
+    const targets = [];
+
+    for (const enemies of this._enemiesByChunk.values()) {
+      for (const enemy of enemies) {
+        if (!enemy.isDead) {
+          targets.push(enemy);
+        }
+      }
+    }
+
+    return targets;
   }
 
   // ── Cleanup ─────────────────────────────────────────────────────────────────

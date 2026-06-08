@@ -1,6 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import { ASHFALL_ROAD_GATE_PREFAB } from "../world/prefab/prefabs/ashfallRoadGate.js";
 import { COPPERSTONE_MINE_PREFAB } from "../world/prefab/prefabs/copperstoneMine.js";
+import { HEARTHMERE_CAMP_PREFAB } from "../world/prefab/prefabs/hearthmereCamp.js";
 import { HOLLOW_REACH_RUINS_PREFAB } from "../world/prefab/prefabs/hollowReachRuins.js";
 import {
   HEARTHMERE_CRYPT_PREFAB,
@@ -12,6 +13,7 @@ const PREFAB_CASES = [
   { name: "ashfall_road_gate", def: ASHFALL_ROAD_GATE_PREFAB, expectedId: "ashfall_road_gate" },
   { name: "copperstone_mine", def: COPPERSTONE_MINE_PREFAB, expectedId: "copperstone_mine" },
   { name: "hollow_reach_ruins", def: HOLLOW_REACH_RUINS_PREFAB, expectedId: "hollow_reach_ruins" },
+  { name: "hearthmere_camp", def: HEARTHMERE_CAMP_PREFAB, expectedId: "hearthmere_camp" },
   { name: "hearthmere_crypt", def: HEARTHMERE_CRYPT_PREFAB, expectedId: "hearthmere_crypt" }
 ];
 
@@ -127,6 +129,64 @@ describe("HearthmerePrefabs — authored prefab definitions", () => {
       expect(instance.bossArenas).toEqual([]);
     });
   });
+
+  describe("hearthmere camp production visuals", () => {
+    it("builds fortified caravan outpost dressing without the forge placeholder", () => {
+      const instance = HEARTHMERE_CAMP_PREFAB.build({
+        scene: createSceneStub(),
+        rapier: null,
+        origin: { x: 0, y: 0, z: 0 },
+        callbacks: {}
+      });
+
+      const names = collectObjectNames(instance.group);
+
+      expect(names).toEqual(expect.arrayContaining([
+        "hearthmere-camp-muddy-fortified-pad",
+        "ashfall-road-rutted-caravan-segment",
+        "jagged-caravan-palisade-stake",
+        "broken-caravan-bed",
+        "hearthmere-field-forge-stone-base",
+        "camp-supply-crate",
+        "camp-tarred-supply-barrel",
+        "torn-hearthmere-camp-banner",
+        "camp-live-ember-coal"
+      ]));
+      expect(names).not.toContain("tessa-forge-placeholder");
+
+      instance.dispose();
+    });
+  });
+
+  describe("hearthmere crypt production visuals", () => {
+    it("builds a sealed boss-path entrance with runes, skulls, rubble, and Worldheart details", () => {
+      const instance = buildHearthmere_crypt({
+        scene: createSceneStub(),
+        rapier: null,
+        origin: { x: 0, y: 0, z: 0 },
+        callbacks: {
+          isBossDefeated: () => true
+        }
+      });
+
+      const names = collectObjectNames(instance.group);
+
+      expect(names).toEqual(expect.arrayContaining([
+        "crypt-sealed-door",
+        "crypt-arch-keystone",
+        "crypt-arch-voussoir-stone",
+        "broken-crypt-flagstone",
+        "crypt-rune-plinth-capstone",
+        "crypt-skull-marker-left",
+        "crypt-skull-marker-right",
+        "sealed-door-worldheart-ember-sigil",
+        "worldheart-focus-shard",
+        "crypt-leaning-rubble-block"
+      ]));
+
+      instance.dispose();
+    });
+  });
 });
 
 function createSceneStub() {
@@ -134,4 +194,12 @@ function createSceneStub() {
     add: jest.fn(),
     remove: jest.fn()
   };
+}
+
+function collectObjectNames(root) {
+  const names = [];
+  root.traverse((child) => {
+    if (child.name) names.push(child.name);
+  });
+  return names;
 }

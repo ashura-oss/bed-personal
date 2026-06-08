@@ -14,6 +14,7 @@ describe("HearthmereQuestDefinitions", () => {
     const effects = HEARTHMERE_QUEST_DEFINITIONS.map((definition) => definition.startEffect);
 
     expect(effects).toEqual([
+      HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER,
       HEARTHMERE_QUEST_EFFECTS.TESSA_GATHER_OFFER,
       HEARTHMERE_QUEST_EFFECTS.ALDRIC_HOLLOW_OFFER,
       HEARTHMERE_QUEST_EFFECTS.MARN_SUPPLY_NOTE,
@@ -26,6 +27,8 @@ describe("HearthmereQuestDefinitions", () => {
   test("exports stable lookup helpers", () => {
     expect(listHearthmereQuestDefinitions()).toBe(HEARTHMERE_QUEST_DEFINITIONS);
     expect(getHearthmereQuestDefinition(" hearthmere.tessa_gather ")?.title).toBe("Fuel for the Emberwright");
+    expect(getHearthmereQuestDefinition("hearthmere.road_that_still_stands")?.title)
+      .toBe("The Road That Still Stands");
     expect(getHearthmereQuestDefinition("missing.quest")).toBeNull();
 
     expect(getHearthmereQuestDefinitionForEffect(" quest.brek_mine.offer ")?.id).toBe("hearthmere.brek_mine");
@@ -53,6 +56,10 @@ describe("HearthmereQuestDefinitions", () => {
         }),
         expect.objectContaining({
           type: QUEST_OBJECTIVE_TYPES.CRAFT_ITEM,
+          targetId: "hearthlight_hatchet"
+        }),
+        expect.objectContaining({
+          type: QUEST_OBJECTIVE_TYPES.CRAFT_ITEM,
           targetId: "ashleaf_poultice"
         }),
         expect.objectContaining({
@@ -73,5 +80,26 @@ describe("HearthmereQuestDefinitions", () => {
       });
       expect(definition.rewardMetadata.xp).toBeGreaterThan(0);
     }
+  });
+
+  test("defines the Act 1 road quest as the tracked five-step main quest", () => {
+    const definition = getHearthmereQuestDefinition("hearthmere.road_that_still_stands");
+
+    expect(definition).toMatchObject({
+      title: "The Road That Still Stands",
+      startEffect: HEARTHMERE_QUEST_EFFECTS.ROAD_STANDS_OFFER
+    });
+    expect(definition.objectives.map((objective) => objective.id)).toEqual([
+      "clear_old_road",
+      "recover_caravan_timber",
+      "recover_iron_fittings",
+      "forge_hearthlight_hatchet",
+      "defeat_hollowbound_guard"
+    ]);
+    expect(definition.rewardMetadata).toEqual({
+      id: "hearthmere.road_that_still_stands.reward",
+      type: QUEST_REWARD_TYPES.XP,
+      xp: 30
+    });
   });
 });

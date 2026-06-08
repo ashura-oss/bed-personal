@@ -19,8 +19,12 @@ export const Action = Object.freeze({
   LockOn: "LockOn",
   UseFlask: "UseFlask",
   Interact: "Interact",
+  AbilityQ: "AbilityQ",
+  AbilityE: "AbilityE",
+  AbilityR: "AbilityR",
   Inventory: "Inventory",
   QuestLog: "QuestLog",
+  Minimap: "Minimap",
   Pause: "Pause"
 });
 
@@ -40,14 +44,41 @@ const KEY_BINDINGS = {
   KeyK: Action.HeavyAttack,
   Tab: Action.LockOn,
   KeyF: Action.UseFlask,
+  KeyQ: Action.AbilityQ,
   KeyE: Action.Interact,
+  KeyR: Action.AbilityR,
   KeyI: Action.Inventory,
   KeyL: Action.QuestLog,
+  KeyM: Action.Minimap,
   Escape: Action.Pause
+};
+
+const EXTRA_KEY_BINDINGS = {
+  KeyE: Object.freeze([Action.AbilityE])
 };
 
 export function actionForKeyCode(code) {
   return KEY_BINDINGS[code] ?? null;
+}
+
+export function actionsForKeyCode(code) {
+  const primary = actionForKeyCode(code);
+  const extras = EXTRA_KEY_BINDINGS[code] ?? [];
+  return Object.freeze(primary ? [primary, ...extras] : [...extras]);
+}
+
+export function isGameMouseInputTarget(target) {
+  if (!target || typeof target.closest !== "function") return true;
+
+  return !target.closest([
+    "[data-game-input-blocker]",
+    "button",
+    "a",
+    "input",
+    "select",
+    "textarea",
+    "[role='button']"
+  ].join(","));
 }
 
 export class InputMap {
@@ -62,25 +93,31 @@ export class InputMap {
     this.mb2Just = false;
 
     this.onKeyDown = event => {
-      const action = actionForKeyCode(event.code);
-      if (!action) return;
+      const actions = actionsForKeyCode(event.code);
+      if (actions.length === 0) return;
 
       // Prevent browser defaults (space = scroll, tab = focus trap, etc.)
       event.preventDefault();
 
-      if (!this.held.has(action)) {
-        this.justPressed.add(action);
-      }
+      for (const action of actions) {
+        if (!this.held.has(action)) {
+          this.justPressed.add(action);
+        }
 
-      this.held.add(action);
+        this.held.add(action);
+      }
     };
 
     this.onKeyUp = event => {
-      const action = actionForKeyCode(event.code);
-      if (action) this.held.delete(action);
+      const actions = actionsForKeyCode(event.code);
+      for (const action of actions) {
+        this.held.delete(action);
+      }
     };
 
     this.onMouseDown = event => {
+      if (!isGameMouseInputTarget(event.target)) return;
+
       if (event.button === 0) {
         this.mb0Down = true;
         this.mb0Just = true;

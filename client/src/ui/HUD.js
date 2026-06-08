@@ -139,7 +139,7 @@ export class HUD {
     this.renderInteractPrompt();
   }
 
-  /** Show / hide the i-frame debug indicator. */
+  /** Show / hide the dodge phase cue. */
   setIFrameIndicator(active) {
     this.iframeIndicator?.classList.toggle("iframe-active", active);
   }
@@ -340,6 +340,10 @@ export class HUD {
           "Safe Rest"
         );
       }),
+      this.bus.on("hearthlight:hidden", () => {
+        this.hearthlightMenu.classList.remove("menu-open");
+        this.hearthlightMenu.setAttribute("aria-hidden", "true");
+      }),
       this.bus.on("pause:opened", () => {
         this.pauseMenu.classList.add("menu-open");
         this.pauseMenu.setAttribute("aria-hidden", "false");
@@ -387,6 +391,9 @@ export class HUD {
     bindClick("btn-hearthlight-crafting", () => {
       this.bus.emit("hearthlight:crafting", {});
     });
+    bindClick("btn-hearthlight-abilities", () => {
+      this.bus.emit("hearthlight:abilities", {});
+    });
     bindClick("btn-hearthlight-leave", () => {
       this.bus.emit("menu:closed", {});
     });
@@ -428,6 +435,7 @@ export class HUD {
           <div class="controls-chip"><kbd>Space</kbd><span>Dodge</span></div>
           <div class="controls-chip"><kbd>J</kbd><span>Light Cut</span></div>
           <div class="controls-chip"><kbd>K</kbd><span>Heavy Cut</span></div>
+          <div class="controls-chip"><kbd>Q/E/R</kbd><span>Abilities</span></div>
           <div class="controls-chip"><kbd>Tab</kbd><span>Lock On</span></div>
           <div class="controls-chip"><kbd>E</kbd><span>Interact</span></div>
         </div>

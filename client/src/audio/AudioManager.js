@@ -3,47 +3,85 @@ import {
   subscribeCombatFeedback
 } from "../gameplay/combat/CombatFeedbackSignals.js";
 
+function getGlobalValue(name) {
+  if (typeof globalThis === "undefined") {
+    return undefined;
+  }
+
+  return globalThis[name];
+}
+
 /**
- * AudioManager — Web Audio API manager for Realmforge.
+ * AudioManager - procedural Hearthmere sound design.
  *
- * Manages a single AudioContext (must be resumed after first user gesture).
- * Exposes play(), stopAll(), setMasterVolume(), and dispose().
- *
- * Phase 4 greybox: all sounds are generated procedurally (oscillators +
- * noise) so the game has audio feel without external audio files.
- * Real SFX/music assets replace these in the Phase 4 art pass.
- *
- * No UIBus dependency — callers drive audio from game events in main.js.
+ * The game ships without external SFX files, so every cue is built from Web
+ * Audio primitives: pitched oscillators, shaped noise, filtering, stereo
+ * placement, and tight envelopes. The public API remains intentionally small
+ * because main.js drives sound from gameplay events.
  */
 export class AudioManager {
-  constructor() {
-    this.ctx = null;
+  constructor(options = {}) {
+    this.windowRef = options.window ?? (typeof window !== "undefined" ? window : null);
+    this.performanceRef =
+      options.performance ??
+      this.windowRef?.performance ??
+      getGlobalValue("performance") ??
+      null;
+    this.AudioContextClass =
+      options.AudioContextClass ??
+      options.AudioContext ??
+      this.windowRef?.AudioContext ??
+      this.windowRef?.webkitAudioContext ??
+      getGlobalValue("AudioContext") ??
+      getGlobalValue("webkitAudioContext") ??
+      null;
+
+    this.ctx = options.audioContext ?? null;
     this.masterGain = null;
-    this.masterVolume = 0.65;
+    this.masterVolume = options.masterVolume ?? 0.65;
+    this.enabled = options.enabled ?? true;
+    this.isDisposed = false;
     this.active = new Set();
+    this.cleanupByNode = new Map();
     this.noiseBuffer = null;
     this.variationIndex = new Map();
     this.lastPlayAtMs = new Map();
+    this.unlockEvents = [];
     this.resumeCtx = () => {
-      void this.getCtx().resume();
+      const ctx = this.getCtx();
+      if (ctx?.state === "suspended" && typeof ctx.resume === "function") {
+        void ctx.resume();
+      }
     };
 
-    window.addEventListener("pointerdown", this.resumeCtx, { once: true });
-    window.addEventListener("keydown", this.resumeCtx, { once: true });
+    if (options.autoUnlock !== false && this.windowRef?.addEventListener) {
+      this.windowRef.addEventListener("pointerdown", this.resumeCtx, { once: true });
+      this.windowRef.addEventListener("keydown", this.resumeCtx, { once: true });
+      this.unlockEvents.push("pointerdown", "keydown");
+    }
 
-    this.unsubscribeFeedback = subscribeCombatFeedback((signal) => {
-      this.onCombatFeedback(signal);
-    });
+    this.unsubscribeFeedback =
+      options.subscribeToFeedback === false
+        ? () => undefined
+        : subscribeCombatFeedback((signal) => {
+            this.onCombatFeedback(signal);
+          });
+  }
+
+  setEnabled(enabled) {
+    this.enabled = Boolean(enabled);
+    if (!this.enabled) {
+      this.stopAll();
+    }
   }
 
   setMasterVolume(value) {
     this.masterVolume = Math.max(0, Math.min(1, value));
-    if (this.masterGain) {
-      this.masterGain.gain.setTargetAtTime(this.masterVolume, this.getCtx().currentTime, 0.02);
+    if (this.masterGain && this.ctx) {
+      this.masterGain.gain.setTargetAtTime(this.masterVolume, this.ctx.currentTime, 0.02);
     }
   }
 
-  /** Play a procedural sound by id. */
   play(id) {
     if (id === "dodge") {
       emitCombatFeedback({
@@ -52,8 +90,12 @@ export class AudioManager {
       });
     }
 
+    if (!this.enabled || this.isDisposed) {
+      return;
+    }
+
     const ctx = this.getCtx();
-    if (!ctx || ctx.state === "suspended") {
+    if (!this.canUseContext(ctx)) {
       return;
     }
 
@@ -97,37 +139,74 @@ export class AudioManager {
     }
   }
 
-  dispose() {
-    for (const node of this.active) {
+  stopAll() {
+    for (const node of [...this.active]) {
       try {
-        node.stop();
+        node.stop(this.ctx?.currentTime ?? 0);
       } catch {
-        // already stopped
+        // The node may already have been stopped by its scheduled envelope.
       }
+      this.releaseNode(node);
+    }
+  }
+
+  dispose() {
+    if (this.isDisposed) {
+      return;
     }
 
+    this.stopAll();
     this.active.clear();
-    void this.ctx?.close();
-    this.ctx = null;
+    this.cleanupByNode.clear();
     this.noiseBuffer = null;
-    this.unsubscribeFeedback();
-    window.removeEventListener("pointerdown", this.resumeCtx);
-    window.removeEventListener("keydown", this.resumeCtx);
+    this.masterGain = null;
+
+    if (this.ctx && typeof this.ctx.close === "function") {
+      void this.ctx.close();
+    }
+    this.ctx = null;
+    this.isDisposed = true;
+
+    if (typeof this.unsubscribeFeedback === "function") {
+      this.unsubscribeFeedback();
+    }
+
+    if (this.windowRef?.removeEventListener) {
+      for (const eventName of this.unlockEvents) {
+        this.windowRef.removeEventListener(eventName, this.resumeCtx);
+      }
+    }
+    this.unlockEvents = [];
   }
 
   getCtx() {
-    if (!this.ctx) {
-      this.ctx = new AudioContext();
-      this.masterGain = this.ctx.createGain();
-      this.masterGain.gain.value = this.masterVolume;
-      this.masterGain.connect(this.ctx.destination);
+    if (this.isDisposed) {
+      return null;
     }
 
+    if (!this.ctx) {
+      if (!this.AudioContextClass) {
+        return null;
+      }
+      this.ctx = new this.AudioContextClass();
+    }
+
+    this.ensureMasterGain(this.ctx);
     return this.ctx;
   }
 
+  ensureMasterGain(ctx) {
+    if (this.masterGain || !ctx?.createGain) {
+      return;
+    }
+
+    this.masterGain = ctx.createGain();
+    this.masterGain.gain.value = this.masterVolume;
+    this.masterGain.connect(ctx.destination);
+  }
+
   onCombatFeedback(signal) {
-    if (!this.ctx || this.ctx.state === "suspended") {
+    if (!this.enabled || this.isDisposed || !this.canUseContext(this.ctx)) {
       return;
     }
 
@@ -151,323 +230,571 @@ export class AudioManager {
     }
   }
 
-  playSwing(ctx) {
+  playSwing(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
     const variant = this.nextVariant("swing");
-    const baseFreq = [520, 610, 470][variant % 3] + this.randomBetween(-24, 18);
+    const baseFreq = [620, 690, 560][variant % 3] + this.randomBetween(-18, 22);
+    const pan = [-0.18, 0.16, -0.07][variant % 3];
 
     this.playNoiseBurst(ctx, {
-      decay: 0.11,
-      volume: 0.055,
+      delay: 0,
+      decay: 0.12,
+      volume: 0.07,
       filterType: "bandpass",
-      filterFrequency: 1500 + variant * 180,
-      q: 0.7
+      filterFrequency: 1800 + variant * 120,
+      endFilterFrequency: 920,
+      q: 0.85,
+      pan
     });
     this.playTone(ctx, {
       freq: baseFreq,
-      endFreq: baseFreq * 0.44,
-      decay: 0.095,
-      volume: 0.085,
+      endFreq: baseFreq * 0.38,
+      decay: 0.105,
+      volume: 0.09,
       type: variant % 2 === 0 ? "triangle" : "sawtooth",
-      detune: this.randomBetween(-14, 14)
+      detune: this.randomBetween(-9, 9),
+      pan
     });
     this.playTone(ctx, {
-      freq: baseFreq * 1.8,
-      endFreq: baseFreq * 0.95,
+      freq: baseFreq * 2.05,
+      endFreq: baseFreq * 0.92,
       decay: 0.07,
-      volume: 0.026,
+      volume: 0.025,
       type: "sine",
-      detune: this.randomBetween(-8, 8)
+      delay: 0.008,
+      pan: pan * -0.6
     });
   }
 
-  playHit(ctx) {
-    const variant = this.nextVariant("hit");
-    const impactFreq = 118 + variant * 12 + this.randomBetween(-6, 6);
+  playHit(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
 
+    const variant = this.nextVariant("hit");
+    const body = 112 + variant * 10 + this.randomBetween(-5, 5);
+
+    this.playTone(ctx, {
+      freq: body,
+      endFreq: 52,
+      attack: 0.001,
+      decay: 0.16,
+      volume: 0.2,
+      type: "triangle"
+    });
     this.playNoiseBurst(ctx, {
       decay: 0.18,
       volume: 0.18,
       filterType: "lowpass",
-      filterFrequency: 820 + variant * 110,
-      q: 0.9
+      filterFrequency: 1180 + variant * 90,
+      endFilterFrequency: 380,
+      q: 0.95
+    });
+    this.playNoiseBurst(ctx, {
+      delay: 0.006,
+      decay: 0.075,
+      volume: 0.055,
+      filterType: "bandpass",
+      filterFrequency: 3250 + variant * 150,
+      q: 1.6,
+      pan: this.randomBetween(-0.08, 0.08)
     });
     this.playTone(ctx, {
-      freq: impactFreq,
-      endFreq: 58,
-      decay: 0.12,
-      volume: 0.16,
-      type: "triangle"
-    });
-    this.playTone(ctx, {
-      freq: 760 + variant * 60,
-      endFreq: 300,
-      decay: 0.082,
-      volume: 0.05,
+      freq: 760 + variant * 42,
+      endFreq: 430,
+      decay: 0.09,
+      volume: 0.04,
       type: "square",
-      detune: this.randomBetween(-10, 10)
+      detune: this.randomBetween(-8, 8)
     });
   }
 
-  playDodge(ctx) {
+  playDodge(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
     const variant = this.nextVariant("dodge");
+    const pan = variant % 2 === 0 ? -0.22 : 0.22;
 
     this.playNoiseBurst(ctx, {
-      decay: 0.14,
-      volume: 0.065,
-      filterType: "highpass",
-      filterFrequency: 520 + variant * 90,
-      q: 0.6
-    });
-    this.playTone(ctx, {
-      freq: 520 + variant * 28,
-      endFreq: 260,
-      decay: 0.09,
+      decay: 0.16,
       volume: 0.075,
-      type: "sine",
-      detune: this.randomBetween(-12, 12)
+      filterType: "highpass",
+      filterFrequency: 620 + variant * 80,
+      endFilterFrequency: 1300,
+      q: 0.6,
+      pan
     });
     this.playTone(ctx, {
-      freq: 260,
+      freq: 410 + variant * 22,
+      endFreq: 245,
+      decay: 0.09,
+      volume: 0.065,
+      type: "sine",
+      detune: this.randomBetween(-10, 10),
+      pan
+    });
+    this.playTone(ctx, {
+      freq: 255,
       endFreq: 390,
-      decay: 0.06,
-      volume: 0.032,
+      decay: 0.065,
+      volume: 0.028,
       type: "triangle",
-      delay: 0.01
+      delay: 0.018,
+      pan: pan * -0.45
     });
   }
 
-  playHearthlight(ctx) {
+  playHearthlight(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
+    this.playNoiseBurst(ctx, {
+      decay: 0.72,
+      volume: 0.035,
+      filterType: "lowpass",
+      filterFrequency: 1150,
+      endFilterFrequency: 680,
+      q: 0.5
+    });
     this.playTone(ctx, {
       freq: 220,
-      endFreq: 180,
-      decay: 0.42,
-      volume: 0.2,
+      endFreq: 196,
+      attack: 0.018,
+      decay: 0.56,
+      volume: 0.16,
       type: "sine"
     });
     this.playTone(ctx, {
       freq: 330,
-      endFreq: 248,
-      decay: 0.36,
-      volume: 0.12,
+      endFreq: 294,
+      attack: 0.018,
+      decay: 0.52,
+      volume: 0.11,
       type: "triangle",
-      delay: 0.02
+      delay: 0.035,
+      pan: -0.08
     });
     this.playTone(ctx, {
       freq: 440,
-      endFreq: 330,
-      decay: 0.28,
-      volume: 0.045,
+      endFreq: 392,
+      attack: 0.016,
+      decay: 0.48,
+      volume: 0.06,
       type: "sine",
-      delay: 0.05
+      delay: 0.07,
+      pan: 0.1
+    });
+    this.playTone(ctx, {
+      freq: 880,
+      endFreq: 660,
+      attack: 0.006,
+      decay: 0.18,
+      volume: 0.025,
+      type: "triangle",
+      delay: 0.14,
+      pan: 0.18
     });
   }
 
-  playUnmade(ctx) {
+  playUnmade(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
     this.playNoiseBurst(ctx, {
-      decay: 0.55,
-      volume: 0.1,
+      decay: 0.82,
+      volume: 0.12,
       filterType: "lowpass",
-      filterFrequency: 140,
+      filterFrequency: 310,
+      endFilterFrequency: 95,
       q: 0.8
     });
     this.playTone(ctx, {
-      freq: 78,
-      endFreq: 44,
-      decay: 0.62,
+      freq: 76,
+      endFreq: 39,
+      attack: 0.006,
+      decay: 0.72,
       volume: 0.24,
       type: "sawtooth",
-      detune: -8
+      detune: -6
     });
     this.playTone(ctx, {
-      freq: 116,
-      endFreq: 56,
-      decay: 0.5,
+      freq: 113,
+      endFreq: 54,
+      attack: 0.01,
+      decay: 0.58,
       volume: 0.09,
       type: "sine",
-      detune: 4,
-      delay: 0.03
+      detune: 5,
+      delay: 0.025,
+      pan: -0.1
+    });
+    this.playTone(ctx, {
+      freq: 620,
+      endFreq: 250,
+      attack: 0.002,
+      decay: 0.28,
+      volume: 0.028,
+      type: "triangle",
+      delay: 0.04,
+      pan: 0.12
     });
   }
 
-  playBossHit(ctx) {
-    this.playHit(ctx);
+  playBossHit(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
     this.playTone(ctx, {
-      freq: 96,
-      endFreq: 52,
-      decay: 0.16,
-      volume: 0.11,
+      freq: 92,
+      endFreq: 43,
+      decay: 0.2,
+      volume: 0.24,
       type: "sawtooth"
     });
+    this.playNoiseBurst(ctx, {
+      decay: 0.24,
+      volume: 0.22,
+      filterType: "lowpass",
+      filterFrequency: 760,
+      endFilterFrequency: 260,
+      q: 1.1
+    });
+    this.playNoiseBurst(ctx, {
+      delay: 0.008,
+      decay: 0.11,
+      volume: 0.075,
+      filterType: "bandpass",
+      filterFrequency: 2400,
+      q: 1.2,
+      pan: -0.05
+    });
+    this.playTone(ctx, {
+      freq: 184,
+      endFreq: 78,
+      decay: 0.24,
+      volume: 0.075,
+      type: "triangle",
+      detune: -11,
+      delay: 0.02
+    });
   }
 
-  playBossPhase(ctx) {
+  playBossPhase(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
     this.playNoiseBurst(ctx, {
-      decay: 0.45,
-      volume: 0.08,
+      decay: 0.92,
+      volume: 0.11,
       filterType: "bandpass",
-      filterFrequency: 220,
+      filterFrequency: 210,
+      endFilterFrequency: 520,
       q: 0.9
     });
     this.playTone(ctx, {
-      freq: 130,
-      endFreq: 72,
-      decay: 0.72,
+      freq: 118,
+      endFreq: 64,
+      attack: 0.01,
+      decay: 0.86,
       volume: 0.26,
       type: "sawtooth"
     });
     this.playTone(ctx, {
-      freq: 260,
-      endFreq: 140,
-      decay: 0.52,
-      volume: 0.07,
-      type: "triangle",
-      delay: 0.03
-    });
-  }
-
-  playBossDefeat(ctx) {
-    this.playTone(ctx, {
-      freq: 440,
-      endFreq: 330,
-      decay: 0.32,
-      volume: 0.14,
-      type: "sine"
-    });
-    this.playTone(ctx, {
-      freq: 554,
-      endFreq: 440,
-      decay: 0.44,
-      volume: 0.11,
-      type: "triangle",
-      delay: 0.06
-    });
-    this.playTone(ctx, {
-      freq: 660,
-      endFreq: 524,
+      freq: 235,
+      endFreq: 141,
+      attack: 0.012,
       decay: 0.62,
-      volume: 0.09,
-      type: "sine",
-      delay: 0.12
-    });
-  }
-
-  playEmbers(ctx) {
-    this.playTone(ctx, {
-      freq: 660,
-      endFreq: 760,
-      decay: 0.11,
-      volume: 0.055,
-      type: "sine"
-    });
-    this.playTone(ctx, {
-      freq: 880,
-      endFreq: 980,
-      decay: 0.09,
-      volume: 0.036,
+      volume: 0.08,
       type: "triangle",
-      delay: 0.02
+      delay: 0.035,
+      detune: -8,
+      pan: -0.12
     });
-  }
-
-  playUiSelect(ctx) {
     this.playTone(ctx, {
-      freq: 540,
-      endFreq: 660,
-      decay: 0.05,
-      volume: 0.05,
-      type: "sine"
+      freq: 350,
+      endFreq: 210,
+      attack: 0.012,
+      decay: 0.5,
+      volume: 0.045,
+      type: "sine",
+      delay: 0.07,
+      detune: 11,
+      pan: 0.12
     });
   }
 
-  playAttackAccent(ctx, attack, intensity) {
-    const freq = attack === "heavy" ? 220 : 320;
+  playBossDefeat(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
 
     this.playNoiseBurst(ctx, {
-      decay: attack === "heavy" ? 0.09 : 0.06,
-      volume: attack === "heavy" ? 0.03 : 0.02,
+      decay: 0.86,
+      volume: 0.055,
       filterType: "highpass",
-      filterFrequency: attack === "heavy" ? 700 : 1100,
+      filterFrequency: 760,
+      endFilterFrequency: 1550,
+      q: 0.55
+    });
+    this.playTone(ctx, {
+      freq: 220,
+      endFreq: 196,
+      attack: 0.012,
+      decay: 0.42,
+      volume: 0.12,
+      type: "sine"
+    });
+    this.playTone(ctx, {
+      freq: 277,
+      endFreq: 247,
+      attack: 0.014,
+      decay: 0.52,
+      volume: 0.095,
+      type: "triangle",
+      delay: 0.08,
+      pan: -0.08
+    });
+    this.playTone(ctx, {
+      freq: 330,
+      endFreq: 294,
+      attack: 0.014,
+      decay: 0.58,
+      volume: 0.09,
+      type: "sine",
+      delay: 0.16,
+      pan: 0.08
+    });
+    this.playTone(ctx, {
+      freq: 440,
+      endFreq: 392,
+      attack: 0.012,
+      decay: 0.64,
+      volume: 0.07,
+      type: "triangle",
+      delay: 0.25,
+      pan: 0.16
+    });
+  }
+
+  playEmbers(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
+    const variant = this.nextVariant("embers");
+    const base = [660, 740, 830][variant % 3];
+
+    this.playNoiseBurst(ctx, {
+      decay: 0.12,
+      volume: 0.024,
+      filterType: "highpass",
+      filterFrequency: 1700,
+      q: 0.6,
+      pan: -0.1
+    });
+    for (let i = 0; i < 3; i += 1) {
+      this.playTone(ctx, {
+        freq: base + i * 110 + this.randomBetween(-12, 12),
+        endFreq: base + i * 128 + 80,
+        attack: 0.003,
+        decay: 0.075 + i * 0.025,
+        volume: 0.035 - i * 0.006,
+        type: i % 2 === 0 ? "sine" : "triangle",
+        delay: i * 0.024,
+        pan: -0.12 + i * 0.12
+      });
+    }
+  }
+
+  playUiSelect(ctx = this.getCtx()) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
+    this.playTone(ctx, {
+      freq: 510,
+      endFreq: 660,
+      attack: 0.001,
+      decay: 0.048,
+      volume: 0.052,
+      type: "sine"
+    });
+    this.playTone(ctx, {
+      freq: 1020,
+      endFreq: 840,
+      attack: 0.001,
+      decay: 0.035,
+      volume: 0.018,
+      type: "triangle",
+      delay: 0.008
+    });
+  }
+
+  playAttackAccent(ctx = this.getCtx(), attack = "light", intensity = 1) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
+    const isHeavy = attack === "heavy";
+    const force = this.clamp(intensity, 0, 1.25);
+
+    this.playNoiseBurst(ctx, {
+      decay: isHeavy ? 0.1 : 0.065,
+      volume: (isHeavy ? 0.04 : 0.024) * force,
+      filterType: "highpass",
+      filterFrequency: isHeavy ? 680 : 1200,
+      endFilterFrequency: isHeavy ? 980 : 1800,
       q: 0.7
     });
     this.playTone(ctx, {
-      freq,
-      endFreq: attack === "heavy" ? 120 : 180,
-      decay: attack === "heavy" ? 0.09 : 0.055,
-      volume: (attack === "heavy" ? 0.06 : 0.04) * intensity,
-      type: attack === "heavy" ? "sawtooth" : "triangle"
+      freq: isHeavy ? 230 : 330,
+      endFreq: isHeavy ? 118 : 188,
+      decay: isHeavy ? 0.105 : 0.062,
+      volume: (isHeavy ? 0.075 : 0.045) * force,
+      type: isHeavy ? "sawtooth" : "triangle",
+      detune: isHeavy ? -4 : 3
     });
   }
 
-  playImpactAccent(ctx, intensity) {
+  playImpactAccent(ctx = this.getCtx(), intensity = 1) {
+    if (!this.canUseContext(ctx)) {
+      return;
+    }
+
+    const force = this.clamp(intensity, 0, 1.25);
+
     this.playTone(ctx, {
-      freq: 84,
-      endFreq: 48,
-      decay: 0.085,
-      volume: 0.06 * intensity,
+      freq: 86,
+      endFreq: 46,
+      attack: 0.001,
+      decay: 0.095,
+      volume: 0.075 * force,
       type: "triangle"
+    });
+    this.playNoiseBurst(ctx, {
+      delay: 0.004,
+      decay: 0.07,
+      volume: 0.035 * force,
+      filterType: "lowpass",
+      filterFrequency: 520,
+      q: 0.8
     });
   }
 
   playTone(ctx, config) {
-    if (!this.masterGain) {
-      return;
+    if (!this.canSchedule(ctx)) {
+      return null;
     }
 
     const startTime = ctx.currentTime + (config.delay ?? 0);
-    const attack = config.attack ?? 0.002;
-    const stopTime = startTime + config.decay + 0.02;
+    const attack = config.attack ?? 0.003;
+    const decay = Math.max(0.01, config.decay);
+    const stopTime = startTime + decay + 0.03;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
+    const chain = [osc, gain];
+    const destination = this.connectVoiceChain(ctx, gain, config, chain);
 
-    osc.type = config.type;
-    osc.frequency.setValueAtTime(Math.max(20, config.freq), startTime);
-    osc.frequency.exponentialRampToValueAtTime(Math.max(20, config.endFreq), startTime + config.decay);
+    osc.type = config.type ?? "sine";
+    this.setParam(osc.frequency, Math.max(20, config.freq), startTime);
+    this.rampParam(osc.frequency, Math.max(20, config.endFreq ?? config.freq), startTime + decay, "exponential");
 
-    if (config.detune !== undefined) {
-      osc.detune.setValueAtTime(config.detune, startTime);
+    if (config.detune !== undefined && osc.detune) {
+      this.setParam(osc.detune, config.detune, startTime);
     }
 
-    gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.linearRampToValueAtTime(config.volume, startTime + attack);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + config.decay);
+    this.setParam(gain.gain, 0.0001, startTime);
+    this.rampParam(gain.gain, Math.max(0.0001, config.volume), startTime + attack, "linear");
+    this.rampParam(gain.gain, 0.0001, startTime + decay, "exponential");
+
     osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(startTime);
-    osc.stop(stopTime);
-    osc.onended = () => {
-      this.active.delete(osc);
-    };
-    this.active.add(osc);
+    destination.connect(this.masterGain);
+    this.startNode(osc, startTime, stopTime, chain);
+    return osc;
   }
 
   playNoiseBurst(ctx, config) {
-    if (!this.masterGain) {
-      return;
+    if (!this.canSchedule(ctx)) {
+      return null;
     }
 
     const startTime = ctx.currentTime + (config.delay ?? 0);
+    const decay = Math.max(0.012, config.decay);
     const src = ctx.createBufferSource();
     src.buffer = this.getNoiseBuffer(ctx);
 
     const filter = ctx.createBiquadFilter();
-    filter.type = config.filterType;
-    filter.frequency.setValueAtTime(config.filterFrequency, startTime);
-    filter.Q.setValueAtTime(config.q, startTime);
+    filter.type = config.filterType ?? "bandpass";
+    this.setParam(filter.frequency, Math.max(20, config.filterFrequency), startTime);
+    if (config.endFilterFrequency) {
+      this.rampParam(filter.frequency, Math.max(20, config.endFilterFrequency), startTime + decay, "exponential");
+    }
+    this.setParam(filter.Q, config.q ?? 0.8, startTime);
 
     const gain = ctx.createGain();
-    gain.gain.setValueAtTime(0.0001, startTime);
-    gain.gain.linearRampToValueAtTime(config.volume, startTime + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + config.decay);
+    const chain = [src, filter, gain];
+    const destination = this.connectVoiceChain(ctx, gain, config, chain);
+
+    this.setParam(gain.gain, 0.0001, startTime);
+    this.rampParam(gain.gain, Math.max(0.0001, config.volume), startTime + 0.004, "linear");
+    this.rampParam(gain.gain, 0.0001, startTime + decay, "exponential");
 
     src.connect(filter);
     filter.connect(gain);
-    gain.connect(this.masterGain);
-    src.start(startTime);
-    src.stop(startTime + config.decay + 0.03);
-    src.onended = () => {
-      this.active.delete(src);
+    destination.connect(this.masterGain);
+    this.startNode(src, startTime, startTime + decay + 0.04, chain);
+    return src;
+  }
+
+  connectVoiceChain(ctx, gain, config, chain) {
+    if (typeof ctx.createStereoPanner !== "function" || config.pan === undefined) {
+      return gain;
+    }
+
+    const panner = ctx.createStereoPanner();
+    this.setParam(panner.pan, this.clamp(config.pan, -1, 1), ctx.currentTime + (config.delay ?? 0));
+    gain.connect(panner);
+    chain.push(panner);
+    return panner;
+  }
+
+  startNode(node, startTime, stopTime, chain) {
+    this.active.add(node);
+    this.cleanupByNode.set(node, () => {
+      for (const chainNode of chain) {
+        if (typeof chainNode.disconnect === "function") {
+          try {
+            chainNode.disconnect();
+          } catch {
+            // Some Web Audio implementations throw if already disconnected.
+          }
+        }
+      }
+    });
+
+    node.onended = () => {
+      this.releaseNode(node);
     };
-    this.active.add(src);
+    node.start(startTime);
+    node.stop(stopTime);
+  }
+
+  releaseNode(node) {
+    const cleanup = this.cleanupByNode.get(node);
+    this.active.delete(node);
+    this.cleanupByNode.delete(node);
+    if (cleanup) {
+      cleanup();
+    }
   }
 
   getNoiseBuffer(ctx) {
@@ -475,13 +802,16 @@ export class AudioManager {
       return this.noiseBuffer;
     }
 
-    const duration = 1;
+    const duration = 1.5;
     const length = Math.floor(ctx.sampleRate * duration);
     const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
     const data = buffer.getChannelData(0);
+    let previous = 0;
 
     for (let i = 0; i < length; i += 1) {
-      data[i] = Math.random() * 2 - 1;
+      const white = Math.random() * 2 - 1;
+      previous = previous * 0.74 + white * 0.26;
+      data[i] = this.clamp(previous + white * 0.32, -1, 1);
     }
 
     this.noiseBuffer = buffer;
@@ -516,7 +846,7 @@ export class AudioManager {
   }
 
   canPlay(key, cooldownMs) {
-    const now = performance.now();
+    const now = this.now();
     const last = this.lastPlayAtMs.get(key) ?? -Infinity;
     if (now - last < cooldownMs) {
       return false;
@@ -526,13 +856,71 @@ export class AudioManager {
     return true;
   }
 
+  canUseContext(ctx) {
+    this.ensureMasterGain(ctx);
+
+    return Boolean(
+      this.enabled &&
+        !this.isDisposed &&
+        ctx &&
+        ctx.state !== "suspended" &&
+        this.masterGain
+    );
+  }
+
+  canSchedule(ctx) {
+    return Boolean(this.canUseContext(ctx) && typeof ctx.createGain === "function");
+  }
+
+  setParam(param, value, time) {
+    if (!param) {
+      return;
+    }
+
+    if (typeof param.setValueAtTime === "function") {
+      param.setValueAtTime(value, time);
+    } else {
+      param.value = value;
+    }
+  }
+
+  rampParam(param, value, time, type) {
+    if (!param) {
+      return;
+    }
+
+    if (type === "linear" && typeof param.linearRampToValueAtTime === "function") {
+      param.linearRampToValueAtTime(value, time);
+      return;
+    }
+
+    if (type === "exponential" && typeof param.exponentialRampToValueAtTime === "function") {
+      param.exponentialRampToValueAtTime(Math.max(0.0001, value), time);
+      return;
+    }
+
+    this.setParam(param, value, time);
+  }
+
   nextVariant(key) {
     const current = this.variationIndex.get(key) ?? 0;
     this.variationIndex.set(key, current + 1);
     return current;
   }
 
+  now() {
+    if (this.performanceRef && typeof this.performanceRef.now === "function") {
+      return this.performanceRef.now();
+    }
+
+    return Date.now();
+  }
+
   randomBetween(min, max) {
     return min + Math.random() * (max - min);
+  }
+
+  clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
   }
 }

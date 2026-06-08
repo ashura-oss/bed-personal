@@ -82,7 +82,7 @@ describe("QuestLogUI", () => {
 
     expect(root.classList.contains("menu-open")).toBe(true);
     expect(root.getAttribute("aria-hidden")).toBe("false");
-    expect(root.querySelector("[data-questlog-total]").textContent).toBe("5");
+    expect(root.querySelector("[data-questlog-total]").textContent).toBe("6");
   });
 
   it("renders active, completed, and inactive quest groups from an open payload", () => {
@@ -126,7 +126,7 @@ describe("QuestLogUI", () => {
   });
 
   it("updates rendered quest data from quest:changed while preserving the panel", () => {
-    bus.emit("questlog:open", {});
+    bus.emit("questlog:open", { selectedQuestId: "hearthmere.tessa_gather" });
 
     const questLog = reduceQuestEvents(createQuestLog(), [
       "quest.tessa_gather.offer",
@@ -146,10 +146,10 @@ describe("QuestLogUI", () => {
     bus.on("questlog:select", (payload) => selected.push(payload));
     bus.emit("questlog:open", {});
 
-    mount.querySelector('[data-quest-index="1"]').click();
+    mount.querySelector('[data-quest-index="2"]').click();
     expect(selected).toHaveLength(1);
     expect(selected[0]).toMatchObject({
-      selectedIndex: 1,
+      selectedIndex: 2,
       questId: "hearthmere.aldric_hollow"
     });
 

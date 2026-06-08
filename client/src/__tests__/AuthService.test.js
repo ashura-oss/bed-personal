@@ -35,6 +35,192 @@ beforeEach(() => {
   globalThis.localStorage = new MemoryStorage();
 });
 
+const user = Object.freeze({
+  userId: "user-a",
+  username: "demo"
+});
+
+const character = Object.freeze({
+  characterId: "char-a",
+  userId: "user-a",
+  characterName: "Aster",
+  origin: "Hearthmere",
+  className: "Ranger",
+  affinity: "Nature",
+  level: 1,
+  xp: 0,
+  hp: 42,
+  endurance: 7,
+  intelligence: 5,
+  faith: 4,
+  agility: 8,
+  strength: 6
+});
+
+describe("AuthService character creation flow", () => {
+  it("returns a character-creation result when login finds no characters", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    jest.spyOn(api, "post").mockResolvedValue({ token: "jwt-a", user });
+    jest.spyOn(api, "get").mockResolvedValue([]);
+    localStorage.setItem("rf_charId", "stale-char");
+
+    const result = await new AuthService().login("demo", "password");
+
+    expect(result).toEqual({
+      ok: true,
+      user,
+      needsCharacterCreation: true
+    });
+    expect(api.post).toHaveBeenCalledWith("/auth/login", {
+      username: "demo",
+      password: "password"
+    });
+    expect(api.get).toHaveBeenCalledWith("/users/user-a/characters");
+    expect(localStorage.getItem("rf_userId")).toBe("user-a");
+    expect(localStorage.getItem("rf_charId")).toBeNull();
+  });
+
+  it("keeps the existing login character path unchanged", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    jest.spyOn(api, "post").mockResolvedValue({ token: "jwt-a", user });
+    jest.spyOn(api, "get").mockResolvedValue([character]);
+
+    const result = await new AuthService().login("demo", "password");
+
+    expect(result.ok).toBe(true);
+    expect(result.user).toBe(user);
+    expect(result.character).toBe(character);
+    expect(result.needsCharacterCreation).toBeUndefined();
+    expect(result.stats).toEqual({
+      maxHp: 84,
+      maxFp: 58,
+      maxStamina: 114,
+      lightDmg: 30,
+      heavyDmg: 55,
+      rollSpeed: 1.12
+    });
+    expect(localStorage.getItem("rf_charId")).toBe("char-a");
+  });
+
+  it("returns a character-creation result when resume has a valid token and no characters", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    api.setToken("jwt-a");
+    const getSpy = jest.spyOn(api, "get")
+      .mockResolvedValueOnce(user)
+      .mockResolvedValueOnce([]);
+
+    const result = await new AuthService().tryResume();
+
+    expect(result).toEqual({
+      ok: true,
+      user,
+      needsCharacterCreation: true
+    });
+    expect(getSpy).toHaveBeenNthCalledWith(1, "/auth/me");
+    expect(getSpy).toHaveBeenNthCalledWith(2, "/users/user-a/characters");
+    expect(localStorage.getItem("rf_charId")).toBeNull();
+  });
+
+  it("resumes a stored character id without listing characters", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    api.setToken("jwt-a");
+    localStorage.setItem("rf_charId", "char-a");
+    const getSpy = jest.spyOn(api, "get")
+      .mockResolvedValueOnce(user)
+      .mockResolvedValueOnce(character);
+
+    const result = await new AuthService().tryResume();
+
+    expect(result.ok).toBe(true);
+    expect(result.character).toBe(character);
+    expect(getSpy).toHaveBeenNthCalledWith(1, "/auth/me");
+    expect(getSpy).toHaveBeenNthCalledWith(2, "/characters/char-a");
+    expect(getSpy).not.toHaveBeenCalledWith("/users/user-a/characters");
+  });
+
+  it("falls back to the character list when a stored resume character is stale", async () => {
+    const { api, ApiError, AuthService } = await loadAuthServiceWithApi();
+    api.setToken("jwt-a");
+    localStorage.setItem("rf_charId", "stale-char");
+    const getSpy = jest.spyOn(api, "get")
+      .mockResolvedValueOnce(user)
+      .mockRejectedValueOnce(new ApiError(404, {
+        error: "Not Found",
+        message: "Character was not found."
+      }))
+      .mockResolvedValueOnce([character]);
+
+    const result = await new AuthService().tryResume();
+
+    expect(result.ok).toBe(true);
+    expect(result.character).toBe(character);
+    expect(getSpy).toHaveBeenNthCalledWith(1, "/auth/me");
+    expect(getSpy).toHaveBeenNthCalledWith(2, "/characters/stale-char");
+    expect(getSpy).toHaveBeenNthCalledWith(3, "/users/user-a/characters");
+    expect(localStorage.getItem("rf_charId")).toBe("char-a");
+  });
+
+  it("creates and selects a character", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    jest.spyOn(api, "post").mockResolvedValue(character);
+
+    const result = await new AuthService().createCharacter({
+      userId: "user-a",
+      characterName: "Aster",
+      origin: "Hearthmere",
+      className: "Ranger",
+      affinity: "Nature"
+    });
+
+    expect(api.post).toHaveBeenCalledWith("/characters", {
+      userId: "user-a",
+      characterName: "Aster",
+      origin: "Hearthmere",
+      className: "Ranger",
+      affinity: "Nature"
+    });
+    expect(result.ok).toBe(true);
+    expect(result.character).toBe(character);
+    expect(result.stats.maxHp).toBe(84);
+    expect(localStorage.getItem("rf_charId")).toBe("char-a");
+  });
+
+  it("surfaces character creation API failures", async () => {
+    const { api, ApiError, AuthService } = await loadAuthServiceWithApi();
+    jest.spyOn(api, "post").mockRejectedValue(new ApiError(400, {
+      error: "Bad Request",
+      message: "Invalid character origin."
+    }));
+
+    await expect(new AuthService().createCharacter({
+      userId: "user-a",
+      characterName: "Aster",
+      origin: "Bad",
+      className: "Ranger",
+      affinity: "Nature"
+    })).resolves.toEqual({
+      ok: false,
+      message: "Invalid character origin."
+    });
+  });
+
+  it("surfaces character creation network failures", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    jest.spyOn(api, "post").mockRejectedValue(new TypeError("Failed to fetch"));
+
+    await expect(new AuthService().createCharacter({
+      userId: "user-a",
+      characterName: "Aster",
+      origin: "Hearthmere",
+      className: "Ranger",
+      affinity: "Nature"
+    })).resolves.toEqual({
+      ok: false,
+      message: "Could not reach the server. Is the backend running?"
+    });
+  });
+});
+
 describe("AuthService XP persistence", () => {
   it("persists boss XP gains through the progression character route", async () => {
     const { api, AuthService } = await loadAuthServiceWithApi();
@@ -119,6 +305,50 @@ describe("AuthService XP persistence", () => {
 
     expect(api.put).toHaveBeenCalledWith(
       "/progression/characters/char-a/quest-completions/hearthmere%2Fspecial%20quest"
+    );
+  });
+
+  it("loads the ability catalog with optional filters", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    const abilityList = [{ abilityId: "ability_thornbind" }];
+    jest.spyOn(api, "get").mockResolvedValue(abilityList);
+
+    await expect(
+      new AuthService().listAbilities({ className: "Ranger", affinity: "Nature" })
+    ).resolves.toBe(abilityList);
+
+    expect(api.get).toHaveBeenCalledWith("/abilities?className=Ranger&affinity=Nature");
+  });
+
+  it("loads character ability unlocks through the character route", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    const abilityList = [{ abilityId: "ability_thornbind" }];
+    jest.spyOn(api, "get").mockResolvedValue(abilityList);
+
+    await expect(
+      new AuthService().getCharacterAbilities("char/a")
+    ).resolves.toBe(abilityList);
+
+    expect(api.get).toHaveBeenCalledWith("/characters/char%2Fa/abilities");
+  });
+
+  it("unlocks character abilities through the backend ability route", async () => {
+    const { api, AuthService } = await loadAuthServiceWithApi();
+    const unlockResult = {
+      characterAbility: {
+        characterId: "char-a",
+        abilityId: "ability_thornbind"
+      }
+    };
+    jest.spyOn(api, "post").mockResolvedValue(unlockResult);
+
+    await expect(
+      new AuthService().unlockCharacterAbility("char-a", "ability_thornbind")
+    ).resolves.toBe(unlockResult);
+
+    expect(api.post).toHaveBeenCalledWith(
+      "/characters/char-a/unlock-ability",
+      { abilityId: "ability_thornbind" }
     );
   });
 });
