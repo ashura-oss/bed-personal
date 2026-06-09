@@ -1,16 +1,19 @@
-// ✏️ EDIT THIS FILE — add your own table schemas below the example `tasks` table.
-// After adding a new table, run `npm run db` to recreate the database.
-
-/**
- * All table schemas live here. Add new tables below and run `npm run db` to apply.
- */
-
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
-/** Tasks table. */
-export const tasks = sqliteTable('tasks', {
+export const users = sqliteTable('users', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  title: text('title').notNull(),
-  completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
+  username: text('username').notNull().unique(),
+  displayName: text('display_name').notNull(),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});
+
+export const characters = sqliteTable('characters', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: integer('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  archetype: text('archetype').notNull(),
+  level: integer('level').notNull().default(1),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });

@@ -1,6 +1,14 @@
 # Dependencies
 node_modules
 
+# Environment and local database files
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+
 # OS files
 .DS_Store
 Thumbs.db
@@ -11,9 +19,6 @@ Thumbs.db
 
 # Logs
 *.log
-
-# Test coverage
-coverage
 
 # Test coverage
 coverage
