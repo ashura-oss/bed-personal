@@ -12,6 +12,7 @@ Implemented:
 - `characters` table linked to users
 - User routes for listing, creating, viewing, and editing a profile name
 - Character routes for listing, creating, and viewing starter characters
+- Region routes for viewing early world areas
 - Basic validation and shared error responses
 
 Not implemented yet:
@@ -53,6 +54,9 @@ http://localhost:3000
 | `GET` | `/api/characters` | List characters |
 | `POST` | `/api/characters` | Create a character for a user |
 | `GET` | `/api/characters/:characterId` | Get one character |
+| `GET` | `/api/regions` | List starter regions |
+| `GET` | `/api/regions?dangerLevel=1` | Filter regions by danger level |
+| `GET` | `/api/regions/:regionCode` | Get one region by code |
 
 Example user payload:
 

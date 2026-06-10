@@ -5,6 +5,7 @@ import { setupSwagger } from './_extras/api-docs/swagger.js';
 import { errorHandler } from './src/utils/_errors.js';
 import userRoutes from './src/routes/userRoutes.js';
 import characterRoutes from './src/routes/characterRoutes.js';
+import regionRoutes from './src/routes/regionRoutes.js';
 
 const app = express();
 
@@ -19,6 +20,7 @@ app.get('/api/health', healthCheck);
 
 app.use('/api/users', userRoutes);
 app.use('/api/characters', characterRoutes);
+app.use('/api/regions', regionRoutes);
 
 await setupSwagger(app);
 

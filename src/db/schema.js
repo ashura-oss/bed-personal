@@ -17,3 +17,13 @@ export const characters = sqliteTable('characters', {
   level: integer('level').notNull().default(1),
   createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
 });
+
+export const regions = sqliteTable('regions', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  code: text('code').notNull().unique(),
+  name: text('name').notNull().unique(),
+  description: text('description').notNull(),
+  dangerLevel: integer('danger_level').notNull().default(1),
+  isUnlocked: integer('is_unlocked', { mode: 'boolean' }).notNull().default(true),
+  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+});

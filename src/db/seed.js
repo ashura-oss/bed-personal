@@ -3,11 +3,28 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import 'dotenv/config';
 
-import { characters, users } from './schema.js';
+import { characters, regions, users } from './schema.js';
 
 const sampleUsers = [
   { username: 'ashura', displayName: 'Ashura' },
   { username: 'ember', displayName: 'Ember Initiate' },
+];
+
+const sampleRegions = [
+  {
+    code: 'hearthmere',
+    name: 'Hearthmere Camp',
+    description: 'A quiet camp used as the player starting point.',
+    dangerLevel: 1,
+    isUnlocked: true,
+  },
+  {
+    code: 'ash-barrens',
+    name: 'Ash Barrens',
+    description: 'A scorched outer route planned for early exploration.',
+    dangerLevel: 2,
+    isUnlocked: true,
+  },
 ];
 
 const __filename = fileURLToPath(import.meta.url);
@@ -31,6 +48,7 @@ const getLocalDbPath = () => {
 const createTables = async (client) => {
   await client.execute('PRAGMA foreign_keys = ON');
   await client.execute('DROP TABLE IF EXISTS characters');
+  await client.execute('DROP TABLE IF EXISTS regions');
   await client.execute('DROP TABLE IF EXISTS users');
   await client.execute(`
     CREATE TABLE users (
@@ -49,6 +67,17 @@ const createTables = async (client) => {
       level INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL,
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+  `);
+  await client.execute(`
+    CREATE TABLE regions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      code TEXT NOT NULL UNIQUE,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL,
+      danger_level INTEGER NOT NULL DEFAULT 1,
+      is_unlocked INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
     )
   `);
 };
@@ -73,8 +102,11 @@ export const seed = async (db) => {
     },
   ]);
 
+  const insertedRegions = await db.insert(regions).values(sampleRegions).returning();
+
   console.log(`  Inserted ${insertedUsers.length} users`);
   console.log('  Inserted 2 characters');
+  console.log(`  Inserted ${insertedRegions.length} regions`);
 };
 
 const resetDatabase = async () => {
