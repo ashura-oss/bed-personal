@@ -5,24 +5,25 @@ import {
 } from "../models/progressionModel.js";
 import {
   claimCharacterQuestCompletion,
-  findHearthmereLocalQuestReward
+  findMordorLocalQuestReward
 } from "../models/questCompletionModel.js";
 import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
 import { createHttpError } from "../utils/httpError.js";
-import { getOptionalInteger } from "../utils/validate.js";
+import { getOptionalInteger, getRequiredIdParam } from "../utils/validate.js";
 
 const DEFAULT_RUN_STATE = {
   schemaVersion: 1,
   embers: 0,
   flaskCharges: 4,
-  lastHearthlightX: -5,
-  lastHearthlightY: 0,
-  lastHearthlightZ: 4
+  lastCheckpointX: -5,
+  lastCheckpointY: 0,
+  lastCheckpointZ: 4
 };
 
 export async function getCharacterProgression(req, res, next) {
   try {
-    const existingCharacter = await findCharacterById(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
+    const existingCharacter = await findCharacterById(characterId);
 
     if (!existingCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -30,9 +31,10 @@ export async function getCharacterProgression(req, res, next) {
 
     assertOwnsUserResource(req, existingCharacter.userId);
 
-    const progression = await findCharacterProgressionById(req.params.characterId);
+    const progression = await findCharacterProgressionById(characterId);
 
-    res.status(200).json(progression);
+    res.locals.data = progression;
+    next();
   } catch (error) {
     next(error);
   }
@@ -40,7 +42,8 @@ export async function getCharacterProgression(req, res, next) {
 
 export async function putCharacterProgression(req, res, next) {
   try {
-    const existingCharacter = await findCharacterById(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
+    const existingCharacter = await findCharacterById(characterId);
 
     if (!existingCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -55,18 +58,18 @@ export async function putCharacterProgression(req, res, next) {
       throw createHttpError(
         400,
         "Bad Request",
-        "Provide at least one updatable field: level, xp, hp, schemaVersion, embers, flaskCharges, lastHearthlightX, lastHearthlightY, or lastHearthlightZ."
+        "Provide at least one updatable field: level, xp, hp, schemaVersion, embers, flaskCharges, lastCheckpointX, lastCheckpointY, or lastCheckpointZ."
       );
     }
 
     let runStateUpdates = null;
 
     if (runStateChanges !== null) {
-      const existingProgression = await findCharacterProgressionById(req.params.characterId);
+      const existingProgression = await findCharacterProgressionById(characterId);
       const currentRunState = existingProgression?.runState;
 
       runStateUpdates = {
-        characterId: req.params.characterId,
+        characterId,
         schemaVersion:
           runStateChanges.schemaVersion ??
           currentRunState?.schemaVersion ??
@@ -76,29 +79,30 @@ export async function putCharacterProgression(req, res, next) {
           runStateChanges.flaskCharges ??
           currentRunState?.flaskCharges ??
           DEFAULT_RUN_STATE.flaskCharges,
-        lastHearthlightX:
-          runStateChanges.lastHearthlightX ??
-          currentRunState?.lastHearthlightX ??
-          DEFAULT_RUN_STATE.lastHearthlightX,
-        lastHearthlightY:
-          runStateChanges.lastHearthlightY ??
-          currentRunState?.lastHearthlightY ??
-          DEFAULT_RUN_STATE.lastHearthlightY,
-        lastHearthlightZ:
-          runStateChanges.lastHearthlightZ ??
-          currentRunState?.lastHearthlightZ ??
-          DEFAULT_RUN_STATE.lastHearthlightZ,
+        lastCheckpointX:
+          runStateChanges.lastCheckpointX ??
+          currentRunState?.lastCheckpointX ??
+          DEFAULT_RUN_STATE.lastCheckpointX,
+        lastCheckpointY:
+          runStateChanges.lastCheckpointY ??
+          currentRunState?.lastCheckpointY ??
+          DEFAULT_RUN_STATE.lastCheckpointY,
+        lastCheckpointZ:
+          runStateChanges.lastCheckpointZ ??
+          currentRunState?.lastCheckpointZ ??
+          DEFAULT_RUN_STATE.lastCheckpointZ,
         savedAt: new Date().toISOString()
       };
     }
 
     const savedProgression = await saveCharacterProgression({
-      characterId: req.params.characterId,
+      characterId,
       characterUpdates,
       runStateUpdates
     });
 
-    res.status(200).json(savedProgression);
+    res.locals.data = savedProgression;
+    next();
   } catch (error) {
     next(error);
   }
@@ -106,7 +110,8 @@ export async function putCharacterProgression(req, res, next) {
 
 export async function putCharacterQuestCompletion(req, res, next) {
   try {
-    const existingCharacter = await findCharacterById(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
+    const existingCharacter = await findCharacterById(characterId);
 
     if (!existingCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -114,7 +119,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
 
     assertOwnsUserResource(req, existingCharacter.userId);
 
-    const questReward = findHearthmereLocalQuestReward(req.params.questId);
+    const questReward = findMordorLocalQuestReward(req.params.questId);
 
     if (!questReward) {
       throw createHttpError(
@@ -125,11 +130,11 @@ export async function putCharacterQuestCompletion(req, res, next) {
     }
 
     const claimResult = await claimCharacterQuestCompletion({
-      characterId: req.params.characterId,
+      characterId,
       questReward
     });
 
-    res.status(200).json({
+    res.locals.data = {
       awarded: claimResult.awarded,
       rewards: {
         xp: claimResult.awardedXp
@@ -138,7 +143,8 @@ export async function putCharacterQuestCompletion(req, res, next) {
       characterProgression: claimResult.characterProgression,
       character: claimResult.character,
       questCompletion: claimResult.questCompletion
-    });
+    };
+    next();
   } catch (error) {
     next(error);
   }
@@ -170,17 +176,17 @@ function buildRunStateChanges(body) {
   const schemaVersion = getOptionalInteger(body, "schemaVersion", { min: 1 });
   const embers = getOptionalInteger(body, "embers", { min: 0 });
   const flaskCharges = getOptionalInteger(body, "flaskCharges", { min: 0 });
-  const lastHearthlightX = getOptionalFiniteNumber(body, "lastHearthlightX");
-  const lastHearthlightY = getOptionalFiniteNumber(body, "lastHearthlightY");
-  const lastHearthlightZ = getOptionalFiniteNumber(body, "lastHearthlightZ");
-  const hasAnyHearthlightCoordinate =
-    lastHearthlightX !== undefined ||
-    lastHearthlightY !== undefined ||
-    lastHearthlightZ !== undefined;
-  const hasAllHearthlightCoordinates =
-    lastHearthlightX !== undefined &&
-    lastHearthlightY !== undefined &&
-    lastHearthlightZ !== undefined;
+  const lastCheckpointX = getOptionalFiniteNumber(body, "lastCheckpointX");
+  const lastCheckpointY = getOptionalFiniteNumber(body, "lastCheckpointY");
+  const lastCheckpointZ = getOptionalFiniteNumber(body, "lastCheckpointZ");
+  const hasAnyCheckpointCoordinate =
+    lastCheckpointX !== undefined ||
+    lastCheckpointY !== undefined ||
+    lastCheckpointZ !== undefined;
+  const hasAllCheckpointCoordinates =
+    lastCheckpointX !== undefined &&
+    lastCheckpointY !== undefined &&
+    lastCheckpointZ !== undefined;
 
   if (schemaVersion !== undefined) {
     updates.schemaVersion = schemaVersion;
@@ -194,18 +200,18 @@ function buildRunStateChanges(body) {
     updates.flaskCharges = flaskCharges;
   }
 
-  if (hasAnyHearthlightCoordinate && !hasAllHearthlightCoordinates) {
+  if (hasAnyCheckpointCoordinate && !hasAllCheckpointCoordinates) {
     throw createHttpError(
       400,
       "Bad Request",
-      "Provide lastHearthlightX, lastHearthlightY, and lastHearthlightZ together."
+      "Provide lastCheckpointX, lastCheckpointY, and lastCheckpointZ together."
     );
   }
 
-  if (hasAllHearthlightCoordinates) {
-    updates.lastHearthlightX = lastHearthlightX;
-    updates.lastHearthlightY = lastHearthlightY;
-    updates.lastHearthlightZ = lastHearthlightZ;
+  if (hasAllCheckpointCoordinates) {
+    updates.lastCheckpointX = lastCheckpointX;
+    updates.lastCheckpointY = lastCheckpointY;
+    updates.lastCheckpointZ = lastCheckpointZ;
   }
 
   return Object.keys(updates).length > 0 ? updates : null;

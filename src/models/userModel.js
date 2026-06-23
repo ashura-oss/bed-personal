@@ -1,10 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { users } from "../db/schema.js";
-import { generateId } from "../utils/id.js";
 
 const publicUserColumns = {
-  userId: users.userId,
+  id: users.id,
+  userId: users.id,
   username: users.username,
   level: users.level,
   xp: users.xp,
@@ -31,7 +31,7 @@ export async function findUserById(userId) {
   const result = await db
     .select(publicUserColumns)
     .from(users)
-    .where(eq(users.userId, userId))
+    .where(eq(users.id, userId))
     .limit(1);
 
   return result[0] || null;
@@ -61,7 +61,6 @@ export async function createUser({ username, password }) {
   const result = await db
     .insert(users)
     .values({
-      userId: generateId("user"),
       username,
       password,
       level: 1,
@@ -78,7 +77,7 @@ export async function updateUserById(userId, updates) {
   const result = await db
     .update(users)
     .set(updates)
-    .where(eq(users.userId, userId))
+    .where(eq(users.id, userId))
     .returning(publicUserColumns);
 
   return result[0] || null;
@@ -88,8 +87,8 @@ export async function updateUserPasswordById(userId, password) {
   const result = await db
     .update(users)
     .set({ password })
-    .where(eq(users.userId, userId))
-    .returning({ userId: users.userId });
+    .where(eq(users.id, userId))
+    .returning({ userId: users.id });
 
   return result[0] || null;
 }
@@ -97,8 +96,8 @@ export async function updateUserPasswordById(userId, password) {
 export async function deleteUserById(userId) {
   const result = await db
     .delete(users)
-    .where(eq(users.userId, userId))
-    .returning({ userId: users.userId });
+    .where(eq(users.id, userId))
+    .returning({ userId: users.id });
 
   return result[0] || null;
 }

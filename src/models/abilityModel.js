@@ -1,69 +1,49 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { abilities, characterAbilities } from "../db/schema.js";
-import { generateId } from "../utils/id.js";
-
-const abilityColumns = {
-  abilityId: abilities.abilityId,
-  name: abilities.name,
-  className: abilities.className,
-  affinity: abilities.affinity,
-  abilityType: abilities.abilityType,
-  power: abilities.power,
-  comboTag: abilities.comboTag,
-  requiredLevel: abilities.requiredLevel,
-  description: abilities.description
-};
+import { ABILITY_DEFINITIONS, findAbilityDefinitionById } from "../content/index.js";
 
 const characterAbilityColumns = {
-  characterAbilityId: characterAbilities.characterAbilityId,
+  id: characterAbilities.id,
+  characterAbilityId: characterAbilities.id,
   characterId: characterAbilities.characterId,
-  abilityId: characterAbilities.abilityId,
+  abilityId: abilities.abilityKey,
   unlockedAt: characterAbilities.unlockedAt
 };
 
 export async function findAbilities(filters = {}) {
-  const conditions = [];
+  return ABILITY_DEFINITIONS.filter((ability) => {
+    if (filters.className !== undefined && ability.className !== filters.className) {
+      return false;
+    }
 
-  if (filters.className !== undefined) {
-    conditions.push(eq(abilities.className, filters.className));
-  }
+    if (filters.affinity !== undefined && ability.affinity !== filters.affinity) {
+      return false;
+    }
 
-  if (filters.affinity !== undefined) {
-    conditions.push(eq(abilities.affinity, filters.affinity));
-  }
-
-  const query = db.select(abilityColumns).from(abilities).orderBy(asc(abilities.requiredLevel));
-
-  if (conditions.length === 0) {
-    return query;
-  }
-
-  if (conditions.length === 1) {
-    return query.where(conditions[0]);
-  }
-
-  return query.where(and(...conditions));
+    return true;
+  }).sort((left, right) => left.requiredLevel - right.requiredLevel);
 }
 
 export async function findAbilityById(abilityId) {
-  const result = await db
-    .select(abilityColumns)
-    .from(abilities)
-    .where(eq(abilities.abilityId, abilityId))
-    .limit(1);
-
-  return result[0] || null;
+  return findAbilityDefinitionById(abilityId);
 }
 
 export async function findCharacterAbility(characterId, abilityId) {
+  const abilityRow = await findAbilityRowByKey(abilityId);
+
+  if (!abilityRow) {
+    return null;
+  }
+
   const result = await db
     .select(characterAbilityColumns)
     .from(characterAbilities)
+    .innerJoin(abilities, eq(characterAbilities.abilityId, abilities.id))
     .where(
       and(
         eq(characterAbilities.characterId, characterId),
-        eq(characterAbilities.abilityId, abilityId)
+        eq(characterAbilities.abilityId, abilityRow.id)
       )
     )
     .limit(1);
@@ -72,15 +52,34 @@ export async function findCharacterAbility(characterId, abilityId) {
 }
 
 export async function createCharacterAbility({ characterId, abilityId }) {
+  const abilityRow = await findAbilityRowByKey(abilityId);
+
   const result = await db
     .insert(characterAbilities)
     .values({
-      characterAbilityId: generateId("char_ability"),
       characterId,
-      abilityId,
+      abilityId: abilityRow.id,
       unlockedAt: new Date().toISOString()
     })
-    .returning(characterAbilityColumns);
+    .returning({
+      id: characterAbilities.id,
+      characterAbilityId: characterAbilities.id,
+      characterId: characterAbilities.characterId,
+      unlockedAt: characterAbilities.unlockedAt
+    });
 
-  return result[0];
+  return {
+    ...result[0],
+    abilityId
+  };
+}
+
+async function findAbilityRowByKey(abilityId) {
+  const result = await db
+    .select({ id: abilities.id })
+    .from(abilities)
+    .where(eq(abilities.abilityKey, abilityId))
+    .limit(1);
+
+  return result[0] || null;
 }

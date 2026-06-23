@@ -4,6 +4,7 @@ import {
   deleteQuestById,
   findQuestById,
   findQuests,
+  isAuthoredQuestId,
   updateQuestById
 } from "../models/questModel.js";
 import { validateQuestType, validateRequiredStat } from "../utils/gameRules.js";
@@ -19,7 +20,8 @@ export async function getQuests(req, res, next) {
   try {
     const questList = await findQuests();
 
-    res.status(200).json(questList);
+    res.locals.data = questList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -33,7 +35,8 @@ export async function getQuestById(req, res, next) {
       throw createHttpError(404, "Not Found", "Quest was not found.");
     }
 
-    res.status(200).json(quest);
+    res.locals.data = quest;
+    next();
   } catch (error) {
     next(error);
   }
@@ -49,7 +52,8 @@ export async function getQuestsByRegionId(req, res, next) {
 
     const questList = await findQuests({ regionId: req.params.regionId });
 
-    res.status(200).json(questList);
+    res.locals.data = questList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -66,7 +70,8 @@ export async function postQuest(req, res, next) {
 
     const quest = await createQuest(questData);
 
-    res.status(201).json(quest);
+    res.locals.data = quest;
+    next();
   } catch (error) {
     next(error);
   }
@@ -78,6 +83,14 @@ export async function putQuestById(req, res, next) {
 
     if (!existingQuest) {
       throw createHttpError(404, "Not Found", "Quest was not found.");
+    }
+
+    if (isAuthoredQuestId(req.params.id)) {
+      throw createHttpError(
+        400,
+        "Bad Request",
+        "Authored quests are fixed content and cannot be updated through this route."
+      );
     }
 
     const updates = buildQuestUpdates(req.body);
@@ -92,7 +105,8 @@ export async function putQuestById(req, res, next) {
 
     const quest = await updateQuestById(req.params.id, updates);
 
-    res.status(200).json(quest);
+    res.locals.data = quest;
+    next();
   } catch (error) {
     next(error);
   }
@@ -100,13 +114,22 @@ export async function putQuestById(req, res, next) {
 
 export async function deleteQuest(req, res, next) {
   try {
+    if (isAuthoredQuestId(req.params.id)) {
+      throw createHttpError(
+        400,
+        "Bad Request",
+        "Authored quests are fixed content and cannot be deleted through this route."
+      );
+    }
+
     const deletedQuest = await deleteQuestById(req.params.id);
 
     if (!deletedQuest) {
       throw createHttpError(404, "Not Found", "Quest was not found.");
     }
 
-    res.status(204).send();
+    res.locals.status = 204;
+    next();
   } catch (error) {
     next(error);
   }

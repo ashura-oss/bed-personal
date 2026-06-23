@@ -10,12 +10,12 @@ import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
 import { createHttpError } from "../utils/httpError.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
-import { getRequiredString } from "../utils/validate.js";
+import { getRequiredId, getRequiredIdParam, getRequiredString } from "../utils/validate.js";
 
 export async function postAdventureAttempt(req, res, next) {
   try {
-    const userId = getRequiredString(req.body, "userId");
-    const characterId = getRequiredString(req.body, "characterId");
+    const userId = getRequiredId(req.body, "userId");
+    const characterId = getRequiredId(req.body, "characterId");
     const questId = getRequiredString(req.body, "questId");
     const user = await findUserById(userId);
 
@@ -68,7 +68,7 @@ export async function postAdventureAttempt(req, res, next) {
       userUpdates: userProgression.updates
     });
 
-    res.status(200).json({
+    res.locals.data = {
       outcome: attemptResult.outcome,
       resultText: attemptResult.resultText,
       rewards: {
@@ -88,7 +88,8 @@ export async function postAdventureAttempt(req, res, next) {
       character: savedAttempt.character,
       user: savedAttempt.user,
       adventureLog: savedAttempt.adventureLog
-    });
+    };
+    next();
   } catch (error) {
     next(error);
   }
@@ -96,17 +97,19 @@ export async function postAdventureAttempt(req, res, next) {
 
 export async function getAdventureLogsByUserId(req, res, next) {
   try {
-    const user = await findUserById(req.params.userId);
+    const userId = getRequiredIdParam(req.params, "userId");
+    const user = await findUserById(userId);
 
     if (!user) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    assertOwnsUserResource(req, req.params.userId);
+    assertOwnsUserResource(req, userId);
 
-    const adventureLogList = await findAdventureLogsByUserId(req.params.userId);
+    const adventureLogList = await findAdventureLogsByUserId(userId);
 
-    res.status(200).json(adventureLogList);
+    res.locals.data = adventureLogList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -114,7 +117,8 @@ export async function getAdventureLogsByUserId(req, res, next) {
 
 export async function getAdventureLogsByCharacterId(req, res, next) {
   try {
-    const character = await findCharacterById(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
+    const character = await findCharacterById(characterId);
 
     if (!character) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -122,9 +126,10 @@ export async function getAdventureLogsByCharacterId(req, res, next) {
 
     assertOwnsUserResource(req, character.userId);
 
-    const adventureLogList = await findAdventureLogsByCharacterId(req.params.characterId);
+    const adventureLogList = await findAdventureLogsByCharacterId(characterId);
 
-    res.status(200).json(adventureLogList);
+    res.locals.data = adventureLogList;
+    next();
   } catch (error) {
     next(error);
   }

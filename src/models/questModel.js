@@ -1,11 +1,13 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
-import { quests } from "../db/schema.js";
+import { quests, regions } from "../db/schema.js";
+import { QUEST_DEFINITIONS, findQuestDefinitionById, isAuthoredQuestId } from "../content/index.js";
 import { generateId } from "../utils/id.js";
 
 const questColumns = {
-  questId: quests.questId,
-  regionId: quests.regionId,
+  id: quests.id,
+  questId: quests.questKey,
+  regionId: regions.regionKey,
   title: quests.title,
   description: quests.description,
   questType: quests.questType,
@@ -20,52 +22,113 @@ const questColumns = {
 };
 
 export async function findQuests(filters = {}) {
-  const query = db.select(questColumns).from(quests).orderBy(asc(quests.requiredLevel));
+  const authoredQuests = QUEST_DEFINITIONS.filter((quest) =>
+    filters.regionId === undefined ? true : quest.regionId === filters.regionId
+  );
+  const legacyQuestRows = await findLegacyQuests(filters);
+  const authoredQuestIds = new Set(authoredQuests.map((quest) => quest.questId));
+  const customQuests = legacyQuestRows.filter((quest) => !authoredQuestIds.has(quest.questId));
 
-  if (filters.regionId !== undefined) {
-    return query.where(eq(quests.regionId, filters.regionId));
-  }
-
-  return query;
+  return [...authoredQuests, ...customQuests].sort(
+    (left, right) => left.requiredLevel - right.requiredLevel
+  );
 }
 
 export async function findQuestById(questId) {
+  const authoredQuest = findQuestDefinitionById(questId);
+
+  if (authoredQuest) {
+    return authoredQuest;
+  }
+
   const result = await db
     .select(questColumns)
     .from(quests)
-    .where(eq(quests.questId, questId))
+    .innerJoin(regions, eq(quests.regionId, regions.id))
+    .where(eq(quests.questKey, questId))
     .limit(1);
 
   return result[0] || null;
 }
 
+export { isAuthoredQuestId };
+
+async function findLegacyQuests(filters = {}) {
+  const query = db
+    .select(questColumns)
+    .from(quests)
+    .innerJoin(regions, eq(quests.regionId, regions.id))
+    .orderBy(asc(quests.requiredLevel));
+
+  if (filters.regionId !== undefined) {
+    return query.where(eq(regions.regionKey, filters.regionId));
+  }
+
+  return query;
+}
+
 export async function createQuest(questData) {
-  const result = await db
+  const regionRow = await findRegionRowByKey(questData.regionId);
+  const questId = generateId("quest");
+
+  await db
     .insert(quests)
     .values({
-      questId: generateId("quest"),
-      ...questData
-    })
-    .returning(questColumns);
+      questKey: questId,
+      ...toQuestDbValues(questData, regionRow.id)
+    });
 
-  return result[0];
+  return findQuestById(questId);
 }
 
 export async function updateQuestById(questId, updates) {
-  const result = await db
-    .update(quests)
-    .set(updates)
-    .where(eq(quests.questId, questId))
-    .returning(questColumns);
+  const dbUpdates = { ...updates };
 
-  return result[0] || null;
+  if (updates.regionId !== undefined) {
+    const regionRow = await findRegionRowByKey(updates.regionId);
+    dbUpdates.regionId = regionRow.id;
+  }
+
+  await db
+    .update(quests)
+    .set(dbUpdates)
+    .where(eq(quests.questKey, questId));
+
+  return findQuestById(questId);
 }
 
 export async function deleteQuestById(questId) {
   const result = await db
     .delete(quests)
-    .where(eq(quests.questId, questId))
-    .returning({ questId: quests.questId });
+    .where(eq(quests.questKey, questId))
+    .returning({ questId: quests.questKey });
 
   return result[0] || null;
+}
+
+async function findRegionRowByKey(regionId) {
+  const result = await db
+    .select({ id: regions.id })
+    .from(regions)
+    .where(eq(regions.regionKey, regionId))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+function toQuestDbValues(questData, regionId) {
+  return {
+    regionId,
+    title: questData.title,
+    description: questData.description,
+    questType: questData.questType,
+    requiredLevel: questData.requiredLevel,
+    difficulty: questData.difficulty,
+    requiredStat: questData.requiredStat,
+    requiredStatValue: questData.requiredStatValue,
+    rewardXp: questData.rewardXp,
+    rewardGold: questData.rewardGold,
+    successText: questData.successText,
+    failureText: questData.failureText
+  };
 }

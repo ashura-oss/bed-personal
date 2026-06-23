@@ -1,10 +1,10 @@
-# Realmforge: Shards of the Worldheart
+# Sauron's Conquest
 
 ## Game Theme Description
 
-Realmforge: Shards of the Worldheart is a backend-driven fantasy RPG project built for the CA1 Backend Web Development assignment.
+Sauron's Conquest is a backend-driven fantasy RPG project built for the CA1 Backend Web Development assignment.
 
-The player creates an Unbound adventurer in the fractured realm of Elarion. After the ancient Worldheart shattered, its magical shards warped regions of the world into dangerous places filled with Hollowborn, corrupted rulers, lost memories, and faction conflict.
+The player advances Sauron's return through Mordor, the Black Road, the Ring Gate, and later campaign fronts such as Eregion. Fixed lore, quests, abilities, enemies, items, recipes, maps, and regions live in authored backend modules; player-changing progression lives in database tables.
 
 The CA1 backend supports the first core gameplay loop:
 
@@ -49,7 +49,7 @@ Optional local environment values:
 
 ```powershell
 $env:PORT = "3000"
-$env:LIBSQL_URL = "file:realmforge.db"
+$env:LIBSQL_URL = "file:saurons-conquest.db"
 $env:JWT_SECRET = "replace-this-with-a-long-random-secret"
 $env:JWT_EXPIRES_IN = "2h"
 ```
@@ -221,25 +221,47 @@ Implemented character creation frontend:
 
 ## Database and ERD Notes
 
-The CA1 MVP schema uses these tables:
+The current backend schema uses these dynamic player-state tables:
 
 - `users`
 - `characters`
+- `save_slots`
+- `character_run_states`
+- `character_inventory`
+- `character_equipment`
+- `character_abilities`
+- `character_quest_completions`
+- `adventure_logs`
+- `character_dialogue_flags`
+- `character_boss_states`
+- `character_campaign_markers`
+- `character_faction_reputation`
+- `character_region_states`
+
+These compatibility mirror tables also exist for assignment/custom-content routes, while fixed authored definitions live in `src/content/*`:
+
 - `regions`
 - `quests`
-- `adventure_logs`
 - `abilities`
-- `character_abilities`
 
 Important relationships:
 
-- `characters.user_id -> users.user_id`
-- `quests.region_id -> regions.region_id`
-- `adventure_logs.user_id -> users.user_id`
-- `adventure_logs.character_id -> characters.character_id`
-- `adventure_logs.quest_id -> quests.quest_id`
-- `character_abilities.character_id -> characters.character_id`
-- `character_abilities.ability_id -> abilities.ability_id`
+- `characters.user_id -> users.id`
+- `save_slots.user_id -> users.id`
+- `save_slots.character_id -> characters.id`
+- `quests.region_id -> regions.id`
+- `adventure_logs.character_id -> characters.id`
+- `character_abilities.character_id -> characters.id`
+- `character_abilities.ability_id -> abilities.id`
+- `character_run_states.character_id -> characters.id`
+- `character_quest_completions.character_id -> characters.id`
+- `character_inventory.character_id -> characters.id`
+- `character_equipment.character_id -> characters.id`
+- `character_dialogue_flags.character_id -> characters.id`
+- `character_boss_states.character_id -> characters.id`
+- `character_campaign_markers.character_id -> characters.id`
+- `character_faction_reputation.character_id -> characters.id`
+- `character_region_states.character_id -> characters.id`
 
 Detailed ERD support is in `docs/erd-notes.md`.
 
@@ -248,9 +270,9 @@ Detailed ERD support is in `docs/erd-notes.md`.
 - CA2 backend authentication is implemented with bcrypt and JWT.
 - New passwords are stored as bcrypt hashes.
 - Passwords are never returned by API responses.
-- The seeded demo login is `demoUnbound` / `demo-password-ca1`.
-- The local database uses `file:realmforge.db` unless `LIBSQL_URL` is set.
-- Seed data includes one demo user, one demo character, four regions, eight quests, fifteen abilities, and one demo unlocked ability.
+- The seeded demo login is `demoSauron` / `demo-password-ca1`.
+- The local database uses `file:saurons-conquest.db` unless `LIBSQL_URL` is set.
+- Seed data includes one demo user, one demo character, eleven regions, eight quests, fifteen abilities, and one demo unlocked ability.
 - Ability unlocks are allowed only when the character meets the ability level, class, and affinity requirements.
 - Combo resolution uses real unlocked character abilities and validates ability order. Training/non-boss combo results are simulations; boss quest combo results award XP/gold and write adventure logs.
 - Gold is stored on the user profile, while character progression stores XP, level, HP, and stats.
@@ -270,7 +292,7 @@ Screens and what each one tests:
 
 | Screen | What to test |
 | --- | --- |
-| Login | Submit demo `demoUnbound` / `demo-password-ca1`, then check that the dashboard loads. Wrong password shows a friendly error. |
+| Login | Submit demo `demoSauron` / `demo-password-ca1`, then check that the dashboard loads. Wrong password shows a friendly error. |
 | Register | Create a new account, check that the dashboard opens automatically. Duplicate username shows the conflict message. |
 | Dashboard HUD | Username, level, XP fill, gold, hero count, region count, and log count are dynamic from `/auth/me` and related endpoints. |
 | Character panel | Each saved hero card has **Edit** and **Delete** buttons. Edit opens an inline form to rename the character (origin, class, and affinity are permanent). Delete prompts a confirmation, fades out via WAAPI, and updates the hero count. 401/403/404 and server errors show inline messages. |
@@ -297,8 +319,8 @@ Track 2 planning docs:
 
 Polish features (Phase 11):
 
-- Pulsing Worldheart shard loading screen with rotating lore lines on every page.
+- Pulsing Ring-trace loading screen with rotating lore lines on every page.
 - Centralised WAAPI helpers in `frontend/js/animations/waapi.js` (`animateCardEntrance`, `animatePanelSwap`, `animateRewardPopup`, `animateQuestResult`, `animateBossEntrance`, `animateComboSequence`).
 - Ambient canvas particles using `requestAnimationFrame` with hidden-tab pause and reduced-motion respect.
-- Region-specific colour accents on the world map for Ironvale, Blackroot, Sunken Temple, and Dragon Coast (plus Moonspire, Gravehold, and Ashen Wastes tones for future regions).
+- Region-specific colour accents on the world map for Mordor, Eregion, the Ashen Western March, and the Drowned Ring-Vault.
 - Consistent dark fantasy buttons, forms, cards, modals, error states, empty states, loading states, and auth redirects across all pages.

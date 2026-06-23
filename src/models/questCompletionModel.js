@@ -1,50 +1,50 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { characterQuestCompletions, characters } from "../db/schema.js";
-import { generateId } from "../utils/id.js";
 import { buildCharacterProgression } from "../utils/leveling.js";
 
-export const HEARTHMERE_LOCAL_QUEST_REWARDS = Object.freeze({
-  "hearthmere.tessa_gather": Object.freeze({
-    questId: "hearthmere.tessa_gather",
-    regionId: "hearthmere",
-    title: "Fuel for the Emberwright",
+export const MORDOR_LOCAL_QUEST_REWARDS = Object.freeze({
+  "mordor.war_stock": Object.freeze({
+    questId: "mordor.war_stock",
+    regionId: "mordor",
+    title: "War Stock for the March",
     rewardXp: 35
   }),
-  "hearthmere.road_that_still_stands": Object.freeze({
-    questId: "hearthmere.road_that_still_stands",
-    regionId: "hearthmere",
-    title: "The Road That Still Stands",
+  "mordor.black_road_reclamation": Object.freeze({
+    questId: "mordor.black_road_reclamation",
+    regionId: "mordor",
+    title: "Reclaim the Black Road",
     rewardXp: 30
   }),
-  "hearthmere.aldric_hollow": Object.freeze({
-    questId: "hearthmere.aldric_hollow",
-    regionId: "hearthmere",
-    title: "Thin the Hollow Ranks",
+  "mordor.ring_touched_cull": Object.freeze({
+    questId: "mordor.ring_touched_cull",
+    regionId: "mordor",
+    title: "Cull the Ring-Touched",
     rewardXp: 45
   }),
-  "hearthmere.marn_supply": Object.freeze({
-    questId: "hearthmere.marn_supply",
-    regionId: "hearthmere",
-    title: "Supplies for the Road",
+  "mordor.warforge_supply": Object.freeze({
+    questId: "mordor.warforge_supply",
+    regionId: "mordor",
+    title: "Warforge Supply",
     rewardXp: 40
   }),
-  "hearthmere.survivor_rite": Object.freeze({
-    questId: "hearthmere.survivor_rite",
-    regionId: "hearthmere",
-    title: "The Mending Rite",
+  "mordor.first_ring_trace": Object.freeze({
+    questId: "mordor.first_ring_trace",
+    regionId: "mordor",
+    title: "Claim the First Ring-Trace",
     rewardXp: 90
   }),
-  "hearthmere.brek_mine": Object.freeze({
-    questId: "hearthmere.brek_mine",
-    regionId: "hearthmere",
-    title: "Clear Copperstone Mine",
+  "mordor.gorgoroth_mine": Object.freeze({
+    questId: "mordor.gorgoroth_mine",
+    regionId: "mordor",
+    title: "Reclaim Gorgoroth Mine",
     rewardXp: 60
   })
 });
 
 const characterColumns = {
-  characterId: characters.characterId,
+  id: characters.id,
+  characterId: characters.id,
   userId: characters.userId,
   characterName: characters.characterName,
   origin: characters.origin,
@@ -63,17 +63,18 @@ const characterColumns = {
 };
 
 const questCompletionColumns = {
-  characterQuestCompletionId: characterQuestCompletions.characterQuestCompletionId,
+  id: characterQuestCompletions.id,
+  characterQuestCompletionId: characterQuestCompletions.id,
   characterId: characterQuestCompletions.characterId,
-  questId: characterQuestCompletions.questId,
+  questId: characterQuestCompletions.questKey,
   rewardXp: characterQuestCompletions.rewardXp,
   awardedAt: characterQuestCompletions.awardedAt
 };
 
-export function findHearthmereLocalQuestReward(questId) {
+export function findMordorLocalQuestReward(questId) {
   const normalizedQuestId = typeof questId === "string" ? questId.trim() : "";
 
-  return normalizedQuestId ? HEARTHMERE_LOCAL_QUEST_REWARDS[normalizedQuestId] ?? null : null;
+  return normalizedQuestId ? MORDOR_LOCAL_QUEST_REWARDS[normalizedQuestId] ?? null : null;
 }
 
 export async function claimCharacterQuestCompletion({ characterId, questReward }) {
@@ -82,9 +83,8 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
     const insertedCompletionResult = await tx
       .insert(characterQuestCompletions)
       .values({
-        characterQuestCompletionId: generateId("char_quest_completion"),
         characterId,
-        questId: questReward.questId,
+        questKey: questReward.questId,
         rewardXp: questReward.rewardXp,
         awardedAt: now
       })
@@ -118,7 +118,7 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
     const updatedCharacterResult = await tx
       .update(characters)
       .set(characterProgression.updates)
-      .where(eq(characters.characterId, characterId))
+      .where(eq(characters.id, characterId))
       .returning(characterColumns);
 
     return {
@@ -135,7 +135,7 @@ async function findCharacterInTransaction(tx, characterId) {
   const result = await tx
     .select(characterColumns)
     .from(characters)
-    .where(eq(characters.characterId, characterId))
+    .where(eq(characters.id, characterId))
     .limit(1);
 
   return result[0] || null;
@@ -148,7 +148,7 @@ async function findQuestCompletionInTransaction(tx, characterId, questId) {
     .where(
       and(
         eq(characterQuestCompletions.characterId, characterId),
-        eq(characterQuestCompletions.questId, questId)
+        eq(characterQuestCompletions.questKey, questId)
       )
     )
     .limit(1);

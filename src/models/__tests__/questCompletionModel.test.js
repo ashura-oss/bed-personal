@@ -2,35 +2,35 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  HEARTHMERE_LOCAL_QUEST_REWARDS,
-  findHearthmereLocalQuestReward
+  MORDOR_LOCAL_QUEST_REWARDS,
+  findMordorLocalQuestReward
 } from "../questCompletionModel.js";
 
-test("findHearthmereLocalQuestReward maps the Act 1 road quest reward", () => {
+test("findMordorLocalQuestReward maps the Act 1 Black Road reward", () => {
   assert.deepEqual(
-    findHearthmereLocalQuestReward("hearthmere.road_that_still_stands"),
+    findMordorLocalQuestReward("mordor.black_road_reclamation"),
     {
-      questId: "hearthmere.road_that_still_stands",
-      regionId: "hearthmere",
-      title: "The Road That Still Stands",
+      questId: "mordor.black_road_reclamation",
+      regionId: "mordor",
+      title: "Reclaim the Black Road",
       rewardXp: 30
     }
   );
 });
 
-test("findHearthmereLocalQuestReward preserves existing local Hearthmere rewards", () => {
+test("findMordorLocalQuestReward preserves existing local Mordor rewards", () => {
   const existingQuestIds = [
-    "hearthmere.tessa_gather",
-    "hearthmere.aldric_hollow",
-    "hearthmere.marn_supply",
-    "hearthmere.survivor_rite",
-    "hearthmere.brek_mine"
+    "mordor.war_stock",
+    "mordor.ring_touched_cull",
+    "mordor.warforge_supply",
+    "mordor.first_ring_trace",
+    "mordor.gorgoroth_mine"
   ];
 
   for (const questId of existingQuestIds) {
     assert.equal(
-      findHearthmereLocalQuestReward(questId),
-      HEARTHMERE_LOCAL_QUEST_REWARDS[questId]
+      findMordorLocalQuestReward(questId),
+      MORDOR_LOCAL_QUEST_REWARDS[questId]
     );
   }
 });

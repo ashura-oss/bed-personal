@@ -23,7 +23,8 @@ export async function postRegister(req, res, next) {
     const hashedPassword = await hashPassword(password);
     const user = await createUser({ username, password: hashedPassword });
 
-    res.status(201).json(buildAuthResponse(user));
+    res.locals.data = buildAuthResponse(user);
+    next();
   } catch (error) {
     next(error);
   }
@@ -45,7 +46,8 @@ export async function postLogin(req, res, next) {
       throw invalidCredentialsError();
     }
 
-    res.status(200).json(buildAuthResponse(toPublicUser(userCredentials)));
+    res.locals.data = buildAuthResponse(toPublicUser(userCredentials));
+    next();
   } catch (error) {
     next(error);
   }
@@ -59,7 +61,8 @@ export async function getCurrentUser(req, res, next) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    res.status(200).json(user);
+    res.locals.data = user;
+    next();
   } catch (error) {
     next(error);
   }

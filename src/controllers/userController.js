@@ -12,6 +12,7 @@ import {
   getOptionalInteger,
   getOptionalPositiveIntegerQuery,
   getOptionalString,
+  getRequiredIdParam,
   getRequiredString
 } from "../utils/validate.js";
 
@@ -20,7 +21,8 @@ export async function getUsers(req, res, next) {
     const level = getOptionalPositiveIntegerQuery(req.query, "level");
     const userList = await findUsers({ level });
 
-    res.status(200).json(userList);
+    res.locals.data = userList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -28,13 +30,15 @@ export async function getUsers(req, res, next) {
 
 export async function getUserById(req, res, next) {
   try {
-    const user = await findUserById(req.params.id);
+    const userId = getRequiredIdParam(req.params, "id");
+    const user = await findUserById(userId);
 
     if (!user) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    res.status(200).json(user);
+    res.locals.data = user;
+    next();
   } catch (error) {
     next(error);
   }
@@ -53,7 +57,8 @@ export async function postUser(req, res, next) {
     const hashedPassword = await hashPassword(password);
     const user = await createUser({ username, password: hashedPassword });
 
-    res.status(201).json(user);
+    res.locals.data = user;
+    next();
   } catch (error) {
     next(error);
   }
@@ -61,7 +66,8 @@ export async function postUser(req, res, next) {
 
 export async function putUserById(req, res, next) {
   try {
-    const existingUser = await findUserById(req.params.id);
+    const userId = getRequiredIdParam(req.params, "id");
+    const existingUser = await findUserById(userId);
 
     if (!existingUser) {
       throw createHttpError(404, "Not Found", "User was not found.");
@@ -72,14 +78,15 @@ export async function putUserById(req, res, next) {
     if (updates.username !== undefined) {
       const usernameOwner = await findUserByUsername(updates.username);
 
-      if (usernameOwner && usernameOwner.userId !== req.params.id) {
+      if (usernameOwner && usernameOwner.userId !== userId) {
         throw createHttpError(409, "Conflict", "Username is already taken.");
       }
     }
 
-    const updatedUser = await updateUserById(req.params.id, updates);
+    const updatedUser = await updateUserById(userId, updates);
 
-    res.status(200).json(updatedUser);
+    res.locals.data = updatedUser;
+    next();
   } catch (error) {
     next(error);
   }
@@ -87,13 +94,15 @@ export async function putUserById(req, res, next) {
 
 export async function deleteUser(req, res, next) {
   try {
-    const deletedUser = await deleteUserById(req.params.id);
+    const userId = getRequiredIdParam(req.params, "id");
+    const deletedUser = await deleteUserById(userId);
 
     if (!deletedUser) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    res.status(204).send();
+    res.locals.status = 204;
+    next();
   } catch (error) {
     next(error);
   }

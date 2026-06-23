@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-const defaultJwtSecret = "realmforge-local-development-secret-change-me";
+const defaultJwtSecret = "saurons-conquest-local-development-secret-change-me";
 const defaultTokenExpiry = "2h";
 
 export function getTokenExpiry() {

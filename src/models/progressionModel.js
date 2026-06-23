@@ -3,7 +3,8 @@ import { db } from "../db/client.js";
 import { characterRunStates, characters } from "../db/schema.js";
 
 const characterProgressionColumns = {
-  characterId: characters.characterId,
+  id: characters.id,
+  characterId: characters.id,
   userId: characters.userId,
   level: characters.level,
   xp: characters.xp,
@@ -12,13 +13,14 @@ const characterProgressionColumns = {
 };
 
 const characterRunStateColumns = {
+  id: characterRunStates.id,
   characterId: characterRunStates.characterId,
   schemaVersion: characterRunStates.schemaVersion,
   embers: characterRunStates.embers,
   flaskCharges: characterRunStates.flaskCharges,
-  lastHearthlightX: characterRunStates.lastHearthlightX,
-  lastHearthlightY: characterRunStates.lastHearthlightY,
-  lastHearthlightZ: characterRunStates.lastHearthlightZ,
+  lastCheckpointX: characterRunStates.lastCheckpointX,
+  lastCheckpointY: characterRunStates.lastCheckpointY,
+  lastCheckpointZ: characterRunStates.lastCheckpointZ,
   savedAt: characterRunStates.savedAt
 };
 
@@ -26,7 +28,7 @@ export async function findCharacterProgressionById(characterId) {
   const characterResult = await db
     .select(characterProgressionColumns)
     .from(characters)
-    .where(eq(characters.characterId, characterId))
+    .where(eq(characters.id, characterId))
     .limit(1);
 
   if (!characterResult[0]) {
@@ -56,12 +58,12 @@ export async function saveCharacterProgression({
         ? await tx
             .update(characters)
             .set(characterUpdates)
-            .where(eq(characters.characterId, characterId))
+            .where(eq(characters.id, characterId))
             .returning(characterProgressionColumns)
         : await tx
             .select(characterProgressionColumns)
             .from(characters)
-            .where(eq(characters.characterId, characterId))
+            .where(eq(characters.id, characterId))
             .limit(1);
 
     const runStateResult =
@@ -75,9 +77,9 @@ export async function saveCharacterProgression({
                 schemaVersion: runStateUpdates.schemaVersion,
                 embers: runStateUpdates.embers,
                 flaskCharges: runStateUpdates.flaskCharges,
-                lastHearthlightX: runStateUpdates.lastHearthlightX,
-                lastHearthlightY: runStateUpdates.lastHearthlightY,
-                lastHearthlightZ: runStateUpdates.lastHearthlightZ,
+                lastCheckpointX: runStateUpdates.lastCheckpointX,
+                lastCheckpointY: runStateUpdates.lastCheckpointY,
+                lastCheckpointZ: runStateUpdates.lastCheckpointZ,
                 savedAt: runStateUpdates.savedAt
               }
             })

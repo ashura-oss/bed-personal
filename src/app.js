@@ -12,6 +12,7 @@ import comboRoutes from "./routes/comboRoutes.js";
 import progressionRoutes from "./routes/progressionRoutes.js";
 import questRoutes from "./routes/questRoutes.js";
 import regionRoutes from "./routes/regionRoutes.js";
+import stateRoutes from "./routes/stateRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 
 const app = express();
@@ -35,7 +36,7 @@ app.get("/health", async (_req, res, next) => {
 
     res.status(200).json({
       status: "ok",
-      project: "Realmforge: Shards of the Worldheart",
+      project: "Sauron's Conquest",
       database: "connected"
     });
   } catch (error) {
@@ -52,6 +53,7 @@ app.use("/adventures", adventureRoutes);
 app.use("/abilities", abilityRoutes);
 app.use("/combos", comboRoutes);
 app.use("/progression", progressionRoutes);
+app.use("/state", stateRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

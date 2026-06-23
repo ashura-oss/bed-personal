@@ -6,7 +6,7 @@ export function authenticateToken(req, _res, next) {
     const token = getBearerToken(req);
     const payload = verifyAuthToken(token);
 
-    if (!payload || typeof payload !== "object" || typeof payload.userId !== "string") {
+    if (!payload || typeof payload !== "object" || !Number.isInteger(payload.userId)) {
       throw createHttpError(401, "Unauthorized", "Token payload is invalid.");
     }
 
@@ -31,7 +31,7 @@ export function requireSelfParam(paramName) {
     try {
       requireAuthenticatedUser(req);
 
-      if (req.auth.userId !== req.params[paramName]) {
+      if (req.auth.userId !== parsePositiveId(req.params[paramName])) {
         throw createHttpError(403, "Forbidden", "You cannot access another user's resource.");
       }
 
@@ -47,7 +47,7 @@ export function requireSelfBody(fieldName) {
     try {
       requireAuthenticatedUser(req);
 
-      if (req.auth.userId !== req.body?.[fieldName]) {
+      if (req.auth.userId !== parsePositiveId(req.body?.[fieldName])) {
         throw createHttpError(403, "Forbidden", "Request userId must match the logged-in user.");
       }
 
@@ -92,4 +92,14 @@ function requireAuthenticatedUser(req) {
   if (!req.auth?.userId) {
     throw createHttpError(401, "Unauthorized", "Login is required for this route.");
   }
+}
+
+function parsePositiveId(value) {
+  const parsedValue = typeof value === "string" ? Number(value) : value;
+
+  if (!Number.isInteger(parsedValue) || parsedValue < 1) {
+    throw createHttpError(400, "Bad Request", "Route id must be a positive integer.");
+  }
+
+  return parsedValue;
 }

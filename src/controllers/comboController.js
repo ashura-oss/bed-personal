@@ -7,13 +7,13 @@ import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
 import { createHttpError } from "../utils/httpError.js";
 import { resolveComboBattle } from "../utils/comboRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
-import { getOptionalString, getRequiredString } from "../utils/validate.js";
+import { getOptionalString, getRequiredId } from "../utils/validate.js";
 
 const maxComboAbilities = 5;
 
 export async function postResolveCombo(req, res, next) {
   try {
-    const characterId = getRequiredString(req.body, "characterId");
+    const characterId = getRequiredId(req.body, "characterId");
     const abilityIds = getRequiredAbilityIds(req.body);
     const questId = getOptionalString(req.body, "questId");
     const enemyId = getOptionalString(req.body, "enemyId");
@@ -64,11 +64,13 @@ export async function postResolveCombo(req, res, next) {
         comboResult
       });
 
-      res.status(200).json(savedBossResult);
+      res.locals.data = savedBossResult;
+      next();
       return;
     }
 
-    res.status(200).json(comboResult);
+    res.locals.data = comboResult;
+    next();
   } catch (error) {
     next(error);
   }

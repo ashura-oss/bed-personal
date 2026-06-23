@@ -1,10 +1,10 @@
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/client.js";
 import { characters } from "../db/schema.js";
-import { generateId } from "../utils/id.js";
 
 const characterColumns = {
-  characterId: characters.characterId,
+  id: characters.id,
+  characterId: characters.id,
   userId: characters.userId,
   characterName: characters.characterName,
   origin: characters.origin,
@@ -36,7 +36,7 @@ export async function findCharacterById(characterId) {
   const result = await db
     .select(characterColumns)
     .from(characters)
-    .where(eq(characters.characterId, characterId))
+    .where(eq(characters.id, characterId))
     .limit(1);
 
   return result[0] || null;
@@ -61,7 +61,6 @@ export async function createCharacter({
   const result = await db
     .insert(characters)
     .values({
-      characterId: generateId("char"),
       userId,
       characterName,
       origin,
@@ -87,7 +86,7 @@ export async function updateCharacterById(characterId, updates) {
   const result = await db
     .update(characters)
     .set(updates)
-    .where(eq(characters.characterId, characterId))
+    .where(eq(characters.id, characterId))
     .returning(characterColumns);
 
   return result[0] || null;
@@ -96,8 +95,8 @@ export async function updateCharacterById(characterId, updates) {
 export async function deleteCharacterById(characterId) {
   const result = await db
     .delete(characters)
-    .where(eq(characters.characterId, characterId))
-    .returning({ characterId: characters.characterId });
+    .where(eq(characters.id, characterId))
+    .returning({ characterId: characters.id });
 
   return result[0] || null;
 }

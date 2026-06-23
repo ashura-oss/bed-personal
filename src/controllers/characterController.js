@@ -16,7 +16,7 @@ import {
   validateOrigin
 } from "../utils/gameRules.js";
 import { createHttpError } from "../utils/httpError.js";
-import { getOptionalString, getRequiredString } from "../utils/validate.js";
+import { getOptionalString, getRequiredId, getRequiredIdParam, getRequiredString } from "../utils/validate.js";
 
 export async function getCharacters(req, res, next) {
   try {
@@ -28,7 +28,8 @@ export async function getCharacters(req, res, next) {
 
     const characterList = await findCharacters({ className });
 
-    res.status(200).json(characterList);
+    res.locals.data = characterList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -36,7 +37,8 @@ export async function getCharacters(req, res, next) {
 
 export async function getCharacterById(req, res, next) {
   try {
-    const character = await findCharacterById(req.params.id);
+    const characterId = getRequiredIdParam(req.params, "id");
+    const character = await findCharacterById(characterId);
 
     if (!character) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -44,7 +46,8 @@ export async function getCharacterById(req, res, next) {
 
     assertOwnsUserResource(req, character.userId);
 
-    res.status(200).json(character);
+    res.locals.data = character;
+    next();
   } catch (error) {
     next(error);
   }
@@ -52,17 +55,19 @@ export async function getCharacterById(req, res, next) {
 
 export async function getCharactersByUserId(req, res, next) {
   try {
-    const user = await findUserById(req.params.userId);
+    const userId = getRequiredIdParam(req.params, "userId");
+    const user = await findUserById(userId);
 
     if (!user) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    assertOwnsUserResource(req, req.params.userId);
+    assertOwnsUserResource(req, userId);
 
-    const characterList = await findCharactersByUserId(req.params.userId);
+    const characterList = await findCharactersByUserId(userId);
 
-    res.status(200).json(characterList);
+    res.locals.data = characterList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -70,7 +75,7 @@ export async function getCharactersByUserId(req, res, next) {
 
 export async function postCharacter(req, res, next) {
   try {
-    const userId = getRequiredString(req.body, "userId");
+    const userId = getRequiredId(req.body, "userId");
     const characterName = getRequiredString(req.body, "characterName");
     const origin = getRequiredString(req.body, "origin");
     const className = getRequiredString(req.body, "className");
@@ -94,7 +99,8 @@ export async function postCharacter(req, res, next) {
       stats
     });
 
-    res.status(201).json(character);
+    res.locals.data = character;
+    next();
   } catch (error) {
     next(error);
   }
@@ -102,7 +108,8 @@ export async function postCharacter(req, res, next) {
 
 export async function putCharacterById(req, res, next) {
   try {
-    const existingCharacter = await findCharacterById(req.params.id);
+    const characterId = getRequiredIdParam(req.params, "id");
+    const existingCharacter = await findCharacterById(characterId);
 
     if (!existingCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -111,9 +118,10 @@ export async function putCharacterById(req, res, next) {
     assertOwnsUserResource(req, existingCharacter.userId);
 
     const updates = buildCharacterUpdates(req.body, existingCharacter);
-    const updatedCharacter = await updateCharacterById(req.params.id, updates);
+    const updatedCharacter = await updateCharacterById(characterId, updates);
 
-    res.status(200).json(updatedCharacter);
+    res.locals.data = updatedCharacter;
+    next();
   } catch (error) {
     next(error);
   }
@@ -121,7 +129,8 @@ export async function putCharacterById(req, res, next) {
 
 export async function deleteCharacter(req, res, next) {
   try {
-    const existingCharacter = await findCharacterById(req.params.id);
+    const characterId = getRequiredIdParam(req.params, "id");
+    const existingCharacter = await findCharacterById(characterId);
 
     if (!existingCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
@@ -129,9 +138,10 @@ export async function deleteCharacter(req, res, next) {
 
     assertOwnsUserResource(req, existingCharacter.userId);
 
-    await deleteCharacterById(req.params.id);
+    await deleteCharacterById(characterId);
 
-    res.status(204).send();
+    res.locals.status = 204;
+    next();
   } catch (error) {
     next(error);
   }

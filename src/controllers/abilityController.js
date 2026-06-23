@@ -9,7 +9,7 @@ import { findUnlockedAbilitiesByCharacterId } from "../models/comboModel.js";
 import { assertOwnsUserResource } from "../middlewares/authMiddleware.js";
 import { createHttpError } from "../utils/httpError.js";
 import { validateAffinity, validateClassName } from "../utils/gameRules.js";
-import { getOptionalString, getRequiredString } from "../utils/validate.js";
+import { getOptionalString, getRequiredIdParam, getRequiredString } from "../utils/validate.js";
 
 export async function getAbilities(req, res, next) {
   try {
@@ -26,7 +26,8 @@ export async function getAbilities(req, res, next) {
 
     const abilityList = await findAbilities({ className, affinity });
 
-    res.status(200).json(abilityList);
+    res.locals.data = abilityList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -34,7 +35,7 @@ export async function getAbilities(req, res, next) {
 
 export async function unlockCharacterAbility(req, res, next) {
   try {
-    const characterId = req.params.characterId;
+    const characterId = getRequiredIdParam(req.params, "characterId");
     const abilityId = getRequiredString(req.body, "abilityId");
     const character = await findCharacterById(characterId);
 
@@ -60,10 +61,11 @@ export async function unlockCharacterAbility(req, res, next) {
 
     const characterAbility = await createCharacterAbility({ characterId, abilityId });
 
-    res.status(201).json({
+    res.locals.data = {
       characterAbility,
       ability
-    });
+    };
+    next();
   } catch (error) {
     next(error);
   }
@@ -71,7 +73,7 @@ export async function unlockCharacterAbility(req, res, next) {
 
 export async function getCharacterAbilities(req, res, next) {
   try {
-    const characterId = req.params.characterId;
+    const characterId = getRequiredIdParam(req.params, "characterId");
     const character = await findCharacterById(characterId);
 
     if (!character) {
@@ -82,7 +84,8 @@ export async function getCharacterAbilities(req, res, next) {
 
     const unlockedAbilities = await findUnlockedAbilitiesByCharacterId(characterId);
 
-    res.status(200).json(unlockedAbilities);
+    res.locals.data = unlockedAbilities;
+    next();
   } catch (error) {
     next(error);
   }

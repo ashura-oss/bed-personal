@@ -17,10 +17,10 @@ This file maps CA1 and CA2 requirements to planned project files, routes, tables
 | Use Drizzle ORM | [SATISFIED] | `src/db/schema.js`, Drizzle insert seed operations | 1.1 |
 | Use nodemon | [SATISFIED] | `npm run dev` starts `nodemon src/server.js` | 1.1 |
 | Build Express backend server for a game | [SATISFIED] | Game backend, route structure, seed data, quest loop, progression, and ability unlocks implemented and validated | 1.1 onward |
-| users table has `user_id <varchar, PK>` | [SATISFIED] | `users.user_id text primary key` in `src/db/schema.js` and seed DDL | 1.1 |
-| users table has `username <varchar>` | [SATISFIED] | `users.username text unique not null` in `src/db/schema.js` and seed DDL | 1.1 |
-| users table includes `password <varchar>` for CA2 | [SATISFIED] | `users.password text not null`; CA2 auth now stores seeded and new passwords as bcrypt hashes | 1.1, 8.1 |
-| At least one FK table back to users | [SATISFIED] | `characters.user_id -> users.user_id`; verified seeded sample character | 1.1 |
+| users table has `id <int, PK>` | [SATISFIED] | `users.id integer primary key autoincrement` in `src/db/schema.js`; seed DDL uses `id INTEGER PRIMARY KEY AUTOINCREMENT` | 1.1 |
+| users table has `username <varchar>` | [SATISFIED] | `users.username` is unique and not null; seed DDL uses `VARCHAR(255)` | 1.1 |
+| users table includes `password <varchar>` for CA2 | [SATISFIED] | `users.password` stores bcrypt hashes; seed DDL uses `VARCHAR(255)` | 1.1, 8.1 |
+| At least one FK table back to users | [SATISFIED] | `characters.user_id -> users.id`; verified seeded sample character | 1.1 |
 | At least one Create route | [SATISFIED] | `POST /users`, `POST /characters`, and `POST /quests` implemented and tested | 2.1, 3.1, 4.1 |
 | At least one Read route | [SATISFIED] | Users, characters, regions, and quests read routes implemented and tested | 2.1, 3.1, 4.1 |
 | At least one Update route | [SATISFIED] | `PUT /users/:id`, `PUT /characters/:id`, and `PUT /quests/:id` implemented and tested | 2.1, 3.1, 4.1 |
@@ -28,6 +28,7 @@ This file maps CA1 and CA2 requirements to planned project files, routes, tables
 | Each route reachable | [SATISFIED] | Implemented user, character, region, quest, adventure, and ability routes are reachable and tested | 2.1 onward |
 | Appropriate HTTP status codes | [SATISFIED] | User, character, region, quest, adventure, and ability route status codes verified | 1.1 onward |
 | Appropriate error handling | [SATISFIED] | Shared error middleware plus user, character, region, quest, adventure, and ability validation implemented and tested | 1.1 onward |
+| Teacher-style success response middleware | [SATISFIED] | Controllers place success data into `res.locals`; routes append `withMessage(...)` and `sendResponse` from `src/middlewares/response.js` | 1.1 onward |
 | Dynamic route | [SATISFIED] | User, character, region, quest, adventure log, and unlock dynamic routes tested | 2.1, 3.1, 4.1, 5.1, 6.1 |
 | Query parameter route | [SATISFIED] | `GET /users?level=1`, `GET /characters?className=Rogue`, `GET /regions?dangerLevel=3`, `GET /abilities?className=Mage`, and `GET /abilities?affinity=Fire` tested | 2.1, 3.1, 4.1, 6.1 |
 | Use `src/models` | [SATISFIED] | User, character, region, quest, adventure, and ability models implemented | 2.1, 3.1, 4.1, 5.1, 6.1 |
@@ -51,8 +52,8 @@ This file maps CA1 and CA2 requirements to planned project files, routes, tables
 | Use express, libSQL, Drizzle, nodemon | [SATISFIED] | Foundation remains implemented and was rechecked during CA2 auth validation | 1.1, 8.1 |
 | Use bcrypt | [SATISFIED] | `bcrypt` dependency added; registration and user creation hash passwords | 8.1 |
 | Use jsonwebtoken | [SATISFIED] | `jsonwebtoken` dependency added; login/register issue JWTs and middleware verifies JWTs | 8.1 |
-| Users table has password column | [SATISFIED] | `users.password text not null` | 1.1 |
-| At least one FK table back to users | [SATISFIED] | `characters.user_id -> users.user_id` | 1.1 |
+| Users table has password column | [SATISFIED] | `users.password` is a required varchar-style string column containing bcrypt hashes | 1.1 |
+| At least one FK table back to users | [SATISFIED] | `characters.user_id -> users.id` | 1.1 |
 | CRUD route set remains functional | [SATISFIED] | Users, characters, and quests CRUD remain implemented and exercised through the dashboard character Edit/Delete UI (`PUT /characters/:id`, `DELETE /characters/:id`) and Hero Forge (`POST /characters`) | 2.1 onward, 11.5 |
 | Dynamic route remains functional | [SATISFIED] | User, character, region, quest, adventure log, ability unlock, and combo dynamic routes are exercised through dashboard map, journal, ability, and combo flows | 2.1 onward, 11.5 |
 | Query parameter route remains functional | [SATISFIED] | User level, character class, region danger, ability class, and ability affinity filters remain implemented and rechecked during the Phase 11 polish pass | 2.1 onward, 11.5 |
@@ -80,3 +81,24 @@ This file maps CA1 and CA2 requirements to planned project files, routes, tables
 ## Current Rule
 
 Statuses in this file describe requirement satisfaction, not just planning. Do not mark a requirement `[SATISFIED]` until the corresponding implementation exists and has been tested.
+
+## Full-Game Backend Persistence Extension
+
+This section is outside the original CA1/CA2 checklist and records the larger RPG backend shape.
+
+| Requirement | Status | Implementation |
+| --- | --- | --- |
+| Fixed authored content lives in modules | [SATISFIED] | `src/content/*` now stores authored regions, quests, abilities, items, factions, enemies, recipes, and maps. Existing fixed-content DB tables remain as compatibility mirrors where needed. |
+| Dynamic save slots | [SATISFIED] | `save_slots`; `/state/users/:userId/save-slots` |
+| Dynamic inventory | [SATISFIED] | `character_inventory`; `/state/characters/:characterId/inventory/:itemId` |
+| Dynamic equipment | [SATISFIED] | `character_equipment`; `/state/characters/:characterId/equipment/:equipmentSlot` |
+| Dynamic unlocked abilities | [SATISFIED] | Existing `character_abilities` table uses integer FKs and resolves definitions from `src/content/abilities.js` |
+| Dynamic quest completion state | [SATISFIED] | Existing `character_quest_completions` table |
+| Dynamic adventure/combat logs | [SATISFIED] | Existing `adventure_logs` table, enriched from authored quest/region modules |
+| Dynamic dialogue flags | [SATISFIED] | `character_dialogue_flags`; `/state/characters/:characterId/dialogue-flags/:flagId` |
+| Dynamic boss progression state | [SATISFIED] | `character_boss_states`; `/state/characters/:characterId/boss-states/:bossId` |
+| Dynamic campaign-map markers | [SATISFIED] | `character_campaign_markers`; `/state/characters/:characterId/campaign-markers/:markerId` |
+| Dynamic faction reputation | [SATISFIED] | `character_faction_reputation`; `/state/characters/:characterId/faction-reputation/:factionId` |
+| Dynamic region/world state | [SATISFIED] | `character_region_states`; `/state/characters/:characterId/region-states/:regionId` |
+| App-level FK enforcement | [SATISFIED] | `src/db/client.js` enables `PRAGMA foreign_keys = ON` for normal backend runtime connections. |
+| Integer `id` primary keys | [SATISFIED] | Every real table now uses `id INTEGER PRIMARY KEY AUTOINCREMENT`; authored game keys are normal string columns such as `quest_key`, `item_key`, and `region_key`. |

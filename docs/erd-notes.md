@@ -1,29 +1,29 @@
 # ERD Notes
 
-This file supports CA1 and CA2 ERD drawing. It currently documents the planned CA1 MVP schema. Update it whenever the actual Drizzle schema changes.
+This file documents the current backend ERD shape. It follows the BED/MVC convention requested by the teacher: every real database table has an integer primary key named `id`, foreign keys point to those integer `id` columns, and string game identifiers are normal unique/reference columns instead of primary keys.
 
 Status:
-- CA1 MVP schema is implemented in `src/db/schema.js`.
-- Tables are created by `src/db/seed.js` using `CREATE TABLE IF NOT EXISTS`.
-- Seed data was verified on 2026-05-12.
-- Users, characters, regions, quests, adventures, and abilities are implemented in `src/models`, `src/controllers`, and `src/routes`.
-- Region reads, quest CRUD, adventure attempts, progression updates, adventure log reads, ability reads, and ability unlocks were verified on 2026-05-12.
-- CA1 ERD support was validated on 2026-05-12 against `src/db/schema.js` and `src/db/seed.js`.
-- CA2 auth was implemented on 2026-05-12 without adding new tables.
-- The `users.password` column now stores bcrypt hashes for seeded and newly registered users.
-- Phase 10.1 combo resolution was implemented on 2026-05-13 without adding new tables; it uses `characters`, `abilities`, `character_abilities`, and optional `quests` records.
-- Phase 10.2 ability progression frontend was implemented on 2026-05-13 without adding new tables; it reads `abilities` and `character_abilities`, unlocks through the existing join table, and resolves combos through existing character/ability records.
-- Corrective Phase 10.3 boss combo gameplay was verified on 2026-05-13 without adding new tables; boss combo results reuse `quests`, update `users` and `characters`, and write to `adventure_logs`.
+- Current schema is implemented in `src/db/schema.js`.
+- Reset/seed SQL is implemented in `src/db/seed.js`.
+- `npm run db:seed` recreates the local database from scratch.
+- `npm run test:backend` passes.
+- Success responses use route-level `withMessage(...)` plus `sendResponse`.
+- Fixed game rules/content live in `src/content/*`; player-changing state lives in database tables.
 
-## CA1 MVP Tables
+## Key Rules
+
+- Primary keys: every table uses `id INTEGER PRIMARY KEY AUTOINCREMENT`.
+- Foreign keys: user/character/ability/region relational links use integer FK columns such as `user_id`, `character_id`, `ability_id`, and `region_id`.
+- Authored game keys: fixed-content identifiers such as `quest_key`, `region_key`, `ability_key`, `item_key`, `boss_key`, and `faction_key` are string columns, not primary keys.
+- Duplicate prevention: junction/state tables use unique constraints such as `(character_id, ability_id)` and `(character_id, item_key)`.
+- Static content: regions, quests, abilities, items, factions, enemies, recipes, and maps are authored content modules unless they are compatibility mirrors.
+
+## Tables
 
 ### users
 
-Purpose:
-Stores player profiles. CA1 includes `password` now to prepare for CA2.
-
 Columns:
-- `user_id <varchar, PK>`
+- `id <int, PK>`
 - `username <varchar, unique, not null>`
 - `password <varchar, not null>`
 - `level <int, default 1>`
@@ -31,19 +31,15 @@ Columns:
 - `gold <int, default 0>`
 - `created_at <varchar, not null>`
 
-Notes:
-- Passwords must not be returned in API responses.
-- CA2 auth stores seeded and newly created passwords as bcrypt hashes.
-- The auth login flow migrates a legacy plaintext password to bcrypt if one is encountered and the login is successful.
+Relationships:
+- One user owns many characters.
+- One user owns many save slots.
 
 ### characters
 
-Purpose:
-Stores player-created RPG heroes.
-
 Columns:
-- `character_id <varchar, PK>`
-- `user_id <varchar, FK, not null>`
+- `id <int, PK>`
+- `user_id <int, FK -> users.id, not null>`
 - `character_name <varchar, not null>`
 - `origin <varchar, not null>`
 - `class_name <varchar, not null>`
@@ -60,17 +56,17 @@ Columns:
 - `created_at <varchar, not null>`
 
 Relationships:
-- `characters.user_id -> users.user_id`
-- One user can own many characters.
-- Each character belongs to exactly one user.
+- Many characters belong to one user.
+- One character has one current run state.
+- One character has many inventory, equipment, ability, quest completion, log, dialogue, boss, marker, faction, and region-state rows.
 
 ### regions
 
-Purpose:
-Stores world map regions.
+Compatibility mirror for authored region definitions.
 
 Columns:
-- `region_id <varchar, PK>`
+- `id <int, PK>`
+- `region_key <varchar, unique, not null>`
 - `name <varchar, unique, not null>`
 - `description <varchar, not null>`
 - `danger_level <int, not null>`
@@ -80,17 +76,16 @@ Columns:
 - `is_unlocked <int, default 1>`
 
 Relationships:
-- `regions.region_id <- quests.region_id`
-- One region can contain many quests.
+- One region can have many compatibility quest rows.
 
 ### quests
 
-Purpose:
-Stores quest board entries and boss encounters.
+Compatibility/custom quest table. Authored quests live in `src/content/quests.js`.
 
 Columns:
-- `quest_id <varchar, PK>`
-- `region_id <varchar, FK, not null>`
+- `id <int, PK>`
+- `quest_key <varchar, unique, not null>`
+- `region_id <int, FK -> regions.id, not null>`
 - `title <varchar, not null>`
 - `description <varchar, not null>`
 - `quest_type <varchar, not null>`
@@ -104,21 +99,15 @@ Columns:
 - `failure_text <varchar, not null>`
 
 Relationships:
-- `quests.region_id -> regions.region_id`
-- `quests.quest_id <- adventure_logs.quest_id`
-- One region can contain many quests.
-- One quest can appear in many adventure logs.
+- Many quests belong to one region.
+- Adventure logs store `quest_key` because authored quests are fixed content.
 
 ### adventure_logs
 
-Purpose:
-Stores quest attempt results.
-
 Columns:
-- `log_id <varchar, PK>`
-- `user_id <varchar, FK, not null>`
-- `character_id <varchar, FK, not null>`
-- `quest_id <varchar, FK, not null>`
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `quest_key <varchar, not null>`
 - `outcome <varchar, not null>`
 - `xp_gained <int, not null>`
 - `gold_gained <int, not null>`
@@ -126,20 +115,16 @@ Columns:
 - `created_at <varchar, not null>`
 
 Relationships:
-- `adventure_logs.user_id -> users.user_id`
-- `adventure_logs.character_id -> characters.character_id`
-- `adventure_logs.quest_id -> quests.quest_id`
-- One user can have many adventure logs.
-- One character can have many adventure logs.
-- One quest can have many adventure logs.
+- Many adventure logs belong to one character.
+- User ownership is derived through `characters.user_id`, avoiding a redundant `user_id` FK.
 
 ### abilities
 
-Purpose:
-Stores available abilities for class, affinity, and combo progression.
+Compatibility mirror for authored ability definitions.
 
 Columns:
-- `ability_id <varchar, PK>`
+- `id <int, PK>`
+- `ability_key <varchar, unique, not null>`
 - `name <varchar, not null>`
 - `class_name <varchar, nullable>`
 - `affinity <varchar, nullable>`
@@ -150,69 +135,222 @@ Columns:
 - `description <varchar, not null>`
 
 Relationships:
-- `abilities.ability_id <- character_abilities.ability_id`
-- One ability can be unlocked by many characters.
+- One ability can be unlocked by many characters through `character_abilities`.
 
 ### character_abilities
 
-Purpose:
-Join table for unlocked character abilities.
+Junction table for learned abilities.
 
 Columns:
-- `character_ability_id <varchar, PK>`
-- `character_id <varchar, FK, not null>`
-- `ability_id <varchar, FK, not null>`
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `ability_id <int, FK -> abilities.id, not null>`
 - `unlocked_at <varchar, not null>`
 
+Constraints:
+- Unique `(character_id, ability_id)`
+
 Relationships:
-- `character_abilities.character_id -> characters.character_id`
-- `character_abilities.ability_id -> abilities.ability_id`
-- One character can unlock many abilities.
-- One ability can be unlocked by many characters.
+- Many-to-many between characters and abilities.
 
-## Planned ERD Relationship Arrows
+### character_run_states
 
-- `characters.user_id -> users.user_id`
-- `adventure_logs.user_id -> users.user_id`
-- `quests.region_id -> regions.region_id`
-- `adventure_logs.character_id -> characters.character_id`
-- `adventure_logs.quest_id -> quests.quest_id`
-- `character_abilities.character_id -> characters.character_id`
-- `character_abilities.ability_id -> abilities.ability_id`
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, unique, not null>`
+- `schema_version <int, default 1>`
+- `embers <int, default 0>`
+- `flask_charges <int, default 4>`
+- `last_checkpoint_x <real, default -5>`
+- `last_checkpoint_y <real, default 0>`
+- `last_checkpoint_z <real, default 4>`
+- `saved_at <varchar, not null>`
 
-## Future CA2 Tables Not To Implement Yet
+Relationships:
+- One-to-one with characters.
 
-Do not implement these until a future ticket explicitly asks:
+### save_slots
 
-- `factions`
-- `character_reputation`
-- `battles`
-- `battle_turns`
-- `inventory_items`
-- `character_inventory`
-- `endings`
-- `region_unlocks`
+Columns:
+- `id <int, PK>`
+- `user_id <int, FK -> users.id, not null>`
+- `character_id <int, FK -> characters.id, nullable>`
+- `slot_index <int, not null>`
+- `slot_name <varchar, not null>`
+- `created_at <varchar, not null>`
+- `updated_at <varchar, not null>`
+- `last_played_at <varchar, nullable>`
 
-## ERD Drawing Notes
+Constraints:
+- Unique `(user_id, slot_index)`
 
-For CA1, draw these tables:
-- `users`
-- `characters`
-- `regions`
-- `quests`
-- `adventure_logs`
-- `abilities`
-- `character_abilities`
+Relationships:
+- One user has many save slots.
+- A save slot can point to one character or no character.
 
-Use rectangles for tables. List each column with type. Mark PK and FK beside the relevant columns. Draw arrows from FK columns to PK columns.
+### character_quest_completions
 
-Before submitting CA1 or CA2, compare this file with the real `src/db/schema.js` and update any mismatch.
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `quest_key <varchar, not null>`
+- `reward_xp <int, not null>`
+- `awarded_at <varchar, not null>`
 
-## CA2 Phase 11 Note
+Constraints:
+- Unique `(character_id, quest_key)`
 
-The Phase 11 polish pass and the dashboard character Edit/Delete flow reuse the existing CA1 schema with no changes:
+Relationships:
+- One character has many quest completion records.
 
-- Edit calls protected `PUT /characters/:id`, which updates `characters.character_name` (and recomputes stats when origin/class/affinity ever change, although the frontend only ever sends `characterName`).
-- Delete calls protected `DELETE /characters/:id`, which removes the row from `characters`. `adventure_logs.character_id` continues to reference characters via the FK already documented above; deleting a character does not retroactively edit existing log rows because the model removes the character row only.
+### character_inventory
 
-No new tables, columns, or relationships are introduced by the CA2 frontend Edit/Delete flow, the combo battle resolution route, or the Phase 11 polish.
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `item_key <varchar, not null>`
+- `quantity <int, default 1>`
+- `acquired_at <varchar, not null>`
+- `updated_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, item_key)`
+
+Relationships:
+- One character has many inventory rows.
+
+### character_equipment
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `equipment_slot <varchar, not null>`
+- `item_key <varchar, not null>`
+- `equipped_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, equipment_slot)`
+
+Relationships:
+- One character has many equipment slots.
+
+### character_dialogue_flags
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `flag_key <varchar, not null>`
+- `flag_value <varchar, default true>`
+- `set_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, flag_key)`
+
+Relationships:
+- One character has many dialogue/story flags.
+
+### character_boss_states
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `boss_key <varchar, not null>`
+- `status <varchar, default unknown>`
+- `attempts <int, default 0>`
+- `defeats <int, default 0>`
+- `best_time_seconds <real, nullable>`
+- `last_outcome <varchar, nullable>`
+- `updated_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, boss_key)`
+
+Relationships:
+- One character has many boss-state records.
+
+### character_campaign_markers
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `marker_key <varchar, not null>`
+- `region_key <varchar, not null>`
+- `marker_type <varchar, not null>`
+- `is_revealed <int, default 1>`
+- `is_completed <int, default 0>`
+- `position_x <real, nullable>`
+- `position_y <real, nullable>`
+- `position_z <real, nullable>`
+- `updated_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, marker_key)`
+
+Relationships:
+- One character has many campaign marker records.
+
+### character_faction_reputation
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `faction_key <varchar, not null>`
+- `reputation <int, default 0>`
+- `rank <varchar, default neutral>`
+- `updated_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, faction_key)`
+
+Relationships:
+- One character has many faction reputation records.
+
+### character_region_states
+
+Columns:
+- `id <int, PK>`
+- `character_id <int, FK -> characters.id, not null>`
+- `region_key <varchar, not null>`
+- `is_unlocked <int, default 0>`
+- `is_discovered <int, default 0>`
+- `threat_level <int, default 0>`
+- `world_state <varchar, default stable>`
+- `updated_at <varchar, not null>`
+
+Constraints:
+- Unique `(character_id, region_key)`
+
+Relationships:
+- One character has many per-region state records.
+
+## Relationship Arrows
+
+- `characters.user_id -> users.id`
+- `save_slots.user_id -> users.id`
+- `save_slots.character_id -> characters.id`
+- `quests.region_id -> regions.id`
+- `adventure_logs.character_id -> characters.id`
+- `character_abilities.character_id -> characters.id`
+- `character_abilities.ability_id -> abilities.id`
+- `character_run_states.character_id -> characters.id`
+- `character_quest_completions.character_id -> characters.id`
+- `character_inventory.character_id -> characters.id`
+- `character_equipment.character_id -> characters.id`
+- `character_dialogue_flags.character_id -> characters.id`
+- `character_boss_states.character_id -> characters.id`
+- `character_campaign_markers.character_id -> characters.id`
+- `character_faction_reputation.character_id -> characters.id`
+- `character_region_states.character_id -> characters.id`
+
+## Authored Content Modules
+
+These are fixed rules/content and should not be normal mutable gameplay DB tables:
+
+- `src/content/regions.js`
+- `src/content/quests.js`
+- `src/content/abilities.js`
+- `src/content/items.js`
+- `src/content/factions.js`
+- `src/content/enemies.js`
+- `src/content/recipes.js`
+- `src/content/maps.js`

@@ -4,14 +4,14 @@ const MIN_CHARACTER_NAME_LENGTH = 2;
 const MAX_CHARACTER_NAME_LENGTH = 40;
 
 export const allowedOrigins = [
-  "Exiled Noble",
-  "Street Thief",
-  "Cursed Scholar",
-  "Temple Acolyte",
-  "Village Hunter",
-  "Mercenary",
-  "Forgotten Heir",
-  "Monster-Blooded Outcast"
+  "Mordor Conscript",
+  "Black Road Scout",
+  "War Camp Smith",
+  "Ring-Seeking Acolyte",
+  "Ash Plain Hunter",
+  "Haradrim Mercenary",
+  "Fallen Southron Noble",
+  "Uruk-Blooded Outcast"
 ];
 
 export const allowedClasses = [
@@ -61,14 +61,14 @@ const baseStats = {
 };
 
 const originBonuses = {
-  "Exiled Noble": { charisma: 2, intelligence: 1 },
-  "Street Thief": { agility: 2, charisma: 1 },
-  "Cursed Scholar": { intelligence: 2, faith: 1 },
-  "Temple Acolyte": { faith: 2, charisma: 1 },
-  "Village Hunter": { strength: 1, agility: 1 },
-  Mercenary: { strength: 1, endurance: 2 },
-  "Forgotten Heir": { charisma: 1, faith: 1, intelligence: 1 },
-  "Monster-Blooded Outcast": { strength: 2, endurance: 1 }
+  "Mordor Conscript": { strength: 1, endurance: 2 },
+  "Black Road Scout": { agility: 2, endurance: 1 },
+  "War Camp Smith": { strength: 1, intelligence: 1, endurance: 1 },
+  "Ring-Seeking Acolyte": { intelligence: 2, faith: 1 },
+  "Ash Plain Hunter": { strength: 1, agility: 1 },
+  "Haradrim Mercenary": { strength: 1, charisma: 1, endurance: 1 },
+  "Fallen Southron Noble": { charisma: 2, intelligence: 1 },
+  "Uruk-Blooded Outcast": { strength: 2, endurance: 1 }
 };
 
 const classBonuses = {

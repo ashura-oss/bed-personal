@@ -7,7 +7,8 @@ export async function getRegions(req, res, next) {
     const dangerLevel = getOptionalPositiveIntegerQuery(req.query, "dangerLevel");
     const regionList = await findRegions({ dangerLevel });
 
-    res.status(200).json(regionList);
+    res.locals.data = regionList;
+    next();
   } catch (error) {
     next(error);
   }
@@ -21,7 +22,8 @@ export async function getRegionById(req, res, next) {
       throw createHttpError(404, "Not Found", "Region was not found.");
     }
 
-    res.status(200).json(region);
+    res.locals.data = region;
+    next();
   } catch (error) {
     next(error);
   }

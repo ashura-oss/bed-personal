@@ -1,7 +1,9 @@
 import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+const id = () => integer("id").primaryKey({ autoIncrement: true });
+
 export const users = sqliteTable("users", {
-  userId: text("user_id").primaryKey(),
+  id: id(),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   level: integer("level").notNull().default(1),
@@ -11,10 +13,10 @@ export const users = sqliteTable("users", {
 });
 
 export const characters = sqliteTable("characters", {
-  characterId: text("character_id").primaryKey(),
-  userId: text("user_id")
+  id: id(),
+  userId: integer("user_id")
     .notNull()
-    .references(() => users.userId, { onDelete: "cascade" }),
+    .references(() => users.id, { onDelete: "cascade" }),
   characterName: text("character_name").notNull(),
   origin: text("origin").notNull(),
   className: text("class_name").notNull(),
@@ -32,7 +34,8 @@ export const characters = sqliteTable("characters", {
 });
 
 export const regions = sqliteTable("regions", {
-  regionId: text("region_id").primaryKey(),
+  id: id(),
+  regionKey: text("region_key").notNull().unique(),
   name: text("name").notNull().unique(),
   description: text("description").notNull(),
   dangerLevel: integer("danger_level").notNull(),
@@ -43,10 +46,11 @@ export const regions = sqliteTable("regions", {
 });
 
 export const quests = sqliteTable("quests", {
-  questId: text("quest_id").primaryKey(),
-  regionId: text("region_id")
+  id: id(),
+  questKey: text("quest_key").notNull().unique(),
+  regionId: integer("region_id")
     .notNull()
-    .references(() => regions.regionId, { onDelete: "cascade" }),
+    .references(() => regions.id, { onDelete: "cascade" }),
   title: text("title").notNull(),
   description: text("description").notNull(),
   questType: text("quest_type").notNull(),
@@ -61,16 +65,11 @@ export const quests = sqliteTable("quests", {
 });
 
 export const adventureLogs = sqliteTable("adventure_logs", {
-  logId: text("log_id").primaryKey(),
-  userId: text("user_id")
+  id: id(),
+  characterId: integer("character_id")
     .notNull()
-    .references(() => users.userId, { onDelete: "cascade" }),
-  characterId: text("character_id")
-    .notNull()
-    .references(() => characters.characterId, { onDelete: "cascade" }),
-  questId: text("quest_id")
-    .notNull()
-    .references(() => quests.questId, { onDelete: "cascade" }),
+    .references(() => characters.id, { onDelete: "cascade" }),
+  questKey: text("quest_key").notNull(),
   outcome: text("outcome").notNull(),
   xpGained: integer("xp_gained").notNull(),
   goldGained: integer("gold_gained").notNull(),
@@ -79,7 +78,8 @@ export const adventureLogs = sqliteTable("adventure_logs", {
 });
 
 export const abilities = sqliteTable("abilities", {
-  abilityId: text("ability_id").primaryKey(),
+  id: id(),
+  abilityKey: text("ability_key").notNull().unique(),
   name: text("name").notNull(),
   className: text("class_name"),
   affinity: text("affinity"),
@@ -93,13 +93,13 @@ export const abilities = sqliteTable("abilities", {
 export const characterAbilities = sqliteTable(
   "character_abilities",
   {
-    characterAbilityId: text("character_ability_id").primaryKey(),
-    characterId: text("character_id")
+    id: id(),
+    characterId: integer("character_id")
       .notNull()
-      .references(() => characters.characterId, { onDelete: "cascade" }),
-    abilityId: text("ability_id")
+      .references(() => characters.id, { onDelete: "cascade" }),
+    abilityId: integer("ability_id")
       .notNull()
-      .references(() => abilities.abilityId, { onDelete: "cascade" }),
+      .references(() => abilities.id, { onDelete: "cascade" }),
     unlockedAt: text("unlocked_at").notNull()
   },
   (table) => ({
@@ -110,33 +110,212 @@ export const characterAbilities = sqliteTable(
   })
 );
 
-export const characterRunStates = sqliteTable("character_run_states", {
-  characterId: text("character_id")
-    .primaryKey()
-    .references(() => characters.characterId, { onDelete: "cascade" }),
-  schemaVersion: integer("schema_version").notNull().default(1),
-  embers: integer("embers").notNull().default(0),
-  flaskCharges: integer("flask_charges").notNull().default(4),
-  lastHearthlightX: real("last_hearthlight_x").notNull().default(-5),
-  lastHearthlightY: real("last_hearthlight_y").notNull().default(0),
-  lastHearthlightZ: real("last_hearthlight_z").notNull().default(4),
-  savedAt: text("saved_at").notNull()
-});
+export const characterRunStates = sqliteTable(
+  "character_run_states",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    embers: integer("embers").notNull().default(0),
+    flaskCharges: integer("flask_charges").notNull().default(4),
+    lastCheckpointX: real("last_checkpoint_x").notNull().default(-5),
+    lastCheckpointY: real("last_checkpoint_y").notNull().default(0),
+    lastCheckpointZ: real("last_checkpoint_z").notNull().default(4),
+    savedAt: text("saved_at").notNull()
+  },
+  (table) => ({
+    characterRunStateUnique: uniqueIndex("character_run_states_character_unique").on(
+      table.characterId
+    )
+  })
+);
 
 export const characterQuestCompletions = sqliteTable(
   "character_quest_completions",
   {
-    characterQuestCompletionId: text("character_quest_completion_id").primaryKey(),
-    characterId: text("character_id")
+    id: id(),
+    characterId: integer("character_id")
       .notNull()
-      .references(() => characters.characterId, { onDelete: "cascade" }),
-    questId: text("quest_id").notNull(),
+      .references(() => characters.id, { onDelete: "cascade" }),
+    questKey: text("quest_key").notNull(),
     rewardXp: integer("reward_xp").notNull(),
     awardedAt: text("awarded_at").notNull()
   },
   (table) => ({
     characterQuestCompletionUnique: uniqueIndex(
       "character_quest_completions_character_quest_unique"
-    ).on(table.characterId, table.questId)
+    ).on(table.characterId, table.questKey)
+  })
+);
+
+export const saveSlots = sqliteTable(
+  "save_slots",
+  {
+    id: id(),
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    characterId: integer("character_id").references(() => characters.id, {
+      onDelete: "set null"
+    }),
+    slotIndex: integer("slot_index").notNull(),
+    slotName: text("slot_name").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    lastPlayedAt: text("last_played_at")
+  },
+  (table) => ({
+    saveSlotUserIndexUnique: uniqueIndex("save_slots_user_slot_index_unique").on(
+      table.userId,
+      table.slotIndex
+    )
+  })
+);
+
+export const characterInventory = sqliteTable(
+  "character_inventory",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    itemKey: text("item_key").notNull(),
+    quantity: integer("quantity").notNull().default(1),
+    acquiredAt: text("acquired_at").notNull(),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => ({
+    characterInventoryItemUnique: uniqueIndex("character_inventory_character_item_unique").on(
+      table.characterId,
+      table.itemKey
+    )
+  })
+);
+
+export const characterEquipment = sqliteTable(
+  "character_equipment",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    equipmentSlot: text("equipment_slot").notNull(),
+    itemKey: text("item_key").notNull(),
+    equippedAt: text("equipped_at").notNull()
+  },
+  (table) => ({
+    characterEquipmentSlotUnique: uniqueIndex("character_equipment_character_slot_unique").on(
+      table.characterId,
+      table.equipmentSlot
+    )
+  })
+);
+
+export const characterDialogueFlags = sqliteTable(
+  "character_dialogue_flags",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    flagKey: text("flag_key").notNull(),
+    flagValue: text("flag_value").notNull().default("true"),
+    setAt: text("set_at").notNull()
+  },
+  (table) => ({
+    characterDialogueFlagUnique: uniqueIndex("character_dialogue_flags_character_flag_unique").on(
+      table.characterId,
+      table.flagKey
+    )
+  })
+);
+
+export const characterBossStates = sqliteTable(
+  "character_boss_states",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    bossKey: text("boss_key").notNull(),
+    status: text("status").notNull().default("unknown"),
+    attempts: integer("attempts").notNull().default(0),
+    defeats: integer("defeats").notNull().default(0),
+    bestTimeSeconds: real("best_time_seconds"),
+    lastOutcome: text("last_outcome"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => ({
+    characterBossStateUnique: uniqueIndex("character_boss_states_character_boss_unique").on(
+      table.characterId,
+      table.bossKey
+    )
+  })
+);
+
+export const characterCampaignMarkers = sqliteTable(
+  "character_campaign_markers",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    markerKey: text("marker_key").notNull(),
+    regionKey: text("region_key").notNull(),
+    markerType: text("marker_type").notNull(),
+    isRevealed: integer("is_revealed").notNull().default(1),
+    isCompleted: integer("is_completed").notNull().default(0),
+    positionX: real("position_x"),
+    positionY: real("position_y"),
+    positionZ: real("position_z"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => ({
+    characterCampaignMarkerUnique: uniqueIndex(
+      "character_campaign_markers_character_marker_unique"
+    ).on(table.characterId, table.markerKey)
+  })
+);
+
+export const characterFactionReputation = sqliteTable(
+  "character_faction_reputation",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    factionKey: text("faction_key").notNull(),
+    reputation: integer("reputation").notNull().default(0),
+    rank: text("rank").notNull().default("neutral"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => ({
+    characterFactionReputationUnique: uniqueIndex(
+      "character_faction_reputation_character_faction_unique"
+    ).on(table.characterId, table.factionKey)
+  })
+);
+
+export const characterRegionStates = sqliteTable(
+  "character_region_states",
+  {
+    id: id(),
+    characterId: integer("character_id")
+      .notNull()
+      .references(() => characters.id, { onDelete: "cascade" }),
+    regionKey: text("region_key").notNull(),
+    isUnlocked: integer("is_unlocked").notNull().default(0),
+    isDiscovered: integer("is_discovered").notNull().default(0),
+    threatLevel: integer("threat_level").notNull().default(0),
+    worldState: text("world_state").notNull().default("stable"),
+    updatedAt: text("updated_at").notNull()
+  },
+  (table) => ({
+    characterRegionStateUnique: uniqueIndex("character_region_states_character_region_unique").on(
+      table.characterId,
+      table.regionKey
+    )
   })
 );
