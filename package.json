@@ -1,16 +1,16 @@
 {
-  "name": "saurons-conquest",
+  "name": "dawn-of-man",
   "version": "0.1.0",
-  "description": "Sauron's Conquest - Express, libSQL, and Drizzle backend for a third-person 3D action RPG project.",
+  "description": "Dawn of Man - Express, libSQL, and Drizzle backend for a 2D turn-based RPG project.",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "db": "node src/db/reset.js && drizzle-kit push && node src/db/seed.js",
+    "db": "drizzle-kit push && node src/db/seed.js",
+    "db:reset": "node src/db/reset.js && npm run db",
     "db:seed": "node src/db/seed.js",
-    "test:backend": "node --test src/models/__tests__/*.test.js src/__tests__/*.test.js",
-    "test": "node --test src/models/__tests__/*.test.js src/__tests__/*.test.js"
+    "balance": "node scripts/balance-report.js"
   },
   "keywords": [
     "express",
@@ -23,14 +23,13 @@
   "license": "UNLICENSED",
   "dependencies": {
     "@libsql/client": "^0.15.14",
-    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
     "dotenv": "^16.4.7",
     "drizzle-orm": "^0.45.2",
-    "express": "^4.21.2",
-    "jsonwebtoken": "^9.0.3"
+    "express": "^4.21.2"
   },
   "devDependencies": {
-    "drizzle-kit": "^0.31.4",
+    "drizzle-kit": "^0.31.10",
     "nodemon": "^3.1.9"
   }
 }
