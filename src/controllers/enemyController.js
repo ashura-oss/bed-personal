@@ -1,0 +1,63 @@
+import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
+import { createHttpError, sendHttpError } from "../utils/httpError.js";
+
+export async function getEnemies(req, res, next) {
+  try {
+    let regionId = req.query.regionId;
+    const isBoss = readOptionalBinaryQuery(req.query, "isBoss");
+
+    if (regionId !== undefined) {
+      if (typeof regionId !== "string" || regionId.trim().length === 0) {
+        throw createHttpError(400, "Bad Request", "regionId must be a non-empty string.");
+      }
+
+      regionId = regionId.trim();
+    }
+
+    const enemies = ENEMY_DEFINITIONS.filter((enemy) => {
+      if (regionId !== undefined && enemy.regionId !== regionId) {
+        return false;
+      }
+
+      if (isBoss !== undefined && enemy.isBoss !== isBoss) {
+        return false;
+      }
+
+      return true;
+    }).sort((left, right) => left.level - right.level);
+
+    res.locals.data = enemies;
+    next();
+  } catch (error) {
+    sendHttpError(res, error);
+  }
+}
+
+export async function getEnemyById(req, res, next) {
+  try {
+    const enemy = findEnemyDefinitionById(req.params.enemyId);
+
+    if (!enemy) {
+      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
+    }
+
+    res.locals.data = enemy;
+    next();
+  } catch (error) {
+    sendHttpError(res, error);
+  }
+}
+
+function readOptionalBinaryQuery(query, fieldName) {
+  const value = query?.[fieldName];
+
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (value !== "0" && value !== "1") {
+    throw createHttpError(400, "Bad Request", `${fieldName} query must be 0 or 1.`);
+  }
+
+  return Number(value);
+}

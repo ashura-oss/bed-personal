@@ -1,14 +1,7 @@
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
-import { db, databaseUrl } from "./db.js";
-import {
-  characterAbilities,
-  characterInventory,
-  characterLocations,
-  characterRunStates,
-  characters,
-  users
-} from "./schema.js";
+import { db } from "./db.js";
+import { characterAbilities, characterInventory, characterLocations, characterRunStates, characters, users } from "./schema.js";
 
 const now = new Date();
 
@@ -172,7 +165,7 @@ try {
   await seedData();
 
   console.log("Dawn of Man database seeded successfully.");
-  console.log(`Database: ${databaseUrl}`);
+  console.log(`Database: ${process.env.DATABASE_URL}`);
   console.log("Authored game definitions are loaded from src/constants.");
 } catch (error) {
   console.error("Failed to seed Dawn of Man database.");
