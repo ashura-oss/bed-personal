@@ -1,5 +1,5 @@
 // Dialogue controller functions return dialogue data and mark dialogue completion.
-import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
+import * as stateModel from "../models/stateModel.js";
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
 
 // ------------------------------------------------------------
@@ -90,7 +90,7 @@ export async function postDialogueCompletion(req, res, next) {
       return res.status(400).json({ message: "choiceId does not exist for this dialogue." });
     }
 
-    const dialogueFlag = await dialogueFlagModel.upsertDialogueFlag({
+    const dialogueFlag = await stateModel.upsertDialogueFlag({
       characterId: character.characterId,
       flagId: dialogue.completionFlagId,
       flagValue: 1

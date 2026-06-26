@@ -1,7 +1,7 @@
-// Character inventory model functions read and save inventory rows.
+// Character inventory model functions read and save inventory and equipment rows.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
-import { characterInventory, characterRunStates, characters } from "../db/schema.js";
+import { characterEquipment, characterInventory, characterRunStates, characters } from "../db/schema.js";
 
 // ------------------------------------------------------------
 // DATABASE READS
@@ -43,6 +43,21 @@ export async function findInventoryItemByCharacterId(characterId, itemId) {
   return result[0] || null;
 }
 
+// Find all equipped items for one character.
+export function findEquipmentByCharacterId(characterId) {
+  return db
+    .select({
+      characterEquipmentId: characterEquipment.id,
+      characterId: characterEquipment.characterId,
+      equipmentSlot: characterEquipment.equipmentSlot,
+      itemId: characterEquipment.itemKey,
+      equippedAt: characterEquipment.equippedAt
+    })
+    .from(characterEquipment)
+    .where(eq(characterEquipment.characterId, characterId))
+    .orderBy(asc(characterEquipment.equipmentSlot));
+}
+
 // ------------------------------------------------------------
 // DATABASE WRITES
 // ------------------------------------------------------------
@@ -75,6 +90,47 @@ export async function upsertInventoryItem({ characterId, itemId, quantity }) {
       acquiredAt: characterInventory.acquiredAt,
       updatedAt: characterInventory.updatedAt
     });
+
+  return result[0];
+}
+
+// Insert or update one equipped item slot.
+export async function upsertEquipment({ characterId, equipmentSlot, itemId }) {
+  const now = new Date();
+  const existingResult = await db
+    .select({
+      characterEquipmentId: characterEquipment.id
+    })
+    .from(characterEquipment)
+    .where(
+      and(
+        eq(characterEquipment.characterId, characterId),
+        eq(characterEquipment.equipmentSlot, equipmentSlot)
+      )
+    )
+    .limit(1);
+  const existing = existingResult[0] || null;
+  const query = existing
+    ? db
+        .update(characterEquipment)
+        .set({
+          itemKey: itemId,
+          equippedAt: now
+        })
+        .where(eq(characterEquipment.id, existing.characterEquipmentId))
+    : db.insert(characterEquipment).values({
+        characterId,
+        equipmentSlot,
+        itemKey: itemId,
+        equippedAt: now
+      });
+  const result = await query.returning({
+    characterEquipmentId: characterEquipment.id,
+    characterId: characterEquipment.characterId,
+    equipmentSlot: characterEquipment.equipmentSlot,
+    itemId: characterEquipment.itemKey,
+    equippedAt: characterEquipment.equippedAt
+  });
 
   return result[0];
 }
@@ -274,6 +330,27 @@ export async function removeInventoryItem({ characterId, itemId }) {
       quantity: characterInventory.quantity,
       acquiredAt: characterInventory.acquiredAt,
       updatedAt: characterInventory.updatedAt
+    });
+
+  return result[0] || null;
+}
+
+// Delete one equipped item slot.
+export async function removeEquipment({ characterId, equipmentSlot }) {
+  const result = await db
+    .delete(characterEquipment)
+    .where(
+      and(
+        eq(characterEquipment.characterId, characterId),
+        eq(characterEquipment.equipmentSlot, equipmentSlot)
+      )
+    )
+    .returning({
+      characterEquipmentId: characterEquipment.id,
+      characterId: characterEquipment.characterId,
+      equipmentSlot: characterEquipment.equipmentSlot,
+      itemId: characterEquipment.itemKey,
+      equippedAt: characterEquipment.equippedAt
     });
 
   return result[0] || null;

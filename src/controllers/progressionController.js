@@ -1,6 +1,5 @@
 // Progression controller functions read and save story and quest progression.
 import * as progressionModel from "../models/progressionModel.js";
-import * as questCompletionModel from "../models/questCompletionModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
 
 const DEFAULT_RUN_STATE = {
@@ -120,7 +119,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
       return res.status(400).json({ message: "Only dialogue story milestones can be claimed directly." });
     }
 
-    const claimResult = await questCompletionModel.claimCharacterQuestCompletion({
+    const claimResult = await progressionModel.claimCharacterQuestCompletion({
       characterId,
       questReward
     });

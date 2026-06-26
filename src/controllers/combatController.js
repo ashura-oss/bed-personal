@@ -1,10 +1,10 @@
 // Combat controller functions create sessions, resolve turns, and apply rewards.
 import * as abilityModel from "../models/abilityModel.js";
 import * as adventureModel from "../models/adventureModel.js";
-import * as bossStateModel from "../models/bossStateModel.js";
-import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
+import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import * as combatModel from "../models/combatModel.js";
 import * as mapModel from "../models/mapModel.js";
+import * as stateModel from "../models/stateModel.js";
 import * as storyModel from "../models/storyModel.js";
 import * as userModel from "../models/userModel.js";
 import { findAbilityDefinitionById } from "../constants/abilities.js";
@@ -82,7 +82,7 @@ export async function postCombatSession(req, res, next) {
 
       nodeId = bossNode.nodeId;
 
-      const bossState = await bossStateModel.findBossStateByCharacterId(
+      const bossState = await stateModel.findBossStateByCharacterId(
         character.characterId,
         enemy.enemyId
       );
@@ -91,7 +91,7 @@ export async function postCombatSession(req, res, next) {
         return res.status(409).json({ message: "Boss has already been defeated." });
       }
 
-      await bossStateModel.upsertBossState({
+      await stateModel.upsertBossState({
         characterId: character.characterId,
         bossId: enemy.enemyId,
         status: "active",
@@ -231,12 +231,12 @@ export async function postCombatTurn(req, res, next) {
     }
 
     if (savedTurn.session.status === "lost" && enemy.isBoss === 1) {
-      const bossState = await bossStateModel.findBossStateByCharacterId(
+      const bossState = await stateModel.findBossStateByCharacterId(
         character.characterId,
         enemy.enemyId
       );
 
-      await bossStateModel.upsertBossState({
+      await stateModel.upsertBossState({
         characterId: character.characterId,
         bossId: enemy.enemyId,
         status: "active",
@@ -277,7 +277,7 @@ async function findBossNodeForEnemy(enemyId, res) {
 
 // Build combat character.
 async function buildCombatCharacter(character) {
-  const equipment = await characterEquipmentModel.findEquipmentByCharacterId(character.characterId);
+  const equipment = await characterInventoryModel.findEquipmentByCharacterId(character.characterId);
 
   return applyEquipmentBonuses(character, equipment);
 }

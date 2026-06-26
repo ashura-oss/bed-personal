@@ -1,5 +1,5 @@
 // Map controller functions read map data and move characters between nodes.
-import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
+import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import * as combatModel from "../models/combatModel.js";
 import * as mapModel from "../models/mapModel.js";
 import { findEnemyDefinitionById } from "../constants/enemies.js";
@@ -217,7 +217,7 @@ async function createAmbushTravelEvent({ character, targetNode, res }) {
     return null;
   }
 
-  const equipment = await characterEquipmentModel.findEquipmentByCharacterId(character.characterId);
+  const equipment = await characterInventoryModel.findEquipmentByCharacterId(character.characterId);
   const combatCharacter = applyEquipmentBonuses(character, equipment);
   const combatSession = await combatModel.createCombatSession({
     characterId: character.characterId,

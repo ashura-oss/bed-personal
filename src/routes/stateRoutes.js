@@ -1,14 +1,7 @@
 // Saved state route definitions.
 import { Router } from "express";
-import { putBossState } from "../controllers/bossStateController.js";
-import { putCampaignMarker } from "../controllers/campaignMarkerController.js";
-import { putDialogueFlag } from "../controllers/dialogueFlagController.js";
-import { deleteEquipment, putEquipment } from "../controllers/equipmentController.js";
-import { putFactionReputation } from "../controllers/factionReputationController.js";
-import { getCharacterFullState } from "../controllers/fullStateController.js";
-import { deleteInventoryItem, postConsumeInventoryItem, putInventoryItem } from "../controllers/inventoryController.js";
-import { putRegionState } from "../controllers/regionStateController.js";
-import { getSaveSlotsForUser, putSaveSlotForUser } from "../controllers/saveSlotController.js";
+import { deleteEquipment, deleteInventoryItem, postConsumeInventoryItem, putEquipment, putInventoryItem } from "../controllers/inventoryController.js";
+import { getCharacterFullState, getSaveSlotsForUser, putBossState, putCampaignMarker, putDialogueFlag, putFactionReputation, putRegionState, putSaveSlotForUser } from "../controllers/stateController.js";
 import { loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";
 import { loadUserFromUserIdParam } from "../controllers/userController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

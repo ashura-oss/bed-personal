@@ -1,6 +1,6 @@
 // Army controller functions read, save, and resolve army state.
 import * as armyModel from "../models/armyModel.js";
-import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
+import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import * as progressionModel from "../models/progressionModel.js";
 import * as storyModel from "../models/storyModel.js";
 import { ARMY_ENCOUNTER_DEFINITIONS, findArmyEncounterById } from "../constants/armyEncounters.js";
@@ -190,7 +190,7 @@ export async function postCharacterArmyBattle(req, res, next) {
       return res.status(400).json({ message: `Army encounter requires storyPhase ${encounter.requiredStoryPhase}.` });
     }
 
-    const equipment = await characterEquipmentModel.findEquipmentByCharacterId(characterId);
+    const equipment = await characterInventoryModel.findEquipmentByCharacterId(characterId);
     const equipmentBonus = calculateArmyEquipmentBonus(equipment);
     const battleArmyState = {
       ...armyState,
