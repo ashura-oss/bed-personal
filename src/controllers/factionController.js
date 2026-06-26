@@ -1,6 +1,5 @@
 // Faction controller functions return fixed faction data.
 import { FACTION_DEFINITIONS, findFactionDefinitionById } from "../constants/factions.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Get factions.
 export async function getFactions(req, res, next) {
@@ -12,7 +11,8 @@ export async function getFactions(req, res, next) {
     res.locals.data = factions;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -22,12 +22,13 @@ export async function getFactionById(req, res, next) {
     const faction = findFactionDefinitionById(req.params.factionId);
 
     if (!faction) {
-      throw createError(404, "Not Found", "Faction definition was not found.");
+      return res.status(404).json({ message: "Faction definition was not found." });
     }
 
     res.locals.data = faction;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

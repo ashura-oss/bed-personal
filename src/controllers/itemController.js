@@ -1,6 +1,5 @@
 // Item controller functions return fixed item definitions.
 import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Get items.
 export async function getItems(req, res, next) {
@@ -10,7 +9,7 @@ export async function getItems(req, res, next) {
 
     if (itemType !== undefined) {
       if (typeof itemType !== "string" || itemType.trim().length === 0) {
-        throw createError(400, "Bad Request", "itemType must be a non-empty string.");
+        return res.status(400).json({ message: "itemType must be a non-empty string." });
       }
 
       itemType = itemType.trim();
@@ -18,7 +17,7 @@ export async function getItems(req, res, next) {
 
     if (equipmentSlot !== undefined) {
       if (typeof equipmentSlot !== "string" || equipmentSlot.trim().length === 0) {
-        throw createError(400, "Bad Request", "equipmentSlot must be a non-empty string.");
+        return res.status(400).json({ message: "equipmentSlot must be a non-empty string." });
       }
 
       equipmentSlot = equipmentSlot.trim();
@@ -39,7 +38,8 @@ export async function getItems(req, res, next) {
     res.locals.data = items;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -49,12 +49,13 @@ export async function getItemById(req, res, next) {
     const item = findItemDefinitionById(req.params.itemId);
 
     if (!item) {
-      throw createError(404, "Not Found", "Item definition was not found.");
+      return res.status(404).json({ message: "Item definition was not found." });
     }
 
     res.locals.data = item;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

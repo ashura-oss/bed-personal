@@ -2,7 +2,6 @@
 import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById } from "../constants/items.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Update equipment.
 export async function putEquipment(req, res, next) {
@@ -11,22 +10,18 @@ export async function putEquipment(req, res, next) {
     const itemIdValue = req.body?.itemId;
 
     if (typeof itemIdValue !== "string" || itemIdValue.trim().length === 0) {
-      throw createError(400, "Bad Request", "itemId is required.");
+      return res.status(400).json({ message: "itemId is required." });
     }
 
     const itemId = itemIdValue.trim();
     const item = findItemDefinitionById(itemId);
 
     if (!item) {
-      throw createError(404, "Not Found", "Item definition was not found.");
+      return res.status(404).json({ message: "Item definition was not found." });
     }
 
     if (!item.equipmentSlot || item.equipmentSlot !== req.params.equipmentSlot) {
-      throw createError(
-        400,
-        "Bad Request",
-        `Item cannot be equipped in ${req.params.equipmentSlot}.`
-      );
+      return res.status(400).json({ message: `Item cannot be equipped in ${req.params.equipmentSlot}.` });
     }
 
     const inventoryItem = await characterInventoryModel.findInventoryItemByCharacterId(
@@ -35,7 +30,7 @@ export async function putEquipment(req, res, next) {
     );
 
     if (!inventoryItem || inventoryItem.quantity < 1) {
-      throw createError(400, "Bad Request", "Character does not own this equipment item.");
+      return res.status(400).json({ message: "Character does not own this equipment item." });
     }
 
     const equipment = await characterEquipmentModel.upsertEquipment({
@@ -47,7 +42,8 @@ export async function putEquipment(req, res, next) {
     res.locals.data = equipment;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -63,6 +59,7 @@ export async function deleteEquipment(req, res, next) {
     res.locals.data = { removed: Boolean(removed), equipment: removed };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

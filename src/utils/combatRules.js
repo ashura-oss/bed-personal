@@ -1,8 +1,8 @@
 // Pure combat helper functions used by combat controllers.
 import { findClassDamageRange } from "../constants/combatBalance.js";
-import { createError } from "./errorCode.js";
 
 const validPlayerActions = ["attack", "ability", "defend"];
+const validCombatAbilityTypes = ["attack", "ultimate", "heal", "defend", "support", "command"];
 
 // Resolve one complete round: player action first, then enemy counter if still alive.
 export function resolveCombatTurn({
@@ -13,7 +13,11 @@ export function resolveCombatTurn({
   ability = null,
   rng = Math.random
 }) {
-  validateCombatTurn({ session, actionType, ability });
+  const validationError = validateCombatTurn({ session, actionType, ability });
+
+  if (validationError) {
+    return { error: validationError };
+  }
 
   const playerAction = resolvePlayerAction({
     session,
@@ -85,24 +89,30 @@ export function resolveCombatTurn({
 // Validate turn input before calculating damage.
 function validateCombatTurn({ session, actionType, ability }) {
   if (!session) {
-    throw createError(404, "Not Found", "Combat session was not found.");
+    return { status: 404, message: "Combat session was not found." };
   }
 
   if (session.status !== "active") {
-    throw createError(400, "Bad Request", "Combat session is already complete.");
+    return { status: 400, message: "Combat session is already complete." };
   }
 
   if (!validPlayerActions.includes(actionType)) {
-    throw createError(400, "Bad Request", "actionType must be attack, ability, or defend.");
+    return { status: 400, message: "actionType must be attack, ability, or defend." };
   }
 
   if (actionType === "ability" && !ability) {
-    throw createError(400, "Bad Request", "abilityId is required when actionType is ability.");
+    return { status: 400, message: "abilityId is required when actionType is ability." };
   }
 
   if (actionType !== "ability" && ability) {
-    throw createError(400, "Bad Request", "abilityId can only be used with actionType ability.");
+    return { status: 400, message: "abilityId can only be used with actionType ability." };
   }
+
+  if (ability && !validCombatAbilityTypes.includes(ability.abilityType)) {
+    return { status: 400, message: "Ability type cannot be used in combat." };
+  }
+
+  return null;
 }
 
 // Build damage ranges from class, stats, equipment, level, and ability power.
@@ -221,10 +231,6 @@ function resolveAbilityAction({ session, character, enemy, ability, rng }) {
       damageReduction: 0.25,
       message: `${character.characterName} uses ${ability.name} to strengthen the next exchange.`
     };
-  }
-
-  if (ability.abilityType !== "attack" && ability.abilityType !== "ultimate") {
-    throw createError(400, "Bad Request", "Ability type cannot be used in combat.");
   }
 
   const damageRange = buildPlayerDamageRange({ character, ability });

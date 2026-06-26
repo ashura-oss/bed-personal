@@ -2,7 +2,6 @@
 import * as abilityModel from "../models/abilityModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { ABILITY_DEFINITIONS, findAbilityDefinitionById } from "../constants/abilities.js";
-import { createError, sendError } from "../utils/errorCode.js";
 import { validateAffinity, validateClassName } from "../utils/gameRules.js";
 
 // Return fixed ability definitions, optionally filtered by class or affinity.
@@ -13,7 +12,7 @@ export async function getAbilities(req, res, next) {
 
     if (className !== undefined) {
       if (typeof className !== "string" || className.trim().length === 0) {
-        throw createError(400, "Bad Request", "className must be a non-empty string.");
+        return res.status(400).json({ message: "className must be a non-empty string." });
       }
 
       className = className.trim();
@@ -21,18 +20,26 @@ export async function getAbilities(req, res, next) {
 
     if (affinity !== undefined) {
       if (typeof affinity !== "string" || affinity.trim().length === 0) {
-        throw createError(400, "Bad Request", "affinity must be a non-empty string.");
+        return res.status(400).json({ message: "affinity must be a non-empty string." });
       }
 
       affinity = affinity.trim();
     }
 
     if (className !== undefined) {
-      validateClassName(className);
+      const classNameError = validateClassName(className);
+
+      if (classNameError) {
+        return res.status(400).json({ message: classNameError });
+      }
     }
 
     if (affinity !== undefined) {
-      validateAffinity(affinity);
+      const affinityError = validateAffinity(affinity);
+
+      if (affinityError) {
+        return res.status(400).json({ message: affinityError });
+      }
     }
 
     const abilityList = ABILITY_DEFINITIONS.filter((ability) => {
@@ -50,7 +57,8 @@ export async function getAbilities(req, res, next) {
     res.locals.data = abilityList;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -60,11 +68,11 @@ export async function unlockCharacterAbility(req, res, next) {
     const characterId = Number(req.params.characterId);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+      return res.status(400).json({ message: "characterId must be a positive integer id." });
     }
 
     if (typeof req.body?.abilityId !== "string" || req.body.abilityId.trim().length === 0) {
-      throw createError(400, "Bad Request", "abilityId is required.");
+      return res.status(400).json({ message: "abilityId is required." });
     }
 
     const abilityId = req.body.abilityId.trim();
@@ -73,18 +81,24 @@ export async function unlockCharacterAbility(req, res, next) {
     const ability = findAbilityDefinitionById(abilityId);
 
     if (!ability) {
-      throw createError(404, "Not Found", "Ability was not found.");
+      return res.status(404).json({ message: "Ability was not found." });
     }
 
-    validateAbilityUnlock(character, ability);
+    if (!validateAbilityUnlock(character, ability, res)) {
+      return;
+    }
 
     const existingUnlock = await abilityModel.findCharacterAbility(characterId, abilityId);
 
     if (existingUnlock) {
-      throw createError(409, "Conflict", "Character already unlocked this ability.");
+      return res.status(409).json({ message: "Character already unlocked this ability." });
     }
 
-    await validateAbilityCost(character, ability);
+    const hasAbilityCost = await validateAbilityCost(character, ability, res);
+
+    if (!hasAbilityCost) {
+      return;
+    }
 
     const unlockResult = await abilityModel.createCharacterAbility({ character, ability });
 
@@ -96,7 +110,8 @@ export async function unlockCharacterAbility(req, res, next) {
     };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -126,20 +141,18 @@ export async function getCharacterAbilities(req, res, next) {
     res.locals.data = unlockedAbilities;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
 // Requirement helpers keep unlockCharacterAbility readable.
-async function validateAbilityCost(character, ability) {
+async function validateAbilityCost(character, ability, res) {
   const xpCost = Number(ability.xpCost || 0);
 
   if (character.xp < xpCost) {
-    throw createError(
-      400,
-      "Bad Request",
-      `Character needs ${xpCost} XP to unlock this ability.`
-    );
+    res.status(400).json({ message: `Character needs ${xpCost} XP to unlock this ability.` });
+    return false;
   }
 
   for (const requiredItem of ability.requiredItems || []) {
@@ -149,38 +162,30 @@ async function validateAbilityCost(character, ability) {
     );
 
     if (!inventoryItem || inventoryItem.quantity < requiredItem.quantity) {
-      throw createError(
-        400,
-        "Bad Request",
-        `Character needs ${requiredItem.quantity} ${requiredItem.itemId} to unlock this ability.`
-      );
+      res.status(400).json({ message: `Character needs ${requiredItem.quantity} ${requiredItem.itemId} to unlock this ability.` });
+      return false;
     }
   }
+
+  return true;
 }
 
 // Validate ability unlock.
-function validateAbilityUnlock(character, ability) {
+function validateAbilityUnlock(character, ability, res) {
   if (character.level < ability.requiredLevel) {
-    throw createError(
-      400,
-      "Bad Request",
-      `Character level ${character.level} is too low for this ability. Required level is ${ability.requiredLevel}.`
-    );
+    res.status(400).json({ message: `Character level ${character.level} is too low for this ability. Required level is ${ability.requiredLevel}.` });
+    return false;
   }
 
   if (ability.className !== null && ability.className !== character.className) {
-    throw createError(
-      400,
-      "Bad Request",
-      `Ability requires className ${ability.className}.`
-    );
+    res.status(400).json({ message: `Ability requires className ${ability.className}.` });
+    return false;
   }
 
   if (ability.affinity !== null && ability.affinity !== character.affinity) {
-    throw createError(
-      400,
-      "Bad Request",
-      `Ability requires affinity ${ability.affinity}.`
-    );
+    res.status(400).json({ message: `Ability requires affinity ${ability.affinity}.` });
+    return false;
   }
+
+  return true;
 }

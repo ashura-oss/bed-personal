@@ -1,7 +1,6 @@
 // Quest controller functions return quest definitions and validate quest references.
 import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Load quest from body for the next controller.
 export async function loadQuestFromBody(req, res, next) {
@@ -9,19 +8,20 @@ export async function loadQuestFromBody(req, res, next) {
     const value = req.body?.questId;
 
     if (typeof value !== "string" || value.trim().length === 0) {
-      throw createError(400, "Bad Request", "questId is required.");
+      return res.status(400).json({ message: "questId is required." });
     }
 
     const quest = findQuestDefinitionById(value.trim());
 
     if (!quest) {
-      throw createError(404, "Not Found", "Quest was not found.");
+      return res.status(404).json({ message: "Quest was not found." });
     }
 
     res.locals.quest = quest;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -35,7 +35,8 @@ export async function getQuests(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -45,13 +46,14 @@ export async function getQuestById(req, res, next) {
     const quest = findQuestDefinitionById(req.params.id);
 
     if (!quest) {
-      throw createError(404, "Not Found", "Quest was not found.");
+      return res.status(404).json({ message: "Quest was not found." });
     }
 
     res.locals.data = quest;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -61,7 +63,7 @@ export async function getQuestsByRegionId(req, res, next) {
     const region = findRegionDefinitionById(req.params.regionId);
 
     if (!region) {
-      throw createError(404, "Not Found", "Region was not found.");
+      return res.status(404).json({ message: "Region was not found." });
     }
 
     const questList = QUEST_DEFINITIONS.filter(
@@ -71,6 +73,7 @@ export async function getQuestsByRegionId(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

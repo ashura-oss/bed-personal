@@ -1,16 +1,19 @@
 // Enemy controller functions return fixed enemy and boss data.
 import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Get enemies.
 export async function getEnemies(req, res, next) {
   try {
     let regionId = req.query.regionId;
-    const isBoss = readOptionalBinaryQuery(req.query, "isBoss");
+    const isBoss = readOptionalBinaryQuery(req.query, "isBoss", res);
+
+    if (isBoss === null) {
+      return;
+    }
 
     if (regionId !== undefined) {
       if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        throw createError(400, "Bad Request", "regionId must be a non-empty string.");
+        return res.status(400).json({ message: "regionId must be a non-empty string." });
       }
 
       regionId = regionId.trim();
@@ -31,7 +34,8 @@ export async function getEnemies(req, res, next) {
     res.locals.data = enemies;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -41,18 +45,19 @@ export async function getEnemyById(req, res, next) {
     const enemy = findEnemyDefinitionById(req.params.enemyId);
 
     if (!enemy) {
-      throw createError(404, "Not Found", "Enemy definition was not found.");
+      return res.status(404).json({ message: "Enemy definition was not found." });
     }
 
     res.locals.data = enemy;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
 // Read optional binary query.
-function readOptionalBinaryQuery(query, fieldName) {
+function readOptionalBinaryQuery(query, fieldName, res) {
   const value = query?.[fieldName];
 
   if (value === undefined) {
@@ -60,7 +65,8 @@ function readOptionalBinaryQuery(query, fieldName) {
   }
 
   if (value !== "0" && value !== "1") {
-    throw createError(400, "Bad Request", `${fieldName} query must be 0 or 1.`);
+    res.status(400).json({ message: `${fieldName} query must be 0 or 1.` });
+    return null;
   }
 
   return Number(value);

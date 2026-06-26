@@ -1,7 +1,6 @@
 // Campaign marker controller functions save frontend map marker state.
 import * as campaignMarkerModel from "../models/campaignMarkerModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Update campaign marker.
 export async function putCampaignMarker(req, res, next) {
@@ -15,17 +14,17 @@ export async function putCampaignMarker(req, res, next) {
     const positionY = req.body?.positionY;
 
     if (typeof regionIdValue !== "string" || regionIdValue.trim().length === 0) {
-      throw createError(400, "Bad Request", "regionId is required.");
+      return res.status(400).json({ message: "regionId is required." });
     }
 
     const regionId = regionIdValue.trim();
 
     if (!hasRegionDefinition(regionId)) {
-      throw createError(404, "Not Found", "Region definition was not found.");
+      return res.status(404).json({ message: "Region definition was not found." });
     }
 
     if (typeof markerTypeValue !== "string" || markerTypeValue.trim().length === 0) {
-      throw createError(400, "Bad Request", "markerType is required.");
+      return res.status(400).json({ message: "markerType is required." });
     }
 
     if (
@@ -34,7 +33,7 @@ export async function putCampaignMarker(req, res, next) {
       isRevealedValue !== 0 &&
       isRevealedValue !== 1
     ) {
-      throw createError(400, "Bad Request", "isRevealed must be a boolean or 0/1.");
+      return res.status(400).json({ message: "isRevealed must be a boolean or 0/1." });
     }
 
     if (
@@ -43,7 +42,7 @@ export async function putCampaignMarker(req, res, next) {
       isCompletedValue !== 0 &&
       isCompletedValue !== 1
     ) {
-      throw createError(400, "Bad Request", "isCompleted must be a boolean or 0/1.");
+      return res.status(400).json({ message: "isCompleted must be a boolean or 0/1." });
     }
 
     if (
@@ -51,7 +50,7 @@ export async function putCampaignMarker(req, res, next) {
       positionX !== null &&
       (typeof positionX !== "number" || Number.isNaN(positionX) || !Number.isFinite(positionX))
     ) {
-      throw createError(400, "Bad Request", "positionX must be a finite number.");
+      return res.status(400).json({ message: "positionX must be a finite number." });
     }
 
     if (
@@ -59,7 +58,7 @@ export async function putCampaignMarker(req, res, next) {
       positionY !== null &&
       (typeof positionY !== "number" || Number.isNaN(positionY) || !Number.isFinite(positionY))
     ) {
-      throw createError(400, "Bad Request", "positionY must be a finite number.");
+      return res.status(400).json({ message: "positionY must be a finite number." });
     }
 
     const marker = await campaignMarkerModel.upsertCampaignMarker({
@@ -76,6 +75,7 @@ export async function putCampaignMarker(req, res, next) {
     res.locals.data = marker;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

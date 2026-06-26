@@ -1,6 +1,5 @@
 // Army encounter controller functions return fixed army encounter data.
 import { ARMY_ENCOUNTER_DEFINITIONS, findArmyEncounterById as findArmyEncounterDefinitionById } from "../constants/armyEncounters.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Get army encounters.
 export async function getArmyEncounters(req, res, next) {
@@ -9,7 +8,7 @@ export async function getArmyEncounters(req, res, next) {
 
     if (requiredStoryPhase !== undefined) {
       if (typeof requiredStoryPhase !== "string" || requiredStoryPhase.trim().length === 0) {
-        throw createError(400, "Bad Request", "requiredStoryPhase must be a non-empty string.");
+        return res.status(400).json({ message: "requiredStoryPhase must be a non-empty string." });
       }
 
       requiredStoryPhase = requiredStoryPhase.trim();
@@ -29,7 +28,8 @@ export async function getArmyEncounters(req, res, next) {
     res.locals.data = encounters;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -39,12 +39,13 @@ export async function getArmyEncounterById(req, res, next) {
     const encounter = findArmyEncounterDefinitionById(req.params.armyEncounterId);
 
     if (!encounter) {
-      throw createError(404, "Not Found", "Army encounter definition was not found.");
+      return res.status(404).json({ message: "Army encounter definition was not found." });
     }
 
     res.locals.data = encounter;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

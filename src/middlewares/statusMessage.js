@@ -24,5 +24,12 @@ export function sendResponse(_req, res) {
   const status = res.locals.status || 200;
   const message = res.locals.message || "Success";
 
-  res.status(status).json({ message, data: res.locals || null });
+  if (status === 204) {
+    return res.sendStatus(204);
+  }
+
+  return res.status(status).json({
+    message,
+    data: res.locals.data || null
+  });
 }

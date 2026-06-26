@@ -1,6 +1,5 @@
 // Pure character creation and stat validation helpers.
 import { affinityBonuses, allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins, baseStats, classBonuses, originBonuses } from "../constants/characterOptions.js";
-import { createError } from "./errorCode.js";
 
 const MIN_CHARACTER_NAME_LENGTH = 2;
 const MAX_CHARACTER_NAME_LENGTH = 40;
@@ -9,56 +8,60 @@ export { allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigin
 
 // Validate fixed character creation options from constants.
 export function validateOrigin(origin) {
-  validateAllowedValue("origin", origin, allowedOrigins);
+  return validateAllowedValue("origin", origin, allowedOrigins);
 }
 
 // Validate class name.
 export function validateClassName(className) {
-  validateAllowedValue("className", className, allowedClasses);
+  return validateAllowedValue("className", className, allowedClasses);
 }
 
 // Validate affinity.
 export function validateAffinity(affinity) {
-  validateAllowedValue("affinity", affinity, allowedAffinities);
+  return validateAllowedValue("affinity", affinity, allowedAffinities);
 }
 
 // Validate character name.
 export function validateCharacterName(characterName) {
   if (typeof characterName !== "string" || characterName.trim().length === 0) {
-    throw createError(
-      400,
-      "Bad Request",
-      "characterName is required and must be a non-empty string."
-    );
+    return "characterName is required and must be a non-empty string.";
   }
 
   const length = characterName.trim().length;
   if (length < MIN_CHARACTER_NAME_LENGTH || length > MAX_CHARACTER_NAME_LENGTH) {
-    throw createError(
-      400,
-      "Bad Request",
-      `characterName must be between ${MIN_CHARACTER_NAME_LENGTH} and ${MAX_CHARACTER_NAME_LENGTH} characters.`
-    );
+    return `characterName must be between ${MIN_CHARACTER_NAME_LENGTH} and ${MAX_CHARACTER_NAME_LENGTH} characters.`;
   }
+
+  return null;
 }
 
 // Validate required stat.
 export function validateRequiredStat(requiredStat) {
-  validateAllowedValue("requiredStat", requiredStat, allowedCharacterStats);
+  return validateAllowedValue("requiredStat", requiredStat, allowedCharacterStats);
 }
 
 // Resolve non-combat quest success from the character's required stat.
 export function resolveQuestAttempt(character, quest) {
-  validateRequiredStat(quest.requiredStat);
+  const statError = validateRequiredStat(quest.requiredStat);
+
+  if (statError) {
+    return {
+      error: {
+        status: 400,
+        message: statError
+      }
+    };
+  }
 
   const characterStat = character[quest.requiredStat];
 
   if (!Number.isInteger(characterStat)) {
-    throw createError(
-      500,
-      "Internal Server Error",
-      `Character is missing the required stat ${quest.requiredStat}.`
-    );
+    return {
+      error: {
+        status: 500,
+        message: `Character is missing the required stat ${quest.requiredStat}.`
+      }
+    };
   }
 
   const levelBonus = Math.max(character.level - 1, 0);
@@ -88,10 +91,6 @@ export function resolveQuestAttempt(character, quest) {
 
 // Build starting stats from origin, class, affinity, and level.
 export function calculateCharacterStats({ origin, className, affinity, level = 1 }) {
-  validateOrigin(origin);
-  validateClassName(className);
-  validateAffinity(affinity);
-
   const stats = {
     ...baseStats
   };
@@ -124,8 +123,8 @@ function calculateFailureXp(quest) {
 // Validate allowed value.
 function validateAllowedValue(fieldName, value, allowedValues) {
   if (!allowedValues.includes(value)) {
-    throw createError(400, "Bad Request", `${fieldName} must be one of the allowed values.`, {
-      allowedValues
-    });
+    return `${fieldName} must be one of the allowed values.`;
   }
+
+  return null;
 }

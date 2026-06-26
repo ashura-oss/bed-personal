@@ -2,7 +2,6 @@
 import * as progressionModel from "../models/progressionModel.js";
 import * as questCompletionModel from "../models/questCompletionModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 const DEFAULT_RUN_STATE = {
   supplies: 3,
@@ -21,7 +20,8 @@ export async function getCharacterProgression(req, res, next) {
     res.locals.data = progression;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -31,18 +31,23 @@ export async function putCharacterProgression(req, res, next) {
     const characterId = Number(req.params.characterId);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+      return res.status(400).json({ message: "characterId must be a positive integer id." });
     }
 
-    const characterUpdates = buildCharacterProgressionUpdates(req.body);
-    const runStateChanges = buildRunStateChanges(req.body);
+    const characterUpdates = buildCharacterProgressionUpdates(req.body, res);
+
+    if (!characterUpdates) {
+      return;
+    }
+
+    const runStateChanges = buildRunStateChanges(req.body, res);
+
+    if (runStateChanges === false) {
+      return;
+    }
 
     if (Object.keys(characterUpdates).length === 0 && runStateChanges === null) {
-      throw createError(
-        400,
-        "Bad Request",
-        "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked."
-      );
+      return res.status(400).json({ message: "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked." });
     }
 
     let runStateUpdates = null;
@@ -76,7 +81,8 @@ export async function putCharacterProgression(req, res, next) {
     res.locals.data = savedProgression;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -86,7 +92,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
     const characterId = Number(req.params.characterId);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+      return res.status(400).json({ message: "characterId must be a positive integer id." });
     }
 
     const quest = findQuestDefinitionById(req.params.questId);
@@ -101,19 +107,11 @@ export async function putCharacterQuestCompletion(req, res, next) {
       : null;
 
     if (!questReward) {
-      throw createError(
-        404,
-        "Not Found",
-        "Quest completion reward was not found."
-      );
+      return res.status(404).json({ message: "Quest completion reward was not found." });
     }
 
     if (questReward.questType !== "dialogue") {
-      throw createError(
-        400,
-        "Bad Request",
-        "Only dialogue story milestones can be claimed directly."
-      );
+      return res.status(400).json({ message: "Only dialogue story milestones can be claimed directly." });
     }
 
     const claimResult = await questCompletionModel.claimCharacterQuestCompletion({
@@ -133,21 +131,24 @@ export async function putCharacterQuestCompletion(req, res, next) {
     };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
 // Validation helpers build only the fields that should be updated.
-function buildCharacterProgressionUpdates(body) {
+function buildCharacterProgressionUpdates(body, res) {
   const updates = {};
 
   if (body.level !== undefined) {
     if (!Number.isInteger(body.level)) {
-      throw createError(400, "Bad Request", "level must be an integer.");
+      res.status(400).json({ message: "level must be an integer." });
+      return null;
     }
 
     if (body.level < 1) {
-      throw createError(400, "Bad Request", "level must be at least 1.");
+      res.status(400).json({ message: "level must be at least 1." });
+      return null;
     }
 
     updates.level = body.level;
@@ -155,11 +156,13 @@ function buildCharacterProgressionUpdates(body) {
 
   if (body.xp !== undefined) {
     if (!Number.isInteger(body.xp)) {
-      throw createError(400, "Bad Request", "xp must be an integer.");
+      res.status(400).json({ message: "xp must be an integer." });
+      return null;
     }
 
     if (body.xp < 0) {
-      throw createError(400, "Bad Request", "xp must be at least 0.");
+      res.status(400).json({ message: "xp must be at least 0." });
+      return null;
     }
 
     updates.xp = body.xp;
@@ -167,11 +170,13 @@ function buildCharacterProgressionUpdates(body) {
 
   if (body.hp !== undefined) {
     if (!Number.isInteger(body.hp)) {
-      throw createError(400, "Bad Request", "hp must be an integer.");
+      res.status(400).json({ message: "hp must be an integer." });
+      return null;
     }
 
     if (body.hp < 0) {
-      throw createError(400, "Bad Request", "hp must be at least 0.");
+      res.status(400).json({ message: "hp must be at least 0." });
+      return null;
     }
 
     updates.hp = body.hp;
@@ -181,16 +186,18 @@ function buildCharacterProgressionUpdates(body) {
 }
 
 // Build run state changes.
-function buildRunStateChanges(body) {
+function buildRunStateChanges(body, res) {
   const updates = {};
 
   if (body.supplies !== undefined) {
     if (!Number.isInteger(body.supplies)) {
-      throw createError(400, "Bad Request", "supplies must be an integer.");
+      res.status(400).json({ message: "supplies must be an integer." });
+      return false;
     }
 
     if (body.supplies < 0) {
-      throw createError(400, "Bad Request", "supplies must be at least 0.");
+      res.status(400).json({ message: "supplies must be at least 0." });
+      return false;
     }
 
     updates.supplies = body.supplies;
@@ -198,15 +205,18 @@ function buildRunStateChanges(body) {
 
   if (body.morale !== undefined) {
     if (!Number.isInteger(body.morale)) {
-      throw createError(400, "Bad Request", "morale must be an integer.");
+      res.status(400).json({ message: "morale must be an integer." });
+      return false;
     }
 
     if (body.morale < 0) {
-      throw createError(400, "Bad Request", "morale must be at least 0.");
+      res.status(400).json({ message: "morale must be at least 0." });
+      return false;
     }
 
     if (body.morale > 100) {
-      throw createError(400, "Bad Request", "morale must be at most 100.");
+      res.status(400).json({ message: "morale must be at most 100." });
+      return false;
     }
 
     updates.morale = body.morale;
@@ -214,7 +224,8 @@ function buildRunStateChanges(body) {
 
   if (body.storyPhase !== undefined) {
     if (typeof body.storyPhase !== "string" || body.storyPhase.trim().length === 0) {
-      throw createError(400, "Bad Request", "storyPhase must be a non-empty string when provided.");
+      res.status(400).json({ message: "storyPhase must be a non-empty string when provided." });
+      return false;
     }
 
     updates.storyPhase = body.storyPhase.trim();
@@ -222,15 +233,18 @@ function buildRunStateChanges(body) {
 
   if (body.commandModeUnlocked !== undefined) {
     if (!Number.isInteger(body.commandModeUnlocked)) {
-      throw createError(400, "Bad Request", "commandModeUnlocked must be an integer.");
+      res.status(400).json({ message: "commandModeUnlocked must be an integer." });
+      return false;
     }
 
     if (body.commandModeUnlocked < 0) {
-      throw createError(400, "Bad Request", "commandModeUnlocked must be at least 0.");
+      res.status(400).json({ message: "commandModeUnlocked must be at least 0." });
+      return false;
     }
 
     if (body.commandModeUnlocked > 1) {
-      throw createError(400, "Bad Request", "commandModeUnlocked must be at most 1.");
+      res.status(400).json({ message: "commandModeUnlocked must be at most 1." });
+      return false;
     }
 
     updates.commandModeUnlocked = body.commandModeUnlocked;

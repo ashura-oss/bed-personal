@@ -1,7 +1,6 @@
 // Inventory controller functions save, consume, and remove inventory items.
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById, hasItemDefinition } from "../constants/items.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Update inventory item.
 export async function putInventoryItem(req, res, next) {
@@ -11,11 +10,11 @@ export async function putInventoryItem(req, res, next) {
     const quantity = req.body?.quantity;
 
     if (!hasItemDefinition(itemId)) {
-      throw createError(404, "Not Found", "Item definition was not found.");
+      return res.status(404).json({ message: "Item definition was not found." });
     }
 
     if (!Number.isInteger(quantity) || quantity < 0) {
-      throw createError(400, "Bad Request", "quantity is required and must be a non-negative integer.");
+      return res.status(400).json({ message: "quantity is required and must be a non-negative integer." });
     }
 
     if (quantity === 0) {
@@ -37,7 +36,8 @@ export async function putInventoryItem(req, res, next) {
     res.locals.data = inventoryItem;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -47,7 +47,7 @@ export async function deleteInventoryItem(req, res, next) {
     const character = res.locals.character;
 
     if (!hasItemDefinition(req.params.itemId)) {
-      throw createError(404, "Not Found", "Item definition was not found.");
+      return res.status(404).json({ message: "Item definition was not found." });
     }
 
     const removed = await characterInventoryModel.removeInventoryItem({
@@ -58,7 +58,8 @@ export async function deleteInventoryItem(req, res, next) {
     res.locals.data = { removed: Boolean(removed), inventoryItem: removed };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -69,11 +70,11 @@ export async function postConsumeInventoryItem(req, res, next) {
     const item = findItemDefinitionById(req.params.itemId);
 
     if (!item) {
-      throw createError(404, "Not Found", "Item definition was not found.");
+      return res.status(404).json({ message: "Item definition was not found." });
     }
 
     if (item.itemType !== "consumable" || !item.consumeEffect) {
-      throw createError(400, "Bad Request", "Item is not consumable.");
+      return res.status(400).json({ message: "Item is not consumable." });
     }
 
     const consumeResult = await characterInventoryModel.consumeInventoryItem({
@@ -82,12 +83,13 @@ export async function postConsumeInventoryItem(req, res, next) {
     });
 
     if (!consumeResult.consumed) {
-      throw createError(404, "Not Found", "Consumable item was not found in inventory.");
+      return res.status(404).json({ message: "Consumable item was not found in inventory." });
     }
 
     res.locals.data = consumeResult;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

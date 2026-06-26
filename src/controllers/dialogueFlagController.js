@@ -1,6 +1,5 @@
 // Dialogue flag controller functions save dialogue flags for a character.
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Update dialogue flag.
 export async function putDialogueFlag(req, res, next) {
@@ -9,11 +8,11 @@ export async function putDialogueFlag(req, res, next) {
     const value = req.body?.value;
 
     if (value === undefined) {
-      throw createError(400, "Bad Request", "value is required.");
+      return res.status(400).json({ message: "value is required." });
     }
 
     if (typeof value !== "boolean" && value !== 0 && value !== 1) {
-      throw createError(400, "Bad Request", "value must be a boolean or 0/1.");
+      return res.status(400).json({ message: "value must be a boolean or 0/1." });
     }
 
     const flagValue = typeof value === "boolean" ? Number(value) : value;
@@ -26,6 +25,7 @@ export async function putDialogueFlag(req, res, next) {
     res.locals.data = dialogueFlag;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

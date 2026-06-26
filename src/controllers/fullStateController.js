@@ -1,6 +1,5 @@
 // Full state controller functions return the saved state needed by the frontend.
 import * as fullStateModel from "../models/fullStateModel.js";
-import { sendError } from "../utils/errorCode.js";
 
 // Get character full state.
 export async function getCharacterFullState(req, res, next) {
@@ -14,6 +13,7 @@ export async function getCharacterFullState(req, res, next) {
     };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

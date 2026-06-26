@@ -1,6 +1,5 @@
 // Region controller functions return fixed region data.
 import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regions.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Get regions.
 export async function getRegions(req, res, next) {
@@ -9,13 +8,13 @@ export async function getRegions(req, res, next) {
 
     if (req.query.dangerLevel !== undefined) {
       if (Array.isArray(req.query.dangerLevel)) {
-        throw createError(400, "Bad Request", "dangerLevel query must be provided once.");
+        return res.status(400).json({ message: "dangerLevel query must be provided once." });
       }
 
       dangerLevel = Number(req.query.dangerLevel);
 
       if (!Number.isInteger(dangerLevel) || dangerLevel < 1) {
-        throw createError(400, "Bad Request", "dangerLevel query must be a positive integer.");
+        return res.status(400).json({ message: "dangerLevel query must be a positive integer." });
       }
     }
 
@@ -30,7 +29,8 @@ export async function getRegions(req, res, next) {
     res.locals.data = regionList;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -40,12 +40,13 @@ export async function getRegionById(req, res, next) {
     const region = findRegionDefinitionById(req.params.id);
 
     if (!region) {
-      throw createError(404, "Not Found", "Region was not found.");
+      return res.status(404).json({ message: "Region was not found." });
     }
 
     res.locals.data = region;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

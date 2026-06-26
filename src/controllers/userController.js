@@ -1,6 +1,5 @@
 // User controller functions handle user validation, loading, and CRUD.
 import * as userModel from "../models/userModel.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Shared controller steps used before routes that need an existing user.
 export async function loadUserFromUserIdParam(req, res, next) {
@@ -8,19 +7,20 @@ export async function loadUserFromUserIdParam(req, res, next) {
     const userId = Number(req.params.userId);
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "userId must be a positive integer id.");
+      return res.status(400).json({ message: "userId must be a positive integer id." });
     }
 
     const user = await userModel.findUserById(userId);
 
     if (!user) {
-      throw createError(404, "Not Found", "User was not found.");
+      return res.status(404).json({ message: "User was not found." });
     }
 
     res.locals.user = user;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -31,19 +31,20 @@ export async function loadUserFromBody(req, res, next) {
     const userId = typeof value === "string" ? Number(value) : value;
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "userId must be a positive integer id.");
+      return res.status(400).json({ message: "userId must be a positive integer id." });
     }
 
     const user = await userModel.findUserById(userId);
 
     if (!user) {
-      throw createError(404, "Not Found", "User was not found.");
+      return res.status(404).json({ message: "User was not found." });
     }
 
     res.locals.user = user;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -54,13 +55,13 @@ export async function getUsers(req, res, next) {
 
     if (req.query.level !== undefined) {
       if (Array.isArray(req.query.level)) {
-        throw createError(400, "Bad Request", "level query must be provided once.");
+        return res.status(400).json({ message: "level query must be provided once." });
       }
 
       level = Number(req.query.level);
 
       if (!Number.isInteger(level) || level < 1) {
-        throw createError(400, "Bad Request", "level query must be a positive integer.");
+        return res.status(400).json({ message: "level query must be a positive integer." });
       }
     }
 
@@ -69,7 +70,8 @@ export async function getUsers(req, res, next) {
     res.locals.data = userList;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -79,19 +81,20 @@ export async function getUserById(req, res, next) {
     const userId = Number(req.params.id);
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "id must be a positive integer id.");
+      return res.status(400).json({ message: "id must be a positive integer id." });
     }
 
     const user = await userModel.findUserById(userId);
 
     if (!user) {
-      throw createError(404, "Not Found", "User was not found.");
+      return res.status(404).json({ message: "User was not found." });
     }
 
     res.locals.data = user;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -99,14 +102,14 @@ export async function getUserById(req, res, next) {
 export async function postUser(req, res, next) {
   try {
     if (typeof req.body.username !== "string" || req.body.username.trim().length === 0) {
-      throw createError(400, "Bad Request", "username is required and must be a non-empty string.");
+      return res.status(400).json({ message: "username is required and must be a non-empty string." });
     }
 
     const username = req.body.username.trim();
     const existingUser = await userModel.findUserByUsername(username);
 
     if (existingUser) {
-      throw createError(409, "Conflict", "Username is already taken.");
+      return res.status(409).json({ message: "Username is already taken." });
     }
 
     const user = await userModel.createUser({ username });
@@ -114,7 +117,8 @@ export async function postUser(req, res, next) {
     res.locals.data = user;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -124,29 +128,34 @@ export async function putUserById(req, res, next) {
     const userId = Number(req.params.id);
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "id must be a positive integer id.");
+      return res.status(400).json({ message: "id must be a positive integer id." });
     }
 
-    const updates = buildUserUpdates(req.body);
+    const updates = buildUserUpdates(req.body, res);
+
+    if (!updates) {
+      return;
+    }
 
     if (updates.username !== undefined) {
       const usernameOwner = await userModel.findUserByUsername(updates.username);
 
       if (usernameOwner && usernameOwner.userId !== userId) {
-        throw createError(409, "Conflict", "Username is already taken.");
+        return res.status(409).json({ message: "Username is already taken." });
       }
     }
 
     const updatedUser = await userModel.updateUserById(userId, updates);
 
     if (!updatedUser) {
-      throw createError(404, "Not Found", "User was not found.");
+      return res.status(404).json({ message: "User was not found." });
     }
 
     res.locals.data = updatedUser;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -156,28 +165,30 @@ export async function deleteUser(req, res, next) {
     const userId = Number(req.params.id);
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "id must be a positive integer id.");
+      return res.status(400).json({ message: "id must be a positive integer id." });
     }
 
     const deletedUser = await userModel.deleteUserById(userId);
 
     if (!deletedUser) {
-      throw createError(404, "Not Found", "User was not found.");
+      return res.status(404).json({ message: "User was not found." });
     }
 
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
 // Build only the user fields that the request is allowed to update.
-function buildUserUpdates(body) {
+function buildUserUpdates(body, res) {
   const updates = {};
 
   if (body.username !== undefined) {
     if (typeof body.username !== "string" || body.username.trim().length === 0) {
-      throw createError(400, "Bad Request", "username must be a non-empty string when provided.");
+      res.status(400).json({ message: "username must be a non-empty string when provided." });
+      return null;
     }
 
     updates.username = body.username.trim();
@@ -185,11 +196,13 @@ function buildUserUpdates(body) {
 
   if (body.level !== undefined) {
     if (!Number.isInteger(body.level)) {
-      throw createError(400, "Bad Request", "level must be an integer.");
+      res.status(400).json({ message: "level must be an integer." });
+      return null;
     }
 
     if (body.level < 1) {
-      throw createError(400, "Bad Request", "level must be at least 1.");
+      res.status(400).json({ message: "level must be at least 1." });
+      return null;
     }
 
     updates.level = body.level;
@@ -197,11 +210,13 @@ function buildUserUpdates(body) {
 
   if (body.xp !== undefined) {
     if (!Number.isInteger(body.xp)) {
-      throw createError(400, "Bad Request", "xp must be an integer.");
+      res.status(400).json({ message: "xp must be an integer." });
+      return null;
     }
 
     if (body.xp < 0) {
-      throw createError(400, "Bad Request", "xp must be at least 0.");
+      res.status(400).json({ message: "xp must be at least 0." });
+      return null;
     }
 
     updates.xp = body.xp;
@@ -209,22 +224,21 @@ function buildUserUpdates(body) {
 
   if (body.gold !== undefined) {
     if (!Number.isInteger(body.gold)) {
-      throw createError(400, "Bad Request", "gold must be an integer.");
+      res.status(400).json({ message: "gold must be an integer." });
+      return null;
     }
 
     if (body.gold < 0) {
-      throw createError(400, "Bad Request", "gold must be at least 0.");
+      res.status(400).json({ message: "gold must be at least 0." });
+      return null;
     }
 
     updates.gold = body.gold;
   }
 
   if (Object.keys(updates).length === 0) {
-    throw createError(
-      400,
-      "Bad Request",
-      "Provide at least one updatable field: username, level, xp, or gold."
-    );
+    res.status(400).json({ message: "Provide at least one updatable field: username, level, xp, or gold." });
+    return null;
   }
 
   return updates;

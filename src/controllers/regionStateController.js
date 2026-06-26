@@ -1,7 +1,6 @@
 // Region state controller functions save per-character region state.
 import * as regionStateModel from "../models/regionStateModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
-import { createError, sendError } from "../utils/errorCode.js";
 
 // Update region state.
 export async function putRegionState(req, res, next) {
@@ -13,7 +12,7 @@ export async function putRegionState(req, res, next) {
     const worldState = req.body?.worldState;
 
     if (!hasRegionDefinition(req.params.regionId)) {
-      throw createError(404, "Not Found", "Region definition was not found.");
+      return res.status(404).json({ message: "Region definition was not found." });
     }
 
     if (
@@ -22,7 +21,7 @@ export async function putRegionState(req, res, next) {
       isUnlockedValue !== 0 &&
       isUnlockedValue !== 1
     ) {
-      throw createError(400, "Bad Request", "isUnlocked must be a boolean or 0/1.");
+      return res.status(400).json({ message: "isUnlocked must be a boolean or 0/1." });
     }
 
     if (
@@ -31,15 +30,15 @@ export async function putRegionState(req, res, next) {
       isDiscoveredValue !== 0 &&
       isDiscoveredValue !== 1
     ) {
-      throw createError(400, "Bad Request", "isDiscovered must be a boolean or 0/1.");
+      return res.status(400).json({ message: "isDiscovered must be a boolean or 0/1." });
     }
 
     if (threatLevel !== undefined && (!Number.isInteger(threatLevel) || threatLevel < 0)) {
-      throw createError(400, "Bad Request", "threatLevel must be a non-negative integer.");
+      return res.status(400).json({ message: "threatLevel must be a non-negative integer." });
     }
 
     if (worldState !== undefined && (typeof worldState !== "string" || worldState.trim().length === 0)) {
-      throw createError(400, "Bad Request", "worldState must be a non-empty string.");
+      return res.status(400).json({ message: "worldState must be a non-empty string." });
     }
 
     const regionState = await regionStateModel.upsertRegionState({
@@ -54,6 +53,7 @@ export async function putRegionState(req, res, next) {
     res.locals.data = regionState;
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }

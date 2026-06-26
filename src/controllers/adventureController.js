@@ -3,7 +3,6 @@ import * as adventureModel from "../models/adventureModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
-import { createError, sendError } from "../utils/errorCode.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
 // Resolve one adventure attempt and prepare its reward response.
@@ -14,15 +13,15 @@ export async function postAdventureAttempt(req, res, next) {
       typeof req.body?.characterId === "string" ? Number(req.body.characterId) : req.body?.characterId;
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createError(400, "Bad Request", "userId must be a positive integer id.");
+      return res.status(400).json({ message: "userId must be a positive integer id." });
     }
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+      return res.status(400).json({ message: "characterId must be a positive integer id." });
     }
 
     if (typeof req.body?.questId !== "string" || req.body.questId.trim().length === 0) {
-      throw createError(400, "Bad Request", "questId is required.");
+      return res.status(400).json({ message: "questId is required." });
     }
 
     const questId = req.body.questId.trim();
@@ -31,26 +30,23 @@ export async function postAdventureAttempt(req, res, next) {
     const quest = res.locals.quest;
 
     if (character.userId !== userId) {
-      throw createError(400, "Bad Request", "Character does not belong to the provided user.");
+      return res.status(400).json({ message: "Character does not belong to the provided user." });
     }
 
     if (character.level < quest.requiredLevel) {
-      throw createError(
-        400,
-        "Bad Request",
-        `Character level ${character.level} is too low for this quest. Required level is ${quest.requiredLevel}.`
-      );
+      return res.status(400).json({ message: `Character level ${character.level} is too low for this quest. Required level is ${quest.requiredLevel}.` });
     }
 
     if (["combat", "boss", "strategy"].includes(quest.questType)) {
-      throw createError(
-        400,
-        "Bad Request",
-        "This quest type must be resolved through its gameplay route."
-      );
+      return res.status(400).json({ message: "This quest type must be resolved through its gameplay route." });
     }
 
     const attemptResult = resolveQuestAttempt(character, quest);
+
+    if (attemptResult.error) {
+      return res.status(attemptResult.error.status).json({ message: attemptResult.error.message });
+    }
+
     const characterProgression = buildCharacterProgression(character, attemptResult.xpGained);
     const userProgression = buildUserProgression(
       user,
@@ -92,7 +88,8 @@ export async function postAdventureAttempt(req, res, next) {
     };
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -104,7 +101,8 @@ export async function getAdventureLogsByUserId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
@@ -118,7 +116,8 @@ export async function getAdventureLogsByCharacterId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    sendError(res, error);
+    console.error(error);
+    return res.status(500).json({ message: "Internal Server Error." });
   }
 }
 
