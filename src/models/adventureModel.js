@@ -3,8 +3,11 @@ import { desc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { adventureLogs, characters, users } from "../db/schema.js";
 
+// ------------------------------------------------------------
+// DATABASE INSERTS
+// ------------------------------------------------------------
 
-// Record adventure attempt.
+// Insert one adventure log and apply its user and character rewards.
 export async function recordAdventureAttempt({
   userId,
   characterId,
@@ -85,6 +88,10 @@ export async function recordAdventureAttempt({
     };
   });
 }
+
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
 
 // Find adventure logs by user id.
 export async function findAdventureLogsByUserId(userId) {

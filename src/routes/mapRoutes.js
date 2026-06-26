@@ -3,10 +3,17 @@ import { Router } from "express";
 import { getCharacterMapLocation, getMapNodeById, getMapNodes, postTravelToNode } from "../controllers/mapController.js";
 import { loadCharacterFromBody, loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
+import { requireBodyFields, requireParamFields } from "../middlewares/validation.js";
 
 const router = Router();
 
-// List all map node definitions.
+// ------------------------------------------------------------
+// GET
+// ------------------------------------------------------------
+
+//Get all map node definitions.
+//Required fields: none
+//Optional fields: regionId query
 router.get(
   "/nodes",
   getMapNodes,
@@ -14,26 +21,39 @@ router.get(
   sendResponse
 );
 
-// Read one map node definition.
+//Get one map node definition.
+//Required fields: nodeId parameter
+//Optional fields: none
 router.get(
   "/nodes/:nodeId",
+  requireParamFields("nodeId"),
   getMapNodeById,
   withMessage("Map node retrieved."),
   sendResponse
 );
 
-// Read the current map location for a character.
+//Get one character's current map location.
+//Required fields: characterId parameter
+//Optional fields: none
 router.get(
   "/characters/:characterId/location",
+  requireParamFields("characterId"),
   loadCharacterFromCharacterIdParam,
   getCharacterMapLocation,
   withMessage("Character map location retrieved."),
   sendResponse
 );
 
-// Travel a character to another map node.
+// ------------------------------------------------------------
+// POST
+// ------------------------------------------------------------
+
+//Travel one character to another map node.
+//Required fields: characterId, targetNodeId
+//Optional fields: none
 router.post(
   "/travel",
+  requireBodyFields("characterId", "targetNodeId"),
   loadCharacterFromBody,
   postTravelToNode,
   withMessage("Travel resolved."),

@@ -1,11 +1,18 @@
-// Creates the libSQL client and Drizzle database connection.
+// ------------------------------------------------------------
+// DATABASE CONNECTION
+// ------------------------------------------------------------
+// Connects the backend to the libSQL database.
+// Required env: DATABASE_URL
+// Used by: every model file that needs to run Drizzle queries.
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";
 import * as schema from "./schema.js";
 
+// Create the libSQL client from the database URL in .env.
 const client = createClient({
   url: process.env.DATABASE_URL
 });
 
+// Export one shared Drizzle database object for all models.
 export const db = drizzle(client, { schema });

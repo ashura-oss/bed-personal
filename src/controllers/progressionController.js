@@ -10,6 +10,10 @@ const DEFAULT_RUN_STATE = {
   commandModeUnlocked: 0
 };
 
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
 // Read the current story, run, and quest progression.
 export async function getCharacterProgression(req, res, next) {
   try {
@@ -20,10 +24,13 @@ export async function getCharacterProgression(req, res, next) {
     res.locals.data = progression;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
 
 // Save editable progression fields for frontend state updates.
 export async function putCharacterProgression(req, res, next) {
@@ -81,8 +88,7 @@ export async function putCharacterProgression(req, res, next) {
     res.locals.data = savedProgression;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -131,12 +137,15 @@ export async function putCharacterQuestCompletion(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Validation helpers build only the fields that should be updated.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Build valid character progression updates from the request body.
 function buildCharacterProgressionUpdates(body, res) {
   const updates = {};
 

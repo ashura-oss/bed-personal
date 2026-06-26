@@ -2,10 +2,17 @@
 import { Router } from "express";
 import { getQuestById, getQuests } from "../controllers/questController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
+import { requireParamFields } from "../middlewares/validation.js";
 
 const router = Router();
 
-// List all quest definitions.
+// ------------------------------------------------------------
+// GET
+// ------------------------------------------------------------
+
+//Get all quest definitions.
+//Required fields: none
+//Optional fields: none
 router.get(
   "/",
   getQuests,
@@ -13,9 +20,12 @@ router.get(
   sendResponse
 );
 
-// Read one quest definition.
+//Get one quest definition.
+//Required fields: id parameter
+//Optional fields: none
 router.get(
   "/:id",
+  requireParamFields("id"),
   getQuestById,
   withMessage("Quest retrieved."),
   sendResponse

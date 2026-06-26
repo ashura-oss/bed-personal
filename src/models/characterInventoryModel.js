@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterInventory, characterRunStates, characters } from "../db/schema.js";
 
-// Basic inventory reads and writes.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find every inventory item owned by one character.
 export function findInventoryByCharacterId(characterId) {
   return db
     .select({
@@ -19,7 +23,31 @@ export function findInventoryByCharacterId(characterId) {
     .orderBy(asc(characterInventory.itemKey));
 }
 
-// Insert or update inventory item.
+// Find one inventory item row for one character.
+export async function findInventoryItemByCharacterId(characterId, itemId) {
+  const result = await db
+    .select({
+      characterInventoryId: characterInventory.id,
+      characterId: characterInventory.characterId,
+      itemId: characterInventory.itemKey,
+      quantity: characterInventory.quantity,
+      acquiredAt: characterInventory.acquiredAt,
+      updatedAt: characterInventory.updatedAt
+    })
+    .from(characterInventory)
+    .where(
+      and(eq(characterInventory.characterId, characterId), eq(characterInventory.itemKey, itemId))
+    )
+    .limit(1);
+
+  return result[0] || null;
+}
+
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert, update, or clear one inventory item quantity.
 export async function upsertInventoryItem({ characterId, itemId, quantity }) {
   const now = new Date();
   const existing = await findInventoryItemByCharacterId(characterId, itemId);
@@ -49,45 +77,6 @@ export async function upsertInventoryItem({ characterId, itemId, quantity }) {
     });
 
   return result[0];
-}
-
-// Remove inventory item.
-export async function removeInventoryItem({ characterId, itemId }) {
-  const result = await db
-    .delete(characterInventory)
-    .where(
-      and(eq(characterInventory.characterId, characterId), eq(characterInventory.itemKey, itemId))
-    )
-    .returning({
-      characterInventoryId: characterInventory.id,
-      characterId: characterInventory.characterId,
-      itemId: characterInventory.itemKey,
-      quantity: characterInventory.quantity,
-      acquiredAt: characterInventory.acquiredAt,
-      updatedAt: characterInventory.updatedAt
-    });
-
-  return result[0] || null;
-}
-
-// Find inventory item by character id.
-export async function findInventoryItemByCharacterId(characterId, itemId) {
-  const result = await db
-    .select({
-      characterInventoryId: characterInventory.id,
-      characterId: characterInventory.characterId,
-      itemId: characterInventory.itemKey,
-      quantity: characterInventory.quantity,
-      acquiredAt: characterInventory.acquiredAt,
-      updatedAt: characterInventory.updatedAt
-    })
-    .from(characterInventory)
-    .where(
-      and(eq(characterInventory.characterId, characterId), eq(characterInventory.itemKey, itemId))
-    )
-    .limit(1);
-
-  return result[0] || null;
 }
 
 // Consume an item and apply its saved-game effect in one transaction.
@@ -265,4 +254,27 @@ export async function consumeInventoryItem({ characterId, item }) {
       effects
     };
   });
+}
+
+// ------------------------------------------------------------
+// DATABASE DELETES
+// ------------------------------------------------------------
+
+// Delete one inventory item row.
+export async function removeInventoryItem({ characterId, itemId }) {
+  const result = await db
+    .delete(characterInventory)
+    .where(
+      and(eq(characterInventory.characterId, characterId), eq(characterInventory.itemKey, itemId))
+    )
+    .returning({
+      characterInventoryId: characterInventory.id,
+      characterId: characterInventory.characterId,
+      itemId: characterInventory.itemKey,
+      quantity: characterInventory.quantity,
+      acquiredAt: characterInventory.acquiredAt,
+      updatedAt: characterInventory.updatedAt
+    });
+
+  return result[0] || null;
 }

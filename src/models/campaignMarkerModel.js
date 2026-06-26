@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterCampaignMarkers } from "../db/schema.js";
 
-// Find campaign markers by character id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all campaign marker rows for one character.
 export function findCampaignMarkersByCharacterId(characterId) {
   return db
     .select({
@@ -23,7 +27,11 @@ export function findCampaignMarkersByCharacterId(characterId) {
     .orderBy(asc(characterCampaignMarkers.markerKey));
 }
 
-// Insert or update campaign marker.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one campaign marker row.
 export async function upsertCampaignMarker({
   characterId,
   markerId,
@@ -84,7 +92,11 @@ export async function upsertCampaignMarker({
   return result[0];
 }
 
-// Find campaign marker.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find one campaign marker helper row by character and marker.
 async function findCampaignMarker(characterId, markerId) {
   const result = await db
     .select({

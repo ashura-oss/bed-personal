@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterFactionReputation } from "../db/schema.js";
 
-// Find faction reputation by character id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all faction reputation rows for one character.
 export function findFactionReputationByCharacterId(characterId) {
   return db
     .select({
@@ -19,7 +23,11 @@ export function findFactionReputationByCharacterId(characterId) {
     .orderBy(asc(characterFactionReputation.factionKey));
 }
 
-// Insert or update faction reputation.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one faction reputation row.
 export async function upsertFactionReputation({ characterId, factionId, reputation, rank }) {
   const now = new Date();
   const existing = await findFactionReputation(characterId, factionId);
@@ -54,7 +62,11 @@ export async function upsertFactionReputation({ characterId, factionId, reputati
   return result[0];
 }
 
-// Find faction reputation.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find one faction reputation helper row by character and faction.
 async function findFactionReputation(characterId, factionId) {
   const result = await db
     .select({

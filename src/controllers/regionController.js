@@ -1,7 +1,11 @@
 // Region controller functions return fixed region data.
 import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regions.js";
 
-// Get regions.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all region definitions, optionally filtered by danger level.
 export async function getRegions(req, res, next) {
   try {
     let dangerLevel;
@@ -29,8 +33,7 @@ export async function getRegions(req, res, next) {
     res.locals.data = regionList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -46,7 +49,6 @@ export async function getRegionById(req, res, next) {
     res.locals.data = region;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

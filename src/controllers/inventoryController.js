@@ -2,7 +2,11 @@
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById, hasItemDefinition } from "../constants/items.js";
 
-// Update inventory item.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one inventory item quantity for a character.
 export async function putInventoryItem(req, res, next) {
   try {
     const character = res.locals.character;
@@ -36,12 +40,15 @@ export async function putInventoryItem(req, res, next) {
     res.locals.data = inventoryItem;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Delete inventory item.
+// ------------------------------------------------------------
+// REMOVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Remove one inventory item from a character.
 export async function deleteInventoryItem(req, res, next) {
   try {
     const character = res.locals.character;
@@ -58,10 +65,13 @@ export async function deleteInventoryItem(req, res, next) {
     res.locals.data = { removed: Boolean(removed), inventoryItem: removed };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Consume one inventory item and apply its effects.
 export async function postConsumeInventoryItem(req, res, next) {
@@ -89,7 +99,6 @@ export async function postConsumeInventoryItem(req, res, next) {
     res.locals.data = consumeResult;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

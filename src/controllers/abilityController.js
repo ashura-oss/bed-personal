@@ -4,6 +4,10 @@ import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { ABILITY_DEFINITIONS, findAbilityDefinitionById } from "../constants/abilities.js";
 import { validateAffinity, validateClassName } from "../utils/gameRules.js";
 
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
 // Return fixed ability definitions, optionally filtered by class or affinity.
 export async function getAbilities(req, res, next) {
   try {
@@ -57,10 +61,13 @@ export async function getAbilities(req, res, next) {
     res.locals.data = abilityList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Unlock an ability after checking character level, class, affinity, and cost.
 export async function unlockCharacterAbility(req, res, next) {
@@ -110,10 +117,13 @@ export async function unlockCharacterAbility(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
 
 // Return abilities already unlocked by one character.
 export async function getCharacterAbilities(req, res, next) {
@@ -141,12 +151,15 @@ export async function getCharacterAbilities(req, res, next) {
     res.locals.data = unlockedAbilities;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Requirement helpers keep unlockCharacterAbility readable.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Validate XP and item costs before unlocking an ability.
 async function validateAbilityCost(character, ability, res) {
   const xpCost = Number(ability.xpCost || 0);
 
@@ -170,7 +183,7 @@ async function validateAbilityCost(character, ability, res) {
   return true;
 }
 
-// Validate ability unlock.
+// Validate level, class, and affinity requirements for an ability.
 function validateAbilityUnlock(character, ability, res) {
   if (character.level < ability.requiredLevel) {
     res.status(400).json({ message: `Character level ${character.level} is too low for this ability. Required level is ${ability.requiredLevel}.` });

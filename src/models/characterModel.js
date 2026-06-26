@@ -3,7 +3,11 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characters } from "../db/schema.js";
 
-// Find characters.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all characters, with optional class filtering.
 export async function findCharacters(filters = {}) {
   const query = db.select({
     characterId: characters.id,
@@ -31,7 +35,7 @@ export async function findCharacters(filters = {}) {
   return query;
 }
 
-// Find character by id.
+// Find one character row by id.
 export async function findCharacterById(characterId) {
   const character = await db.query.characters.findFirst({
     columns: {
@@ -58,7 +62,7 @@ export async function findCharacterById(characterId) {
   return formatCharacter(character);
 }
 
-// Find characters by user id.
+// Find all character rows owned by one user.
 export async function findCharactersByUserId(userId) {
   return db
     .select({
@@ -84,7 +88,11 @@ export async function findCharactersByUserId(userId) {
     .orderBy(asc(characters.createdAt));
 }
 
-// Create character.
+// ------------------------------------------------------------
+// DATABASE INSERTS
+// ------------------------------------------------------------
+
+// Insert one character row.
 export async function createCharacter({
   userId,
   characterName,
@@ -117,7 +125,11 @@ export async function createCharacter({
   return formatCharacter(result[0]);
 }
 
-// Update character by id.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Update one character row by id.
 export async function updateCharacterById(characterId, updates) {
   const result = await db
     .update(characters)
@@ -128,7 +140,11 @@ export async function updateCharacterById(characterId, updates) {
   return formatCharacter(result[0]);
 }
 
-// Delete character by id.
+// ------------------------------------------------------------
+// DATABASE DELETES
+// ------------------------------------------------------------
+
+// Delete one character row by id.
 export async function deleteCharacterById(characterId) {
   const result = await db
     .delete(characters)
@@ -138,7 +154,11 @@ export async function deleteCharacterById(characterId) {
   return result[0] || null;
 }
 
-// Format character for API responses.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Convert a character database row into the API response shape.
 function formatCharacter(character) {
   if (!character) {
     return null;

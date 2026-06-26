@@ -2,7 +2,11 @@
 import * as regionStateModel from "../models/regionStateModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
 
-// Update region state.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one character's progress inside a region.
 export async function putRegionState(req, res, next) {
   try {
     const character = res.locals.character;
@@ -53,7 +57,6 @@ export async function putRegionState(req, res, next) {
     res.locals.data = regionState;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

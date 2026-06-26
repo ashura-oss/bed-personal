@@ -3,6 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterArmyStates, characterBossStates, characterCampaignMarkers, characterFactionReputation, characterInventory, characterQuestCompletions, characterRegionStates, characterRunStates } from "../db/schema.js";
 
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
 // Apply all campaign changes caused by defeating a boss.
 export async function applyCombatVictoryStory({ characterId, enemy, questId, milestone }) {
   if (!milestone) {
@@ -99,7 +103,11 @@ export async function applyArmyVictoryStory({ characterId, encounter }) {
   });
 }
 
-// Story helpers below are kept private because they are only used inside transactions.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Mark one boss as defeated inside a story transaction.
 async function markBossDefeated(tx, { characterId, bossId, now }) {
   const existingResult = await tx
     .select({
@@ -165,7 +173,7 @@ async function recordQuestCompletion(tx, { characterId, questId, rewardXp, now }
   }
 }
 
-// Insert or update run state.
+// Insert or update one character run state row.
 async function upsertRunState(
   tx,
   { characterId, storyPhase, moraleChange, commandModeUnlocked, now }
@@ -205,7 +213,7 @@ async function upsertRunState(
   }
 }
 
-// Unlock region.
+// Unlock one region for a character during story progression.
 async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
   const existingResult = await tx
     .select({
@@ -244,7 +252,7 @@ async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
   }
 }
 
-// Reveal campaign marker.
+// Reveal one campaign marker during story progression.
 async function revealCampaignMarker(tx, { characterId, marker, now }) {
   const existingResult = await tx
     .select({
@@ -287,7 +295,7 @@ async function revealCampaignMarker(tx, { characterId, marker, now }) {
   }
 }
 
-// Apply faction change.
+// Save one faction reputation change during story progression.
 async function applyFactionChange(tx, { characterId, factionChange, now }) {
   const existingResult = await tx
     .select({
@@ -362,7 +370,7 @@ async function addInventoryReward(tx, { characterId, itemReward, now }) {
   }
 }
 
-// Unlock army state.
+// Unlock command mode and army state during story progression.
 async function unlockArmyState(tx, { characterId, armyState, now }) {
   const existingResult = await tx
     .select({

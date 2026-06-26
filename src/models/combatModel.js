@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { combatSessions, combatTurnLogs } from "../db/schema.js";
 
-// Create and read combat sessions.
+// ------------------------------------------------------------
+// DATABASE INSERTS
+// ------------------------------------------------------------
+
+// Create one combat session row for a character and enemy.
 export async function createCombatSession({
   characterId,
   enemyId,
@@ -52,6 +56,10 @@ export async function createCombatSession({
 
   return result[0];
 }
+
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
 
 // Find combat session by id.
 export async function findCombatSessionById(combatSessionId) {
@@ -126,6 +134,10 @@ export async function findCombatLogsBySessionId(combatSessionId) {
     .where(eq(combatTurnLogs.combatSessionId, combatSessionId))
     .orderBy(asc(combatTurnLogs.id));
 }
+
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
 
 // Save the updated session and turn logs together.
 export async function saveCombatTurn({ combatSessionId, sessionUpdates, turnLogs }) {

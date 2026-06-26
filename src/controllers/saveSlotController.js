@@ -2,18 +2,25 @@
 import * as characterModel from "../models/characterModel.js";
 import * as saveSlotModel from "../models/saveSlotModel.js";
 
-// Get save slots for user.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all save slots owned by one user.
 export async function getSaveSlotsForUser(req, res, next) {
   try {
     res.locals.data = await saveSlotModel.findSaveSlotsByUserId(res.locals.user.userId);
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Update save slot for user.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one save slot for one user.
 export async function putSaveSlotForUser(req, res, next) {
   try {
     const userId = res.locals.user.userId;
@@ -59,7 +66,6 @@ export async function putSaveSlotForUser(req, res, next) {
     res.locals.data = saveSlot;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

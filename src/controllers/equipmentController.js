@@ -3,7 +3,11 @@ import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById } from "../constants/items.js";
 
-// Update equipment.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Equip one owned item into one equipment slot.
 export async function putEquipment(req, res, next) {
   try {
     const character = res.locals.character;
@@ -42,12 +46,15 @@ export async function putEquipment(req, res, next) {
     res.locals.data = equipment;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Delete equipment.
+// ------------------------------------------------------------
+// REMOVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Remove one equipped item from a slot.
 export async function deleteEquipment(req, res, next) {
   try {
     const character = res.locals.character;
@@ -59,7 +66,6 @@ export async function deleteEquipment(req, res, next) {
     res.locals.data = { removed: Boolean(removed), equipment: removed };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

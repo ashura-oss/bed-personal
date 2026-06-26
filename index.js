@@ -4,7 +4,6 @@ import express from "express";
 import cors from "cors";
 import abilityRoutes from "./src/routes/abilityRoutes.js";
 import adventureRoutes from "./src/routes/adventureRoutes.js";
-import armyEncounterRoutes from "./src/routes/armyEncounterRoutes.js";
 import armyRoutes from "./src/routes/armyRoutes.js";
 import characterRoutes from "./src/routes/characterRoutes.js";
 import combatRoutes from "./src/routes/combatRoutes.js";
@@ -18,12 +17,14 @@ import questRoutes from "./src/routes/questRoutes.js";
 import regionRoutes from "./src/routes/regionRoutes.js";
 import stateRoutes from "./src/routes/stateRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import { notFound } from "./src/middlewares/statusMessage.js";
+import { errorHandler, notFound } from "./src/middlewares/statusMessage.js";
+import { handleJsonParseError } from "./src/middlewares/validation.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(handleJsonParseError);
 
 app.use("/users", userRoutes);
 app.use("/characters", characterRoutes);
@@ -38,11 +39,11 @@ app.use("/combat", combatRoutes);
 app.use("/dialogues", dialogueRoutes);
 app.use("/map", mapRoutes);
 app.use("/army", armyRoutes);
-app.use("/army-encounters", armyEncounterRoutes);
 app.use("/progression", progressionRoutes);
 app.use("/state", stateRoutes);
 
 app.use(notFound);
+app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 

@@ -2,7 +2,11 @@
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
 
-// Get dialogues.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all dialogue definitions, optionally filtered by story phase.
 export async function getDialogues(req, res, next) {
   try {
     let regionId = req.query.regionId;
@@ -39,8 +43,7 @@ export async function getDialogues(req, res, next) {
     res.locals.data = dialogues;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -56,10 +59,13 @@ export async function getDialogueById(req, res, next) {
     res.locals.data = dialogue;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Complete one dialogue and claim its quest reward.
 export async function postDialogueCompletion(req, res, next) {
@@ -97,7 +103,6 @@ export async function postDialogueCompletion(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

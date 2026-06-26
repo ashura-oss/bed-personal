@@ -5,7 +5,13 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-// List all ability definitions.
+// ------------------------------------------------------------
+// GET
+// ------------------------------------------------------------
+
+//Get all ability definitions.
+//Required fields: none
+//Optional fields: className query, affinity query
 router.get(
   "/",
   getAbilities,

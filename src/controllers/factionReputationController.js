@@ -2,7 +2,11 @@
 import * as factionReputationModel from "../models/factionReputationModel.js";
 import { hasFactionDefinition } from "../constants/factions.js";
 
-// Update faction reputation.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one character's reputation with a faction.
 export async function putFactionReputation(req, res, next) {
   try {
     const character = res.locals.character;
@@ -31,7 +35,6 @@ export async function putFactionReputation(req, res, next) {
     res.locals.data = reputation;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

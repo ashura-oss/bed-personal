@@ -1,7 +1,11 @@
 // Full state controller functions return the saved state needed by the frontend.
 import * as fullStateModel from "../models/fullStateModel.js";
 
-// Get character full state.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return one character's full saved-game state.
 export async function getCharacterFullState(req, res, next) {
   try {
     const character = res.locals.character;
@@ -13,7 +17,6 @@ export async function getCharacterFullState(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

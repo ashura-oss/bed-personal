@@ -3,6 +3,10 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterDialogueFlags } from "../db/schema.js";
 
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
 // Find dialogue flags by character id.
 export function findDialogueFlagsByCharacterId(characterId) {
   return db
@@ -17,6 +21,10 @@ export function findDialogueFlagsByCharacterId(characterId) {
     .where(eq(characterDialogueFlags.characterId, characterId))
     .orderBy(asc(characterDialogueFlags.flagKey));
 }
+
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
 
 // Insert or update dialogue flag.
 export async function upsertDialogueFlag({ characterId, flagId, flagValue }) {

@@ -4,6 +4,10 @@ import { db } from "../db/db.js";
 import { characterQuestCompletions, characters } from "../db/schema.js";
 import { buildCharacterProgression } from "../utils/leveling.js";
 
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
 // Claim a character quest completion inside one transaction.
 export async function claimCharacterQuestCompletion({ characterId, questReward }) {
   return db.transaction(async (tx) => {
@@ -96,7 +100,11 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
   });
 }
 
-// Find character in transaction.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find one character row inside an existing transaction.
 async function findCharacterInTransaction(tx, characterId) {
   const result = await tx
     .select({
@@ -124,7 +132,7 @@ async function findCharacterInTransaction(tx, characterId) {
   return result[0] || null;
 }
 
-// Find quest completion in transaction.
+// Find one quest completion row inside an existing transaction.
 async function findQuestCompletionInTransaction(tx, characterId, questId) {
   const result = await tx
     .select({

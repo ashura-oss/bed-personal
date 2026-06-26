@@ -8,6 +8,10 @@ import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
 
 const START_NODE_ID = "node_hearthvale_square";
 
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
 // Return map definitions, optionally filtered by region.
 export async function getMapNodes(req, res, next) {
   try {
@@ -30,8 +34,7 @@ export async function getMapNodes(req, res, next) {
     res.locals.data = nodes;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -47,8 +50,7 @@ export async function getMapNodeById(req, res, next) {
     res.locals.data = node;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -65,10 +67,13 @@ export async function getCharacterMapLocation(req, res, next) {
     res.locals.data = location;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Move a character only if the target node is connected and unlocked.
 export async function postTravelToNode(req, res, next) {
@@ -126,10 +131,13 @@ export async function postTravelToNode(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
 
 // A missing location is created at the starting node.
 async function findOrCreateReadableLocation(characterId, res) {

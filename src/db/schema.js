@@ -1,7 +1,18 @@
+// ------------------------------------------------------------
+// DATABASE SCHEMA
+// ------------------------------------------------------------
 // Drizzle table definitions for user-created and saved game data.
+// Constants such as items, quests, regions, enemies, and abilities stay in src/constants.
+// The database stores player-owned data, progress, logs, and frontend save state.
 import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
-// Core player account table.
+// ------------------------------------------------------------
+// CORE PLAYER TABLES
+// ------------------------------------------------------------
+
+// Stores account-level player data.
+// Linked records: characters, save slots.
+// Required minimum from CA: user id and username.
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
@@ -11,7 +22,9 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
-// Playable character table linked to users.
+// Stores each playable character owned by a user.
+// userId is a foreign key back to users, so deleting a user deletes their characters.
+// Stats are saved here because equipment, combat, and progression all read them.
 export const characters = sqliteTable("characters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id")
@@ -33,7 +46,13 @@ export const characters = sqliteTable("characters", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
-// History of completed or attempted adventures.
+// ------------------------------------------------------------
+// QUEST AND ADVENTURE HISTORY
+// ------------------------------------------------------------
+
+// Stores the history of quest/adventure attempts.
+// questKey points to a fixed quest definition in src/constants/quests.js.
+// Used for: user adventure logs, character adventure logs, reward history.
 export const adventureLogs = sqliteTable("adventure_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
@@ -47,7 +66,9 @@ export const adventureLogs = sqliteTable("adventure_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
-// Unlocked ability rows for each character.
+// Stores which fixed ability definitions each character has unlocked.
+// abilityKey points to src/constants/abilities.js.
+// Unique rule: one character cannot unlock the same ability twice.
 export const characterAbilities = sqliteTable(
   "character_abilities",
   {
@@ -66,7 +87,9 @@ export const characterAbilities = sqliteTable(
   })
 );
 
-// Persistent story and run state for each character.
+// Stores one persistent story/run state row per character.
+// Used by: progression routes, map locks, army unlock flow, frontend save/load.
+// Unique rule: each character has only one current run state row.
 export const characterRunStates = sqliteTable(
   "character_run_states",
   {
@@ -87,7 +110,13 @@ export const characterRunStates = sqliteTable(
   })
 );
 
-// Current map location for each character.
+// ------------------------------------------------------------
+// MAP AND TRAVEL STATE
+// ------------------------------------------------------------
+
+// Stores one current map location row per character.
+// nodeKey and regionKey point to fixed map/region definitions in src/constants.
+// Unique rule: each character has only one current location row.
 export const characterLocations = sqliteTable(
   "character_locations",
   {
@@ -107,7 +136,13 @@ export const characterLocations = sqliteTable(
   })
 );
 
-// Turn-based combat session state.
+// ------------------------------------------------------------
+// COMBAT STATE
+// ------------------------------------------------------------
+
+// Stores an active or completed turn-based combat session.
+// enemyKey points to src/constants/enemies.js.
+// This table keeps HP, turn owner, round number, and combat status between requests.
 export const combatSessions = sqliteTable("combat_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
@@ -128,7 +163,9 @@ export const combatSessions = sqliteTable("combat_sessions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
 });
 
-// Combat turn history for each session.
+// Stores individual combat turn results for a combat session.
+// Used by: GET /combat/sessions/:combatSessionId so the frontend can show battle history.
+// Deleting a combat session deletes its turn logs.
 export const combatTurnLogs = sqliteTable("combat_turn_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   combatSessionId: integer("combat_session_id")
@@ -144,7 +181,13 @@ export const combatTurnLogs = sqliteTable("combat_turn_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
-// Army command state unlocked later in the story.
+// ------------------------------------------------------------
+// ARMY COMMAND STATE
+// ------------------------------------------------------------
+
+// Stores one army state row for a character after command mode is unlocked.
+// Used by: army state endpoints and army battle simulation.
+// Unique rule: each character has one current army state row.
 export const characterArmyStates = sqliteTable(
   "character_army_states",
   {
@@ -168,7 +211,13 @@ export const characterArmyStates = sqliteTable(
   })
 );
 
-// Completed quest records for each character.
+// ------------------------------------------------------------
+// COMPLETION AND SAVE STATE
+// ------------------------------------------------------------
+
+// Stores completed quest flags and reward XP for each character.
+// questKey points to fixed quest definitions in src/constants/quests.js.
+// Unique rule: one character cannot claim the same quest completion twice.
 export const characterQuestCompletions = sqliteTable(
   "character_quest_completions",
   {
@@ -187,7 +236,9 @@ export const characterQuestCompletions = sqliteTable(
   })
 );
 
-// User save slots for frontend save and load screens.
+// Stores save slot metadata for frontend save/load screens.
+// userId owns the slot; characterId can be null if the linked character is deleted.
+// Unique rule: one user cannot have two save slots with the same slot index.
 export const saveSlots = sqliteTable(
   "save_slots",
   {
@@ -212,7 +263,13 @@ export const saveSlots = sqliteTable(
   })
 );
 
-// Character inventory rows for owned items.
+// ------------------------------------------------------------
+// INVENTORY AND EQUIPMENT
+// ------------------------------------------------------------
+
+// Stores owned item quantities for each character.
+// itemKey points to fixed item definitions in src/constants/items.js.
+// Unique rule: one character has one row per item type.
 export const characterInventory = sqliteTable(
   "character_inventory",
   {
@@ -233,7 +290,9 @@ export const characterInventory = sqliteTable(
   })
 );
 
-// Equipped items by character and equipment slot.
+// Stores equipped items by character and equipment slot.
+// itemKey still points to a fixed item definition; this table only stores ownership state.
+// Unique rule: one character can equip only one item per slot.
 export const characterEquipment = sqliteTable(
   "character_equipment",
   {
@@ -253,7 +312,13 @@ export const characterEquipment = sqliteTable(
   })
 );
 
-// Dialogue flags used to remember completed conversations.
+// ------------------------------------------------------------
+// FRONTEND AND STORY FLAGS
+// ------------------------------------------------------------
+
+// Stores dialogue flags so completed conversations are remembered.
+// flagKey points to fixed dialogue/story keys from src/constants/dialogues.js.
+// Unique rule: one character has one row per dialogue flag.
 export const characterDialogueFlags = sqliteTable(
   "character_dialogue_flags",
   {
@@ -273,7 +338,9 @@ export const characterDialogueFlags = sqliteTable(
   })
 );
 
-// Boss progress, attempts, and outcomes.
+// Stores boss progress, attempt count, defeat count, and latest outcome.
+// bossKey points to boss enemy definitions in src/constants/enemies.js.
+// Unique rule: one character has one row per boss.
 export const characterBossStates = sqliteTable(
   "character_boss_states",
   {
@@ -297,7 +364,9 @@ export const characterBossStates = sqliteTable(
   })
 );
 
-// Map markers shown or completed in the frontend.
+// Stores campaign markers shown on the frontend map.
+// markerKey is fixed game content, while reveal/completion state belongs to the player.
+// Unique rule: one character has one row per campaign marker.
 export const characterCampaignMarkers = sqliteTable(
   "character_campaign_markers",
   {
@@ -321,7 +390,9 @@ export const characterCampaignMarkers = sqliteTable(
   })
 );
 
-// Reputation state with each faction.
+// Stores one character's reputation state with each faction.
+// factionKey points to src/constants/factions.js.
+// Unique rule: one character has one row per faction.
 export const characterFactionReputation = sqliteTable(
   "character_faction_reputation",
   {
@@ -341,7 +412,9 @@ export const characterFactionReputation = sqliteTable(
   })
 );
 
-// Per-region unlock, discovery, and world state.
+// Stores per-region unlock, discovery, threat, and world-state progress.
+// regionKey points to fixed region definitions in src/constants/regions.js.
+// Unique rule: one character has one row per region.
 export const characterRegionStates = sqliteTable(
   "character_region_states",
   {

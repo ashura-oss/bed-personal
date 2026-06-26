@@ -2,6 +2,10 @@
 import * as characterModel from "../models/characterModel.js";
 import { calculateCharacterStats, validateAffinity, validateCharacterName, validateClassName, validateOrigin } from "../utils/gameRules.js";
 
+// ------------------------------------------------------------
+// RESOURCE LOADERS
+// ------------------------------------------------------------
+
 // Shared controller steps used before routes that need an existing character.
 export async function loadCharacterFromCharacterIdParam(req, res, next) {
   try {
@@ -20,8 +24,7 @@ export async function loadCharacterFromCharacterIdParam(req, res, next) {
     res.locals.character = character;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -43,8 +46,7 @@ export async function loadCharacterFromIdParam(req, res, next) {
     res.locals.character = character;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -67,12 +69,15 @@ export async function loadCharacterFromBody(req, res, next) {
     res.locals.character = character;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Character CRUD and related read controllers.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all characters, optionally filtered by class.
 export async function getCharacters(req, res, next) {
   try {
     let className = req.query.className;
@@ -98,8 +103,7 @@ export async function getCharacters(req, res, next) {
     res.locals.data = characterList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -121,8 +125,7 @@ export async function getCharacterById(req, res, next) {
     res.locals.data = character;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -134,10 +137,13 @@ export async function getCharactersByUserId(req, res, next) {
     res.locals.data = characterList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Create a character after validating owner and character choices.
 export async function postCharacter(req, res, next) {
@@ -206,12 +212,15 @@ export async function postCharacter(req, res, next) {
     res.locals.data = character;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Update character by id.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Update one character row by id.
 export async function putCharacterById(req, res, next) {
   try {
     const characterId = Number(req.params.id);
@@ -231,10 +240,13 @@ export async function putCharacterById(req, res, next) {
     res.locals.data = updatedCharacter;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// REMOVE CONTROLLERS
+// ------------------------------------------------------------
 
 // Delete character.
 export async function deleteCharacter(req, res, next) {
@@ -249,10 +261,13 @@ export async function deleteCharacter(req, res, next) {
 
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
 
 // Build allowed updates and recalculate stats if class data changes.
 function buildCharacterUpdates(body, existingCharacter, res) {

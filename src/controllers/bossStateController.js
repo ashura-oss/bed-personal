@@ -2,7 +2,11 @@
 import * as bossStateModel from "../models/bossStateModel.js";
 import { hasEnemyDefinition } from "../constants/enemies.js";
 
-// Update boss state.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one character's progress against a boss.
 export async function putBossState(req, res, next) {
   try {
     const character = res.locals.character;
@@ -55,7 +59,6 @@ export async function putBossState(req, res, next) {
     res.locals.data = bossState;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

@@ -2,6 +2,10 @@
 import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
 
+// ------------------------------------------------------------
+// RESOURCE LOADERS
+// ------------------------------------------------------------
+
 // Load quest from body for the next controller.
 export async function loadQuestFromBody(req, res, next) {
   try {
@@ -20,12 +24,15 @@ export async function loadQuestFromBody(req, res, next) {
     res.locals.quest = quest;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Get quests.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all quest definitions, optionally filtered by region.
 export async function getQuests(req, res, next) {
   try {
     const questList = [...QUEST_DEFINITIONS].sort(
@@ -35,8 +42,7 @@ export async function getQuests(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -52,8 +58,7 @@ export async function getQuestById(req, res, next) {
     res.locals.data = quest;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -73,7 +78,6 @@ export async function getQuestsByRegionId(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

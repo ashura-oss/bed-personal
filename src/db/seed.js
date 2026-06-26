@@ -1,4 +1,9 @@
-// Seeds default rows that the database needs before the API runs.
+// ------------------------------------------------------------
+// DATABASE SEED SCRIPT
+// ------------------------------------------------------------
+// Inserts safe demo rows so the API can be tested immediately after setup.
+// Required before running endpoints: npm run db
+// Important: every seed step checks for existing rows first, so repeated runs do not duplicate data.
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db.js";
@@ -6,7 +11,11 @@ import { characterAbilities, characterInventory, characterLocations, characterRu
 
 const now = new Date();
 
-// Seed the minimum demo data needed to run the API immediately.
+// ------------------------------------------------------------
+// MAIN SEED FLOW
+// ------------------------------------------------------------
+
+// Creates the demo user, demo character, and starting saved-game records.
 async function seedData() {
   const demoUser = await findOrCreateDemoUser();
   const demoCharacter = await findOrCreateDemoCharacter(demoUser.id);
@@ -17,7 +26,11 @@ async function seedData() {
   await seedStartingInventory(demoCharacter.id);
 }
 
-// Demo user is inserted only if it does not already exist.
+// ------------------------------------------------------------
+// DEMO USER AND CHARACTER
+// ------------------------------------------------------------
+
+// Finds the demo account by username, or creates it if this is the first seed run.
 async function findOrCreateDemoUser() {
   const existingUsers = await db
     .select({ id: users.id })
@@ -43,7 +56,7 @@ async function findOrCreateDemoUser() {
   return demoUser;
 }
 
-// Demo character is tied to the demo user and only inserted once.
+// Finds the starter character for the demo user, or creates the first playable soldier.
 async function findOrCreateDemoCharacter(userId) {
   const existingCharacters = await db
     .select({ id: characters.id })
@@ -79,7 +92,11 @@ async function findOrCreateDemoCharacter(userId) {
   return demoCharacter;
 }
 
-// Starting saves give the demo character enough state for frontend testing.
+// ------------------------------------------------------------
+// STARTING CHARACTER STATE
+// ------------------------------------------------------------
+
+// Gives the demo character one basic combat ability for immediate combat testing.
 async function seedStartingAbility(characterId) {
   const existingAbilities = await db
     .select({ id: characterAbilities.id })
@@ -101,7 +118,7 @@ async function seedStartingAbility(characterId) {
   }
 }
 
-// Seed starting run state.
+// Creates the first story/run state used by map, progression, and frontend save screens.
 async function seedStartingRunState(characterId) {
   const existingRunStates = await db
     .select({ id: characterRunStates.id })
@@ -121,7 +138,7 @@ async function seedStartingRunState(characterId) {
   }
 }
 
-// Seed starting location.
+// Places the demo character at the first map node in Middle-earth.
 async function seedStartingLocation(characterId) {
   const existingLocations = await db
     .select({ id: characterLocations.id })
@@ -140,13 +157,13 @@ async function seedStartingLocation(characterId) {
   }
 }
 
-// Seed starting inventory.
+// Gives the demo character basic materials so inventory endpoints have data to read.
 async function seedStartingInventory(characterId) {
   await seedInventoryItem(characterId, "item_iron_scrap", 2);
   await seedInventoryItem(characterId, "item_healing_herb", 3);
 }
 
-// Shared inventory insert helper keeps seedData idempotent.
+// Inserts one inventory item only if the character does not already own that item.
 async function seedInventoryItem(characterId, itemId, quantity) {
   const existingItems = await db
     .select({ id: characterInventory.id })
@@ -170,7 +187,11 @@ async function seedInventoryItem(characterId, itemId, quantity) {
   }
 }
 
-// Execute the seed script from npm scripts.
+// ------------------------------------------------------------
+// SCRIPT EXECUTION
+// ------------------------------------------------------------
+
+// Runs the seed flow and prints a clear result for the terminal.
 try {
   await seedData();
 

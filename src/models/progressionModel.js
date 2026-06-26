@@ -3,7 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterRunStates, characters } from "../db/schema.js";
 
-// Find character progression by id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find one character with run state and quest completion progress.
 export async function findCharacterProgressionById(characterId) {
   const characterResult = await db
     .select({
@@ -41,7 +45,11 @@ export async function findCharacterProgressionById(characterId) {
   };
 }
 
-// Save character progression.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Save character stats and run state changes together.
 export async function saveCharacterProgression({
   characterId,
   characterUpdates,

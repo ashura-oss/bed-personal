@@ -3,7 +3,11 @@ import { eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterArmyStates, characterRunStates } from "../db/schema.js";
 
-// Find army state by character id.
+// ------------------------------------------------------------
+// ARMY STATE READS
+// ------------------------------------------------------------
+
+// Find one character's army state row.
 export async function findArmyStateByCharacterId(characterId) {
   const result = await db
     .select({
@@ -25,7 +29,11 @@ export async function findArmyStateByCharacterId(characterId) {
   return result[0] || null;
 }
 
-// Insert or update army state.
+// ------------------------------------------------------------
+// ARMY STATE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one character's army state row.
 export async function upsertArmyState({
   characterId,
   isUnlocked,
@@ -114,7 +122,11 @@ export async function upsertArmyState({
   return result[0];
 }
 
-// Save army battle result.
+// ------------------------------------------------------------
+// ARMY BATTLE WRITES
+// ------------------------------------------------------------
+
+// Save troop losses and morale changes after one army battle.
 export async function saveArmyBattleResult({ characterId, battleResult }) {
   const result = await db
     .update(characterArmyStates)

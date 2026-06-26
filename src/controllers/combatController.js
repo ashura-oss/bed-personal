@@ -16,6 +16,10 @@ import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
 import { resolveCombatTurn } from "../utils/combatRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
+
 // Start a new session after validating enemy, quest, and boss location rules.
 export async function postCombatSession(req, res, next) {
   try {
@@ -116,10 +120,13 @@ export async function postCombatSession(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
 
 // Read current session state together with previous turn logs.
 export async function getCombatSession(req, res, next) {
@@ -144,10 +151,13 @@ export async function getCombatSession(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Resolve one player action and save resulting turn logs.
 export async function postCombatTurn(req, res, next) {
@@ -245,12 +255,15 @@ export async function postCombatTurn(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Private helpers keep the controller flow readable.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find the map node connected to a boss enemy.
 async function findBossNodeForEnemy(enemyId, res) {
   const bossNode = findMapNodeDefinitionByEnemyId(enemyId);
 

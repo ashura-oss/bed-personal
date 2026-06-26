@@ -1,7 +1,11 @@
 // Item controller functions return fixed item definitions.
 import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js";
 
-// Get items.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all item definitions, optionally filtered by type or slot.
 export async function getItems(req, res, next) {
   try {
     let itemType = req.query.itemType;
@@ -38,8 +42,7 @@ export async function getItems(req, res, next) {
     res.locals.data = items;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -55,7 +58,6 @@ export async function getItemById(req, res, next) {
     res.locals.data = item;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

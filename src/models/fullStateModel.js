@@ -7,6 +7,10 @@ import { findFactionReputationByCharacterId } from "./factionReputationModel.js"
 import { findInventoryByCharacterId } from "./characterInventoryModel.js";
 import { findRegionStatesByCharacterId } from "./regionStateModel.js";
 
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
 // Combine separate state tables into one frontend-friendly payload.
 export async function findFullCharacterState(characterId) {
   const inventory = await findInventoryByCharacterId(characterId);

@@ -2,7 +2,11 @@
 import * as campaignMarkerModel from "../models/campaignMarkerModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
 
-// Update campaign marker.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Save one character's campaign marker state.
 export async function putCampaignMarker(req, res, next) {
   try {
     const character = res.locals.character;
@@ -75,7 +79,6 @@ export async function putCampaignMarker(req, res, next) {
     res.locals.data = marker;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }

@@ -1,6 +1,10 @@
 // User controller functions handle user validation, loading, and CRUD.
 import * as userModel from "../models/userModel.js";
 
+// ------------------------------------------------------------
+// RESOURCE LOADERS
+// ------------------------------------------------------------
+
 // Shared controller steps used before routes that need an existing user.
 export async function loadUserFromUserIdParam(req, res, next) {
   try {
@@ -19,8 +23,7 @@ export async function loadUserFromUserIdParam(req, res, next) {
     res.locals.user = user;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -43,12 +46,15 @@ export async function loadUserFromBody(req, res, next) {
     res.locals.user = user;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// User CRUD controllers.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all users, optionally filtered by level.
 export async function getUsers(req, res, next) {
   try {
     let level;
@@ -70,8 +76,7 @@ export async function getUsers(req, res, next) {
     res.locals.data = userList;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -93,10 +98,13 @@ export async function getUserById(req, res, next) {
     res.locals.data = user;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
 
 // Create a user after validating the username.
 export async function postUser(req, res, next) {
@@ -117,12 +125,15 @@ export async function postUser(req, res, next) {
     res.locals.data = user;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
-// Update user by id.
+// ------------------------------------------------------------
+// SAVE CONTROLLERS
+// ------------------------------------------------------------
+
+// Update one user row by id.
 export async function putUserById(req, res, next) {
   try {
     const userId = Number(req.params.id);
@@ -154,10 +165,13 @@ export async function putUserById(req, res, next) {
     res.locals.data = updatedUser;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// REMOVE CONTROLLERS
+// ------------------------------------------------------------
 
 // Delete user.
 export async function deleteUser(req, res, next) {
@@ -176,10 +190,13 @@ export async function deleteUser(req, res, next) {
 
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
 
 // Build only the user fields that the request is allowed to update.
 function buildUserUpdates(body, res) {

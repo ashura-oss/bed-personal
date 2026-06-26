@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterEquipment } from "../db/schema.js";
 
-// Find equipment by character id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all equipped items for one character.
 export function findEquipmentByCharacterId(characterId) {
   return db
     .select({
@@ -18,7 +22,11 @@ export function findEquipmentByCharacterId(characterId) {
     .orderBy(asc(characterEquipment.equipmentSlot));
 }
 
-// Insert or update equipment.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one equipped item slot.
 export async function upsertEquipment({ characterId, equipmentSlot, itemId }) {
   const now = new Date();
   const existingResult = await db
@@ -60,7 +68,11 @@ export async function upsertEquipment({ characterId, equipmentSlot, itemId }) {
   return result[0];
 }
 
-// Remove equipment.
+// ------------------------------------------------------------
+// DATABASE DELETES
+// ------------------------------------------------------------
+
+// Delete one equipped item slot.
 export async function removeEquipment({ characterId, equipmentSlot }) {
   const result = await db
     .delete(characterEquipment)

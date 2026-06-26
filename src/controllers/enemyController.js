@@ -1,7 +1,11 @@
 // Enemy controller functions return fixed enemy and boss data.
 import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
 
-// Get enemies.
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
+
+// Return all enemy definitions, optionally filtered by query values.
 export async function getEnemies(req, res, next) {
   try {
     let regionId = req.query.regionId;
@@ -34,8 +38,7 @@ export async function getEnemies(req, res, next) {
     res.locals.data = enemies;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -51,10 +54,13 @@ export async function getEnemyById(req, res, next) {
     res.locals.data = enemy;
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
 
 // Read optional binary query.
 function readOptionalBinaryQuery(query, fieldName, res) {

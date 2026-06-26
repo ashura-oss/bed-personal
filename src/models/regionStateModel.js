@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterRegionStates } from "../db/schema.js";
 
-// Find region states by character id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all region state rows for one character.
 export function findRegionStatesByCharacterId(characterId) {
   return db
     .select({
@@ -21,12 +25,16 @@ export function findRegionStatesByCharacterId(characterId) {
     .orderBy(asc(characterRegionStates.regionKey));
 }
 
-// Find region state by character id.
+// Find one region state row for one character.
 export async function findRegionStateByCharacterId(characterId, regionId) {
   return findRegionState(characterId, regionId);
 }
 
-// Insert or update region state.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one region state row.
 export async function upsertRegionState({
   characterId,
   regionId,
@@ -76,7 +84,11 @@ export async function upsertRegionState({
   return result[0];
 }
 
-// Find region state.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find one region state helper row by character and region.
 async function findRegionState(characterId, regionId) {
   const result = await db
     .select({

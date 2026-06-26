@@ -3,7 +3,11 @@ import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterBossStates } from "../db/schema.js";
 
-// Find boss states by character id.
+// ------------------------------------------------------------
+// DATABASE READS
+// ------------------------------------------------------------
+
+// Find all boss state rows for one character.
 export function findBossStatesByCharacterId(characterId) {
   return db
     .select({
@@ -22,12 +26,16 @@ export function findBossStatesByCharacterId(characterId) {
     .orderBy(asc(characterBossStates.bossKey));
 }
 
-// Find boss state by character id.
+// Find one boss state row for one character.
 export async function findBossStateByCharacterId(characterId, bossId) {
   return findBossState(characterId, bossId);
 }
 
-// Insert or update boss state.
+// ------------------------------------------------------------
+// DATABASE WRITES
+// ------------------------------------------------------------
+
+// Insert or update one boss state row.
 export async function upsertBossState({
   characterId,
   bossId,
@@ -83,7 +91,11 @@ export async function upsertBossState({
   return result[0];
 }
 
-// Find boss state.
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
+
+// Find one boss state helper row by character and boss.
 async function findBossState(characterId, bossId) {
   const result = await db
     .select({

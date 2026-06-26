@@ -5,6 +5,10 @@ import { findRegionDefinitionById } from "../constants/regions.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
+// ------------------------------------------------------------
+// CREATE AND ACTION CONTROLLERS
+// ------------------------------------------------------------
+
 // Resolve one adventure attempt and prepare its reward response.
 export async function postAdventureAttempt(req, res, next) {
   try {
@@ -88,10 +92,13 @@ export async function postAdventureAttempt(req, res, next) {
     };
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// READ CONTROLLERS
+// ------------------------------------------------------------
 
 // Get adventure logs by user id.
 export async function getAdventureLogsByUserId(req, res, next) {
@@ -101,8 +108,7 @@ export async function getAdventureLogsByUserId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
 
@@ -116,10 +122,13 @@ export async function getAdventureLogsByCharacterId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: "Internal Server Error." });
+    next(error);
   }
 }
+
+// ------------------------------------------------------------
+// PRIVATE HELPERS
+// ------------------------------------------------------------
 
 // Enrich adventure log rows with related details.
 function enrichAdventureLogRows(rows) {
