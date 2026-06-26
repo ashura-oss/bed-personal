@@ -4,8 +4,20 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getQuests, withMessage("Quests retrieved."), sendResponse);
+// List all quest definitions.
+router.get(
+  "/",
+  getQuests,
+  withMessage("Quests retrieved."),
+  sendResponse
+);
 
-router.get("/:id", getQuestById, withMessage("Quest retrieved."), sendResponse);
+// Read one quest definition.
+router.get(
+  "/:id",
+  getQuestById,
+  withMessage("Quest retrieved."),
+  sendResponse
+);
 
 export default router;

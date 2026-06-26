@@ -4,6 +4,12 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getAbilities, withMessage("Abilities retrieved."), sendResponse);
+// List all ability definitions.
+router.get(
+  "/",
+  getAbilities,
+  withMessage("Abilities retrieved."),
+  sendResponse
+);
 
 export default router;

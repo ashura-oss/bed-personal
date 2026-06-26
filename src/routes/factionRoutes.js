@@ -4,8 +4,20 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getFactions, withMessage("Factions retrieved."), sendResponse);
+// List all faction definitions.
+router.get(
+  "/",
+  getFactions,
+  withMessage("Factions retrieved."),
+  sendResponse
+);
 
-router.get("/:factionId", getFactionById, withMessage("Faction retrieved."), sendResponse);
+// Read one faction definition.
+router.get(
+  "/:factionId",
+  getFactionById,
+  withMessage("Faction retrieved."),
+  sendResponse
+);
 
 export default router;

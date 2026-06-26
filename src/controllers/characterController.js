@@ -2,6 +2,70 @@ import * as characterModel from "../models/characterModel.js";
 import { calculateCharacterStats, validateAffinity, validateCharacterName, validateClassName, validateOrigin } from "../utils/gameRules.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+export async function loadCharacterFromCharacterIdParam(req, res, next) {
+  try {
+    const characterId = Number(req.params.characterId);
+
+    if (!Number.isInteger(characterId) || characterId < 1) {
+      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+    }
+
+    const character = await characterModel.findCharacterById(characterId);
+
+    if (!character) {
+      throw createError(404, "Not Found", "Character was not found.");
+    }
+
+    res.locals.character = character;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+export async function loadCharacterFromIdParam(req, res, next) {
+  try {
+    const characterId = Number(req.params.id);
+
+    if (!Number.isInteger(characterId) || characterId < 1) {
+      throw createError(400, "Bad Request", "id must be a positive integer id.");
+    }
+
+    const character = await characterModel.findCharacterById(characterId);
+
+    if (!character) {
+      throw createError(404, "Not Found", "Character was not found.");
+    }
+
+    res.locals.character = character;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+export async function loadCharacterFromBody(req, res, next) {
+  try {
+    const value = req.body?.characterId;
+    const characterId = typeof value === "string" ? Number(value) : value;
+
+    if (!Number.isInteger(characterId) || characterId < 1) {
+      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
+    }
+
+    const character = await characterModel.findCharacterById(characterId);
+
+    if (!character) {
+      throw createError(404, "Not Found", "Character was not found.");
+    }
+
+    res.locals.character = character;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
 export async function getCharacters(req, res, next) {
   try {
     let className = req.query.className;
@@ -29,7 +93,19 @@ export async function getCharacters(req, res, next) {
 
 export async function getCharacterById(req, res, next) {
   try {
-    res.locals.data = res.locals.character;
+    const characterId = Number(req.params.id);
+
+    if (!Number.isInteger(characterId) || characterId < 1) {
+      throw createError(400, "Bad Request", "id must be a positive integer id.");
+    }
+
+    const character = await characterModel.findCharacterById(characterId);
+
+    if (!character) {
+      throw createError(404, "Not Found", "Character was not found.");
+    }
+
+    res.locals.data = character;
     next();
   } catch (error) {
     sendError(res, error);

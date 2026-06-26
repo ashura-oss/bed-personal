@@ -1,6 +1,49 @@
 import * as userModel from "../models/userModel.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+export async function loadUserFromUserIdParam(req, res, next) {
+  try {
+    const userId = Number(req.params.userId);
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      throw createError(400, "Bad Request", "userId must be a positive integer id.");
+    }
+
+    const user = await userModel.findUserById(userId);
+
+    if (!user) {
+      throw createError(404, "Not Found", "User was not found.");
+    }
+
+    res.locals.user = user;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
+export async function loadUserFromBody(req, res, next) {
+  try {
+    const value = req.body?.userId;
+    const userId = typeof value === "string" ? Number(value) : value;
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      throw createError(400, "Bad Request", "userId must be a positive integer id.");
+    }
+
+    const user = await userModel.findUserById(userId);
+
+    if (!user) {
+      throw createError(404, "Not Found", "User was not found.");
+    }
+
+    res.locals.user = user;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
 export async function getUsers(req, res, next) {
   try {
     let level;
@@ -28,7 +71,19 @@ export async function getUsers(req, res, next) {
 
 export async function getUserById(req, res, next) {
   try {
-    res.locals.data = res.locals.user;
+    const userId = Number(req.params.id);
+
+    if (!Number.isInteger(userId) || userId < 1) {
+      throw createError(400, "Bad Request", "id must be a positive integer id.");
+    }
+
+    const user = await userModel.findUserById(userId);
+
+    if (!user) {
+      throw createError(404, "Not Found", "User was not found.");
+    }
+
+    res.locals.data = user;
     next();
   } catch (error) {
     sendError(res, error);
@@ -76,6 +131,10 @@ export async function putUserById(req, res, next) {
     }
 
     const updatedUser = await userModel.updateUserById(userId, updates);
+
+    if (!updatedUser) {
+      throw createError(404, "Not Found", "User was not found.");
+    }
 
     res.locals.data = updatedUser;
     next();

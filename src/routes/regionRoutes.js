@@ -5,10 +5,28 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getRegions, withMessage("Regions retrieved."), sendResponse);
+// List all region definitions.
+router.get(
+  "/",
+  getRegions,
+  withMessage("Regions retrieved."),
+  sendResponse
+);
 
-router.get("/:regionId/quests", getQuestsByRegionId, withMessage("Region quests retrieved."), sendResponse);
+// List quests inside one region.
+router.get(
+  "/:regionId/quests",
+  getQuestsByRegionId,
+  withMessage("Region quests retrieved."),
+  sendResponse
+);
 
-router.get("/:id", getRegionById, withMessage("Region retrieved."), sendResponse);
+// Read one region definition.
+router.get(
+  "/:id",
+  getRegionById,
+  withMessage("Region retrieved."),
+  sendResponse
+);
 
 export default router;

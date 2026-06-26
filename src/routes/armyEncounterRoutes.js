@@ -4,8 +4,20 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getArmyEncounters, withMessage("Army encounters retrieved."), sendResponse);
+// List all army encounter definitions.
+router.get(
+  "/",
+  getArmyEncounters,
+  withMessage("Army encounters retrieved."),
+  sendResponse
+);
 
-router.get("/:armyEncounterId", getArmyEncounterById, withMessage("Army encounter retrieved."), sendResponse);
+// Read one army encounter definition.
+router.get(
+  "/:armyEncounterId",
+  getArmyEncounterById,
+  withMessage("Army encounter retrieved."),
+  sendResponse
+);
 
 export default router;

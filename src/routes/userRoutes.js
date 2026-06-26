@@ -1,24 +1,74 @@
 import { Router } from "express";
-import { deleteUser, getUserById, getUsers, postUser, putUserById } from "../controllers/userController.js";
+import {
+  deleteUser,
+  getUserById,
+  getUsers,
+  loadUserFromUserIdParam,
+  postUser,
+  putUserById
+} from "../controllers/userController.js";
 import { getCharactersByUserId } from "../controllers/characterController.js";
 import { getAdventureLogsByUserId } from "../controllers/adventureController.js";
-import { loadUserFromIdParam, loadUserFromUserIdParam } from "../middlewares/loadMiddleware.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getUsers, withMessage("Users retrieved."), sendResponse);
+// List users, optionally filtered by level.
+router.get(
+  "/",
+  getUsers,
+  withMessage("Users retrieved."),
+  sendResponse
+);
 
-router.post("/", postUser, withMessage("User created.", 201), sendResponse);
+// Create a new user.
+router.post(
+  "/",
+  postUser,
+  withMessage("User created.", 201),
+  sendResponse
+);
 
-router.get("/:userId/characters", loadUserFromUserIdParam, getCharactersByUserId, withMessage("User characters retrieved."), sendResponse);
+// List characters owned by one user.
+router.get(
+  "/:userId/characters",
+  loadUserFromUserIdParam,
+  getCharactersByUserId,
+  withMessage("User characters retrieved."),
+  sendResponse
+);
 
-router.get("/:userId/adventure-logs", loadUserFromUserIdParam, getAdventureLogsByUserId, withMessage("User adventure logs retrieved."), sendResponse);
+// List adventure logs owned by one user.
+router.get(
+  "/:userId/adventure-logs",
+  loadUserFromUserIdParam,
+  getAdventureLogsByUserId,
+  withMessage("User adventure logs retrieved."),
+  sendResponse
+);
 
-router.get("/:id", loadUserFromIdParam, getUserById, withMessage("User retrieved."), sendResponse);
+// Read one user by id.
+router.get(
+  "/:id",
+  getUserById,
+  withMessage("User retrieved."),
+  sendResponse
+);
 
-router.put("/:id", loadUserFromIdParam, putUserById, withMessage("User updated."), sendResponse);
+// Update one user by id.
+router.put(
+  "/:id",
+  putUserById,
+  withMessage("User updated."),
+  sendResponse
+);
 
-router.delete("/:id", loadUserFromIdParam, deleteUser, withMessage("User deleted.", 204), sendResponse);
+// Delete one user by id.
+router.delete(
+  "/:id",
+  deleteUser,
+  withMessage("User deleted.", 204),
+  sendResponse
+);
 
 export default router;

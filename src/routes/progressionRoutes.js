@@ -1,14 +1,35 @@
 import { Router } from "express";
+import { loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";
 import { getCharacterProgression, putCharacterProgression, putCharacterQuestCompletion } from "../controllers/progressionController.js";
-import { loadCharacterFromCharacterIdParam } from "../middlewares/loadMiddleware.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/characters/:characterId", loadCharacterFromCharacterIdParam, getCharacterProgression, withMessage("Character progression retrieved."), sendResponse);
+// Read story and quest progression for a character.
+router.get(
+  "/characters/:characterId",
+  loadCharacterFromCharacterIdParam,
+  getCharacterProgression,
+  withMessage("Character progression retrieved."),
+  sendResponse
+);
 
-router.put("/characters/:characterId", loadCharacterFromCharacterIdParam, putCharacterProgression, withMessage("Character progression saved."), sendResponse);
+// Save story and quest progression for a character.
+router.put(
+  "/characters/:characterId",
+  loadCharacterFromCharacterIdParam,
+  putCharacterProgression,
+  withMessage("Character progression saved."),
+  sendResponse
+);
 
-router.put("/characters/:characterId/quest-completions/:questId", loadCharacterFromCharacterIdParam, putCharacterQuestCompletion, withMessage("Quest completion claimed."), sendResponse);
+// Claim or update one quest completion for a character.
+router.put(
+  "/characters/:characterId/quest-completions/:questId",
+  loadCharacterFromCharacterIdParam,
+  putCharacterQuestCompletion,
+  withMessage("Quest completion claimed."),
+  sendResponse
+);
 
 export default router;

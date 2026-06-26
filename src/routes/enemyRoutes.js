@@ -4,8 +4,20 @@ import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 
-router.get("/", getEnemies, withMessage("Enemies retrieved."), sendResponse);
+// List all enemy definitions.
+router.get(
+  "/",
+  getEnemies,
+  withMessage("Enemies retrieved."),
+  sendResponse
+);
 
-router.get("/:enemyId", getEnemyById, withMessage("Enemy retrieved."), sendResponse);
+// Read one enemy definition.
+router.get(
+  "/:enemyId",
+  getEnemyById,
+  withMessage("Enemy retrieved."),
+  sendResponse
+);
 
 export default router;

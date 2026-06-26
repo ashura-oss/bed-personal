@@ -2,6 +2,27 @@ import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.
 import { findRegionDefinitionById } from "../constants/regions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+export async function loadQuestFromBody(req, res, next) {
+  try {
+    const value = req.body?.questId;
+
+    if (typeof value !== "string" || value.trim().length === 0) {
+      throw createError(400, "Bad Request", "questId is required.");
+    }
+
+    const quest = findQuestDefinitionById(value.trim());
+
+    if (!quest) {
+      throw createError(404, "Not Found", "Quest was not found.");
+    }
+
+    res.locals.quest = quest;
+    next();
+  } catch (error) {
+    sendError(res, error);
+  }
+}
+
 export async function getQuests(req, res, next) {
   try {
     const questList = [...QUEST_DEFINITIONS].sort(
