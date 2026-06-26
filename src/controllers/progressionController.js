@@ -1,3 +1,4 @@
+// Progression controller functions read and save story and quest progression.
 import * as progressionModel from "../models/progressionModel.js";
 import * as questCompletionModel from "../models/questCompletionModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
@@ -10,6 +11,7 @@ const DEFAULT_RUN_STATE = {
   commandModeUnlocked: 0
 };
 
+// Read the current story, run, and quest progression.
 export async function getCharacterProgression(req, res, next) {
   try {
     const progression = await progressionModel.findCharacterProgressionById(
@@ -23,6 +25,7 @@ export async function getCharacterProgression(req, res, next) {
   }
 }
 
+// Save editable progression fields for frontend state updates.
 export async function putCharacterProgression(req, res, next) {
   try {
     const characterId = Number(req.params.characterId);
@@ -77,6 +80,7 @@ export async function putCharacterProgression(req, res, next) {
   }
 }
 
+// Claim dialogue quest rewards that are not handled by combat.
 export async function putCharacterQuestCompletion(req, res, next) {
   try {
     const characterId = Number(req.params.characterId);
@@ -133,6 +137,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
   }
 }
 
+// Validation helpers build only the fields that should be updated.
 function buildCharacterProgressionUpdates(body) {
   const updates = {};
 
@@ -175,6 +180,7 @@ function buildCharacterProgressionUpdates(body) {
   return updates;
 }
 
+// Build run state changes.
 function buildRunStateChanges(body) {
   const updates = {};
 

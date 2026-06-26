@@ -1,7 +1,9 @@
+// Save slot controller functions read and write user save slots.
 import * as characterModel from "../models/characterModel.js";
 import * as saveSlotModel from "../models/saveSlotModel.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get save slots for user.
 export async function getSaveSlotsForUser(req, res, next) {
   try {
     res.locals.data = await saveSlotModel.findSaveSlotsByUserId(res.locals.user.userId);
@@ -11,6 +13,7 @@ export async function getSaveSlotsForUser(req, res, next) {
   }
 }
 
+// Update save slot for user.
 export async function putSaveSlotForUser(req, res, next) {
   try {
     const userId = res.locals.user.userId;

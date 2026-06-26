@@ -1,3 +1,4 @@
+// Express entry point that mounts all route files and starts the API server.
 import "dotenv/config";
 import express from "express";
 import cors from "cors";

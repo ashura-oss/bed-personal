@@ -1,7 +1,9 @@
+// Story model functions apply campaign changes after major story events.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterArmyStates, characterBossStates, characterCampaignMarkers, characterFactionReputation, characterInventory, characterQuestCompletions, characterRegionStates, characterRunStates } from "../db/schema.js";
 
+// Apply all campaign changes caused by defeating a boss.
 export async function applyCombatVictoryStory({ characterId, enemy, questId, milestone }) {
   if (!milestone) {
     return null;
@@ -62,6 +64,7 @@ export async function applyCombatVictoryStory({ characterId, enemy, questId, mil
   });
 }
 
+// Apply campaign changes caused by winning an army encounter.
 export async function applyArmyVictoryStory({ characterId, encounter }) {
   return db.transaction(async (tx) => {
     const now = new Date();
@@ -96,6 +99,7 @@ export async function applyArmyVictoryStory({ characterId, encounter }) {
   });
 }
 
+// Story helpers below are kept private because they are only used inside transactions.
 async function markBossDefeated(tx, { characterId, bossId, now }) {
   const existingResult = await tx
     .select({
@@ -135,6 +139,7 @@ async function markBossDefeated(tx, { characterId, bossId, now }) {
   }
 }
 
+// Insert quest completion only once so rewards cannot be duplicated.
 async function recordQuestCompletion(tx, { characterId, questId, rewardXp, now }) {
   const existingResult = await tx
     .select({
@@ -160,6 +165,7 @@ async function recordQuestCompletion(tx, { characterId, questId, rewardXp, now }
   }
 }
 
+// Insert or update run state.
 async function upsertRunState(
   tx,
   { characterId, storyPhase, moraleChange, commandModeUnlocked, now }
@@ -199,6 +205,7 @@ async function upsertRunState(
   }
 }
 
+// Unlock region.
 async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
   const existingResult = await tx
     .select({
@@ -237,6 +244,7 @@ async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
   }
 }
 
+// Reveal campaign marker.
 async function revealCampaignMarker(tx, { characterId, marker, now }) {
   const existingResult = await tx
     .select({
@@ -279,6 +287,7 @@ async function revealCampaignMarker(tx, { characterId, marker, now }) {
   }
 }
 
+// Apply faction change.
 async function applyFactionChange(tx, { characterId, factionChange, now }) {
   const existingResult = await tx
     .select({
@@ -316,6 +325,7 @@ async function applyFactionChange(tx, { characterId, factionChange, now }) {
   }
 }
 
+// Add an item reward during a story update.
 async function addInventoryReward(tx, { characterId, itemReward, now }) {
   const existingResult = await tx
     .select({
@@ -352,6 +362,7 @@ async function addInventoryReward(tx, { characterId, itemReward, now }) {
   }
 }
 
+// Unlock army state.
 async function unlockArmyState(tx, { characterId, armyState, now }) {
   const existingResult = await tx
     .select({

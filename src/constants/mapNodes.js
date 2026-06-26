@@ -1,3 +1,4 @@
+// Map node definitions used by travel and boss location checks.
 export const MAP_NODE_DEFINITIONS = [
   {
     nodeId: "node_hearthvale_square",
@@ -146,14 +147,17 @@ export const MAP_NODE_DEFINITIONS = [
   }
 ];
 
+// Find map node definition by id.
 export function findMapNodeDefinitionById(nodeId) {
   return MAP_NODE_DEFINITIONS.find((node) => node.nodeId === nodeId) || null;
 }
 
+// Find map node definition by enemy id.
 export function findMapNodeDefinitionByEnemyId(enemyId) {
   return MAP_NODE_DEFINITIONS.find((node) => node.enemyId === enemyId) || null;
 }
 
+// Check whether map node definition exists.
 export function hasMapNodeDefinition(nodeId) {
   return findMapNodeDefinitionById(nodeId) !== null;
 }

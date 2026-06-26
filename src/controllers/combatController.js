@@ -1,3 +1,4 @@
+// Combat controller functions create sessions, resolve turns, and apply rewards.
 import * as abilityModel from "../models/abilityModel.js";
 import * as adventureModel from "../models/adventureModel.js";
 import * as bossStateModel from "../models/bossStateModel.js";
@@ -16,6 +17,7 @@ import { resolveCombatTurn } from "../utils/combatRules.js";
 import { createError, sendError } from "../utils/errorCode.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
+// Start a new session after validating enemy, quest, and boss location rules.
 export async function postCombatSession(req, res, next) {
   try {
     const character = res.locals.character;
@@ -123,6 +125,7 @@ export async function postCombatSession(req, res, next) {
   }
 }
 
+// Read current session state together with previous turn logs.
 export async function getCombatSession(req, res, next) {
   try {
     const combatSessionId = Number(req.params.combatSessionId);
@@ -149,6 +152,7 @@ export async function getCombatSession(req, res, next) {
   }
 }
 
+// Resolve one player action and save resulting turn logs.
 export async function postCombatTurn(req, res, next) {
   try {
     const combatSessionId = Number(req.params.combatSessionId);
@@ -234,6 +238,7 @@ export async function postCombatTurn(req, res, next) {
   }
 }
 
+// Private helpers keep the controller flow readable.
 async function findBossNodeForEnemy(enemyId) {
   const bossNode = findMapNodeDefinitionByEnemyId(enemyId);
 
@@ -244,12 +249,14 @@ async function findBossNodeForEnemy(enemyId) {
   return bossNode;
 }
 
+// Build combat character.
 async function buildCombatCharacter(character) {
   const equipment = await characterEquipmentModel.findEquipmentByCharacterId(character.characterId);
 
   return applyEquipmentBonuses(character, equipment);
 }
 
+// Find unlocked ability.
 async function findUnlockedAbility(characterId, abilityId) {
   const unlockedAbility = await abilityModel.findCharacterAbility(characterId, abilityId);
   const ability = unlockedAbility ? findAbilityDefinitionById(abilityId) : null;
@@ -261,6 +268,7 @@ async function findUnlockedAbility(characterId, abilityId) {
   return ability;
 }
 
+// Apply XP, gold, adventure log, and story updates after a combat win.
 async function awardCombatWin({ character, enemy, combatSession }) {
   const user = await userModel.findUserById(character.userId);
 

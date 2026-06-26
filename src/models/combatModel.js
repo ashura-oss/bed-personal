@@ -1,7 +1,9 @@
+// Combat model functions store combat sessions and turn logs.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { combatSessions, combatTurnLogs } from "../db/schema.js";
 
+// Create and read combat sessions.
 export async function createCombatSession({
   characterId,
   enemyId,
@@ -51,6 +53,7 @@ export async function createCombatSession({
   return result[0];
 }
 
+// Find combat session by id.
 export async function findCombatSessionById(combatSessionId) {
   const result = await db
     .select({
@@ -77,6 +80,7 @@ export async function findCombatSessionById(combatSessionId) {
   return result[0] || null;
 }
 
+// Find active combat session by character id.
 export async function findActiveCombatSessionByCharacterId(characterId) {
   const result = await db
     .select({
@@ -103,6 +107,7 @@ export async function findActiveCombatSessionByCharacterId(characterId) {
   return result[0] || null;
 }
 
+// Find combat logs by session id.
 export async function findCombatLogsBySessionId(combatSessionId) {
   return db
     .select({
@@ -122,6 +127,7 @@ export async function findCombatLogsBySessionId(combatSessionId) {
     .orderBy(asc(combatTurnLogs.id));
 }
 
+// Save the updated session and turn logs together.
 export async function saveCombatTurn({ combatSessionId, sessionUpdates, turnLogs }) {
   return db.transaction(async (tx) => {
     const now = new Date();

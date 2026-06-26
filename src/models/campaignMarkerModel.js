@@ -1,7 +1,9 @@
+// Campaign marker model functions read and save map marker rows.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterCampaignMarkers } from "../db/schema.js";
 
+// Find campaign markers by character id.
 export function findCampaignMarkersByCharacterId(characterId) {
   return db
     .select({
@@ -21,6 +23,7 @@ export function findCampaignMarkersByCharacterId(characterId) {
     .orderBy(asc(characterCampaignMarkers.markerKey));
 }
 
+// Insert or update campaign marker.
 export async function upsertCampaignMarker({
   characterId,
   markerId,
@@ -81,6 +84,7 @@ export async function upsertCampaignMarker({
   return result[0];
 }
 
+// Find campaign marker.
 async function findCampaignMarker(characterId, markerId) {
   const result = await db
     .select({

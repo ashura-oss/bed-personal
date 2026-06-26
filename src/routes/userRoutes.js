@@ -1,3 +1,4 @@
+// User route definitions.
 import { Router } from "express";
 import {
   deleteUser,

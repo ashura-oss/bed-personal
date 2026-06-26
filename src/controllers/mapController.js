@@ -1,3 +1,4 @@
+// Map controller functions read map data and move characters between nodes.
 import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as combatModel from "../models/combatModel.js";
 import * as mapModel from "../models/mapModel.js";
@@ -8,6 +9,7 @@ import { createError, sendError } from "../utils/errorCode.js";
 
 const START_NODE_ID = "node_hearthvale_square";
 
+// Return map definitions, optionally filtered by region.
 export async function getMapNodes(req, res, next) {
   try {
     let regionId = req.query.regionId;
@@ -33,6 +35,7 @@ export async function getMapNodes(req, res, next) {
   }
 }
 
+// Read one map node definition by id.
 export async function getMapNodeById(req, res, next) {
   try {
     const node = findMapNodeDefinitionById(req.params.nodeId);
@@ -48,6 +51,7 @@ export async function getMapNodeById(req, res, next) {
   }
 }
 
+// Get character map location.
 export async function getCharacterMapLocation(req, res, next) {
   try {
     const characterId = res.locals.character.characterId;
@@ -60,6 +64,7 @@ export async function getCharacterMapLocation(req, res, next) {
   }
 }
 
+// Move a character only if the target node is connected and unlocked.
 export async function postTravelToNode(req, res, next) {
   try {
     const character = res.locals.character;
@@ -119,6 +124,7 @@ export async function postTravelToNode(req, res, next) {
   }
 }
 
+// A missing location is created at the starting node.
 async function findOrCreateReadableLocation(characterId) {
   const existingLocation = await mapModel.findCharacterLocation(characterId);
 
@@ -135,6 +141,7 @@ async function findOrCreateReadableLocation(characterId) {
   return mapModel.moveCharacterToNode({ characterId, currentNode: startNode, targetNode: startNode });
 }
 
+// Build the result shown by the frontend after movement.
 async function buildTravelEvent(character, targetNode) {
   if (targetNode.nodeType === "gathering") {
     const inventoryItem = await mapModel.addTravelInventoryReward({
@@ -185,6 +192,7 @@ async function buildTravelEvent(character, targetNode) {
   };
 }
 
+// Create ambush travel event.
 async function createAmbushTravelEvent({ character, targetNode }) {
   const enemy = findEnemyDefinitionById(targetNode.encounterEnemyId);
 
@@ -212,6 +220,7 @@ async function createAmbushTravelEvent({ character, targetNode }) {
   };
 }
 
+// Decide whether travel should trigger a random encounter.
 function shouldTriggerEncounter(targetNode) {
   const encounterChance = Number(targetNode.encounterChance || 0);
 

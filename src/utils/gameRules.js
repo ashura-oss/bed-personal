@@ -1,3 +1,4 @@
+// Pure character creation and stat validation helpers.
 import { affinityBonuses, allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins, baseStats, classBonuses, originBonuses } from "../constants/characterOptions.js";
 import { createError } from "./errorCode.js";
 
@@ -6,18 +7,22 @@ const MAX_CHARACTER_NAME_LENGTH = 40;
 
 export { allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins };
 
+// Validate fixed character creation options from constants.
 export function validateOrigin(origin) {
   validateAllowedValue("origin", origin, allowedOrigins);
 }
 
+// Validate class name.
 export function validateClassName(className) {
   validateAllowedValue("className", className, allowedClasses);
 }
 
+// Validate affinity.
 export function validateAffinity(affinity) {
   validateAllowedValue("affinity", affinity, allowedAffinities);
 }
 
+// Validate character name.
 export function validateCharacterName(characterName) {
   if (typeof characterName !== "string" || characterName.trim().length === 0) {
     throw createError(
@@ -37,10 +42,12 @@ export function validateCharacterName(characterName) {
   }
 }
 
+// Validate required stat.
 export function validateRequiredStat(requiredStat) {
   validateAllowedValue("requiredStat", requiredStat, allowedCharacterStats);
 }
 
+// Resolve non-combat quest success from the character's required stat.
 export function resolveQuestAttempt(character, quest) {
   validateRequiredStat(quest.requiredStat);
 
@@ -79,6 +86,7 @@ export function resolveQuestAttempt(character, quest) {
   };
 }
 
+// Build starting stats from origin, class, affinity, and level.
 export function calculateCharacterStats({ origin, className, affinity, level = 1 }) {
   validateOrigin(origin);
   validateClassName(className);
@@ -97,12 +105,14 @@ export function calculateCharacterStats({ origin, className, affinity, level = 1
   return stats;
 }
 
+// Apply bonuses.
 function applyBonuses(stats, bonuses) {
   for (const [statName, value] of Object.entries(bonuses || {})) {
     stats[statName] += value;
   }
 }
 
+// Calculate failure xp.
 function calculateFailureXp(quest) {
   if (quest.rewardXp <= 0) {
     return 0;
@@ -111,6 +121,7 @@ function calculateFailureXp(quest) {
   return Math.min(quest.rewardXp, Math.max(5, quest.difficulty * 5));
 }
 
+// Validate allowed value.
 function validateAllowedValue(fieldName, value, allowedValues) {
   if (!allowedValues.includes(value)) {
     throw createError(400, "Bad Request", `${fieldName} must be one of the allowed values.`, {

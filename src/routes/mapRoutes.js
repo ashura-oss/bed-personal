@@ -1,3 +1,4 @@
+// Map route definitions.
 import { Router } from "express";
 import { getCharacterMapLocation, getMapNodeById, getMapNodes, postTravelToNode } from "../controllers/mapController.js";
 import { loadCharacterFromBody, loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";

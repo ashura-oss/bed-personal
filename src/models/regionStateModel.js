@@ -1,7 +1,9 @@
+// Region state model functions read and save region progress rows.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterRegionStates } from "../db/schema.js";
 
+// Find region states by character id.
 export function findRegionStatesByCharacterId(characterId) {
   return db
     .select({
@@ -19,10 +21,12 @@ export function findRegionStatesByCharacterId(characterId) {
     .orderBy(asc(characterRegionStates.regionKey));
 }
 
+// Find region state by character id.
 export async function findRegionStateByCharacterId(characterId, regionId) {
   return findRegionState(characterId, regionId);
 }
 
+// Insert or update region state.
 export async function upsertRegionState({
   characterId,
   regionId,
@@ -72,6 +76,7 @@ export async function upsertRegionState({
   return result[0];
 }
 
+// Find region state.
 async function findRegionState(characterId, regionId) {
   const result = await db
     .select({

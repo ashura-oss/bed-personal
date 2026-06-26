@@ -1,3 +1,4 @@
+// Adventure controller functions resolve quest attempts and return rewards.
 import * as adventureModel from "../models/adventureModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
@@ -5,6 +6,7 @@ import { resolveQuestAttempt } from "../utils/gameRules.js";
 import { createError, sendError } from "../utils/errorCode.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
+// Resolve one adventure attempt and prepare its reward response.
 export async function postAdventureAttempt(req, res, next) {
   try {
     const userId = typeof req.body?.userId === "string" ? Number(req.body.userId) : req.body?.userId;
@@ -94,6 +96,7 @@ export async function postAdventureAttempt(req, res, next) {
   }
 }
 
+// Get adventure logs by user id.
 export async function getAdventureLogsByUserId(req, res, next) {
   try {
     const adventureLogList = await adventureModel.findAdventureLogsByUserId(res.locals.user.userId);
@@ -105,6 +108,7 @@ export async function getAdventureLogsByUserId(req, res, next) {
   }
 }
 
+// Get adventure logs by character id.
 export async function getAdventureLogsByCharacterId(req, res, next) {
   try {
     const adventureLogList = await adventureModel.findAdventureLogsByCharacterId(
@@ -118,6 +122,7 @@ export async function getAdventureLogsByCharacterId(req, res, next) {
   }
 }
 
+// Enrich adventure log rows with related details.
 function enrichAdventureLogRows(rows) {
   return rows.map((row) => {
     const quest = findQuestDefinitionById(row.questId);

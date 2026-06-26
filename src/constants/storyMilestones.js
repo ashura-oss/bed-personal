@@ -1,3 +1,4 @@
+// Story milestones applied after important boss victories.
 export const STORY_MILESTONES = [
   {
     enemyId: "boss_orc_king",
@@ -103,6 +104,7 @@ export const STORY_MILESTONES = [
   }
 ];
 
+// Find story milestone by enemy id.
 export function findStoryMilestoneByEnemyId(enemyId) {
   return STORY_MILESTONES.find((milestone) => milestone.enemyId === enemyId) || null;
 }

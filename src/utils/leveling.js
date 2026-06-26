@@ -1,9 +1,12 @@
+// Pure leveling helper functions for XP, level, and gold rewards.
 const xpPerLevel = 100;
 
+// Calculate level from xp.
 export function calculateLevelFromXp(xp) {
   return Math.floor(xp / xpPerLevel) + 1;
 }
 
+// Build character progression.
 export function buildCharacterProgression(character, xpGained) {
   const previousXp = character.xp;
   const previousLevel = character.level;
@@ -32,6 +35,7 @@ export function buildCharacterProgression(character, xpGained) {
   };
 }
 
+// Build user progression.
 export function buildUserProgression(user, xpGained, goldGained) {
   const previousXp = user.xp;
   const previousGold = user.gold;

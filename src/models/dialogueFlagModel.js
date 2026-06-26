@@ -1,7 +1,9 @@
+// Dialogue flag model functions read and save dialogue completion flags.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterDialogueFlags } from "../db/schema.js";
 
+// Find dialogue flags by character id.
 export function findDialogueFlagsByCharacterId(characterId) {
   return db
     .select({
@@ -16,6 +18,7 @@ export function findDialogueFlagsByCharacterId(characterId) {
     .orderBy(asc(characterDialogueFlags.flagKey));
 }
 
+// Insert or update dialogue flag.
 export async function upsertDialogueFlag({ characterId, flagId, flagValue }) {
   const now = new Date();
   const existingResult = await db

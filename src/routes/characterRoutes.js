@@ -1,3 +1,4 @@
+// Character route definitions.
 import { Router } from "express";
 import {
   deleteCharacter,

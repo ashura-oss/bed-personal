@@ -1,3 +1,4 @@
+// Seeds default rows that the database needs before the API runs.
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db.js";
@@ -5,6 +6,7 @@ import { characterAbilities, characterInventory, characterLocations, characterRu
 
 const now = new Date();
 
+// Seed the minimum demo data needed to run the API immediately.
 async function seedData() {
   const demoUser = await findOrCreateDemoUser();
   const demoCharacter = await findOrCreateDemoCharacter(demoUser.id);
@@ -15,6 +17,7 @@ async function seedData() {
   await seedStartingInventory(demoCharacter.id);
 }
 
+// Demo user is inserted only if it does not already exist.
 async function findOrCreateDemoUser() {
   const existingUsers = await db
     .select({ id: users.id })
@@ -40,6 +43,7 @@ async function findOrCreateDemoUser() {
   return demoUser;
 }
 
+// Demo character is tied to the demo user and only inserted once.
 async function findOrCreateDemoCharacter(userId) {
   const existingCharacters = await db
     .select({ id: characters.id })
@@ -75,6 +79,7 @@ async function findOrCreateDemoCharacter(userId) {
   return demoCharacter;
 }
 
+// Starting saves give the demo character enough state for frontend testing.
 async function seedStartingAbility(characterId) {
   const existingAbilities = await db
     .select({ id: characterAbilities.id })
@@ -96,6 +101,7 @@ async function seedStartingAbility(characterId) {
   }
 }
 
+// Seed starting run state.
 async function seedStartingRunState(characterId) {
   const existingRunStates = await db
     .select({ id: characterRunStates.id })
@@ -115,6 +121,7 @@ async function seedStartingRunState(characterId) {
   }
 }
 
+// Seed starting location.
 async function seedStartingLocation(characterId) {
   const existingLocations = await db
     .select({ id: characterLocations.id })
@@ -133,11 +140,13 @@ async function seedStartingLocation(characterId) {
   }
 }
 
+// Seed starting inventory.
 async function seedStartingInventory(characterId) {
   await seedInventoryItem(characterId, "item_iron_scrap", 2);
   await seedInventoryItem(characterId, "item_healing_herb", 3);
 }
 
+// Shared inventory insert helper keeps seedData idempotent.
 async function seedInventoryItem(characterId, itemId, quantity) {
   const existingItems = await db
     .select({ id: characterInventory.id })
@@ -161,6 +170,7 @@ async function seedInventoryItem(characterId, itemId, quantity) {
   }
 }
 
+// Execute the seed script from npm scripts.
 try {
   await seedData();
 

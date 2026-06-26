@@ -1,3 +1,4 @@
+// Pure equipment helper functions used to apply item stat bonuses.
 import { findItemDefinitionById } from "../constants/items.js";
 
 const characterStatFields = [
@@ -10,6 +11,7 @@ const characterStatFields = [
   "charisma"
 ];
 
+// Apply equipment bonuses.
 export function applyEquipmentBonuses(character, equipment = []) {
   const combatCharacter = {
     ...character,
@@ -63,6 +65,7 @@ export function applyEquipmentBonuses(character, equipment = []) {
   return combatCharacter;
 }
 
+// Combine base and equipment damage ranges.
 function combineDamageRanges(currentRange, addedRange) {
   if (!currentRange) {
     return {
@@ -77,6 +80,7 @@ function combineDamageRanges(currentRange, addedRange) {
   };
 }
 
+// Calculate army equipment bonus.
 export function calculateArmyEquipmentBonus(equipment = []) {
   let commandPower = 0;
   let morale = 0;

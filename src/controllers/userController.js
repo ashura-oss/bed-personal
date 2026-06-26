@@ -1,6 +1,8 @@
+// User controller functions handle user validation, loading, and CRUD.
 import * as userModel from "../models/userModel.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Shared controller steps used before routes that need an existing user.
 export async function loadUserFromUserIdParam(req, res, next) {
   try {
     const userId = Number(req.params.userId);
@@ -22,6 +24,7 @@ export async function loadUserFromUserIdParam(req, res, next) {
   }
 }
 
+// Load user from body for the next controller.
 export async function loadUserFromBody(req, res, next) {
   try {
     const value = req.body?.userId;
@@ -44,6 +47,7 @@ export async function loadUserFromBody(req, res, next) {
   }
 }
 
+// User CRUD controllers.
 export async function getUsers(req, res, next) {
   try {
     let level;
@@ -69,6 +73,7 @@ export async function getUsers(req, res, next) {
   }
 }
 
+// Read one user by id.
 export async function getUserById(req, res, next) {
   try {
     const userId = Number(req.params.id);
@@ -90,6 +95,7 @@ export async function getUserById(req, res, next) {
   }
 }
 
+// Create a user after validating the username.
 export async function postUser(req, res, next) {
   try {
     if (typeof req.body.username !== "string" || req.body.username.trim().length === 0) {
@@ -112,6 +118,7 @@ export async function postUser(req, res, next) {
   }
 }
 
+// Update user by id.
 export async function putUserById(req, res, next) {
   try {
     const userId = Number(req.params.id);
@@ -143,6 +150,7 @@ export async function putUserById(req, res, next) {
   }
 }
 
+// Delete user.
 export async function deleteUser(req, res, next) {
   try {
     const userId = Number(req.params.id);
@@ -163,6 +171,7 @@ export async function deleteUser(req, res, next) {
   }
 }
 
+// Build only the user fields that the request is allowed to update.
 function buildUserUpdates(body) {
   const updates = {};
 

@@ -1,7 +1,9 @@
+// Ability model functions read and save unlocked character abilities.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterAbilities, characterInventory, characters } from "../db/schema.js";
 
+// Find character ability.
 export async function findCharacterAbility(characterId, abilityId) {
   const result = await db
     .select({
@@ -22,6 +24,7 @@ export async function findCharacterAbility(characterId, abilityId) {
   return result[0] || null;
 }
 
+// Find character ability rows by character id.
 export async function findCharacterAbilityRowsByCharacterId(characterId) {
   return db
     .select({
@@ -34,6 +37,7 @@ export async function findCharacterAbilityRowsByCharacterId(characterId) {
     .where(eq(characterAbilities.characterId, characterId));
 }
 
+// Create character ability.
 export async function createCharacterAbility({ character, ability }) {
   return db.transaction(async (tx) => {
     const now = new Date();

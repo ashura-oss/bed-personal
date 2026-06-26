@@ -1,7 +1,9 @@
+// Progression model functions read and save character progression rows.
 import { eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterRunStates, characters } from "../db/schema.js";
 
+// Find character progression by id.
 export async function findCharacterProgressionById(characterId) {
   const characterResult = await db
     .select({
@@ -39,6 +41,7 @@ export async function findCharacterProgressionById(characterId) {
   };
 }
 
+// Save character progression.
 export async function saveCharacterProgression({
   characterId,
   characterUpdates,

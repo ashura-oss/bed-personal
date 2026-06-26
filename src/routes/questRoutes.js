@@ -1,3 +1,4 @@
+// Quest route definitions.
 import { Router } from "express";
 import { getQuestById, getQuests } from "../controllers/questController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

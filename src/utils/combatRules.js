@@ -1,8 +1,10 @@
+// Pure combat helper functions used by combat controllers.
 import { findClassDamageRange } from "../constants/combatBalance.js";
 import { createError } from "./errorCode.js";
 
 const validPlayerActions = ["attack", "ability", "defend"];
 
+// Resolve one complete round: player action first, then enemy counter if still alive.
 export function resolveCombatTurn({
   session,
   character,
@@ -80,6 +82,7 @@ export function resolveCombatTurn({
   };
 }
 
+// Validate turn input before calculating damage.
 function validateCombatTurn({ session, actionType, ability }) {
   if (!session) {
     throw createError(404, "Not Found", "Combat session was not found.");
@@ -102,6 +105,7 @@ function validateCombatTurn({ session, actionType, ability }) {
   }
 }
 
+// Build damage ranges from class, stats, equipment, level, and ability power.
 export function buildPlayerDamageRange({ character, ability = null }) {
   const classDamage = findClassDamageRange(character.className);
   const classRange = classDamage?.damageRange || { min: 2, max: 5 };
@@ -128,6 +132,7 @@ export function buildPlayerDamageRange({ character, ability = null }) {
   return normalizeRange(range);
 }
 
+// Build enemy damage range.
 export function buildEnemyDamageRange(enemy) {
   return normalizeRange(
     enemy.damageRange || {
@@ -137,6 +142,7 @@ export function buildEnemyDamageRange(enemy) {
   );
 }
 
+// Convert each possible player action into damage, healing, or defence.
 function resolvePlayerAction({ session, character, enemy, actionType, ability, rng }) {
   if (actionType === "defend") {
     return {
@@ -168,6 +174,7 @@ function resolvePlayerAction({ session, character, enemy, actionType, ability, r
   };
 }
 
+// Resolve ability action.
 function resolveAbilityAction({ session, character, enemy, ability, rng }) {
   if (ability.abilityType === "heal") {
     const healingRange = normalizeRange(
@@ -234,6 +241,7 @@ function resolveAbilityAction({ session, character, enemy, ability, rng }) {
   };
 }
 
+// Resolve the enemy counterattack after the player acts.
 function resolveEnemyAction({ character, enemy, enemyHpAfterPlayer, damageReduction, rng }) {
   const enemyDamageRange = buildEnemyDamageRange(enemy);
   const rawDamage = roll(enemyDamageRange.min, enemyDamageRange.max, rng);
@@ -250,6 +258,7 @@ function resolveEnemyAction({ character, enemy, enemyHpAfterPlayer, damageReduct
   };
 }
 
+// Build a damage range from an ability power value.
 function buildPowerDamageRange(ability) {
   if (!ability) {
     return { min: 0, max: 0 };
@@ -263,6 +272,7 @@ function buildPowerDamageRange(ability) {
   };
 }
 
+// Normalize a damage range so min and max are safe numbers.
 function normalizeRange(range) {
   const min = Math.max(0, Number(range?.min || 0));
   const max = Math.max(min, Number(range?.max || min));
@@ -270,6 +280,7 @@ function normalizeRange(range) {
   return { min, max };
 }
 
+// Random rolls are isolated so tests can pass a predictable rng function.
 function roll(min, max, rng) {
   const rollValue = Math.min(Math.max(rng(), 0), 0.999999);
 

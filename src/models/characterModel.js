@@ -1,7 +1,9 @@
+// Character model functions run Drizzle queries for character rows.
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characters } from "../db/schema.js";
 
+// Find characters.
 export async function findCharacters(filters = {}) {
   const query = db.select({
     characterId: characters.id,
@@ -29,6 +31,7 @@ export async function findCharacters(filters = {}) {
   return query;
 }
 
+// Find character by id.
 export async function findCharacterById(characterId) {
   const character = await db.query.characters.findFirst({
     columns: {
@@ -55,6 +58,7 @@ export async function findCharacterById(characterId) {
   return formatCharacter(character);
 }
 
+// Find characters by user id.
 export async function findCharactersByUserId(userId) {
   return db
     .select({
@@ -80,6 +84,7 @@ export async function findCharactersByUserId(userId) {
     .orderBy(asc(characters.createdAt));
 }
 
+// Create character.
 export async function createCharacter({
   userId,
   characterName,
@@ -112,6 +117,7 @@ export async function createCharacter({
   return formatCharacter(result[0]);
 }
 
+// Update character by id.
 export async function updateCharacterById(characterId, updates) {
   const result = await db
     .update(characters)
@@ -122,6 +128,7 @@ export async function updateCharacterById(characterId, updates) {
   return formatCharacter(result[0]);
 }
 
+// Delete character by id.
 export async function deleteCharacterById(characterId) {
   const result = await db
     .delete(characters)
@@ -131,6 +138,7 @@ export async function deleteCharacterById(characterId) {
   return result[0] || null;
 }
 
+// Format character for API responses.
 function formatCharacter(character) {
   if (!character) {
     return null;

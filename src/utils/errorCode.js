@@ -1,3 +1,4 @@
+// Shared error response helpers used by controllers.
 export function createError(statusCode, error, message, details) {
   const errorObject = new Error(message);
   errorObject.statusCode = statusCode;
@@ -10,6 +11,7 @@ export function createError(statusCode, error, message, details) {
   return errorObject;
 }
 
+// Send a consistent JSON error response.
 export function sendError(res, error) {
   const statusCode = getStatusCode(error);
 
@@ -29,6 +31,7 @@ export function sendError(res, error) {
   res.status(statusCode).json(payload);
 }
 
+// Get status code.
 function getStatusCode(error) {
   if (Number.isInteger(error.statusCode)) {
     return error.statusCode;
@@ -45,6 +48,7 @@ function getStatusCode(error) {
   return 500;
 }
 
+// Get default error title.
 function getDefaultErrorTitle(statusCode) {
   if (statusCode === 400) {
     return "Bad Request";

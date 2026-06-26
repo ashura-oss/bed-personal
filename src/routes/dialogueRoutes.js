@@ -1,3 +1,4 @@
+// Dialogue route definitions.
 import { Router } from "express";
 import { getDialogueById, getDialogues, postDialogueCompletion } from "../controllers/dialogueController.js";
 import { loadCharacterFromBody } from "../controllers/characterController.js";

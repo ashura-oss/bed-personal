@@ -1,6 +1,8 @@
+// Dialogue flag controller functions save dialogue flags for a character.
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update dialogue flag.
 export async function putDialogueFlag(req, res, next) {
   try {
     const character = res.locals.character;

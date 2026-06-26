@@ -1,3 +1,4 @@
+// Full state model functions combine saved game rows into one response.
 import { findBossStatesByCharacterId } from "./bossStateModel.js";
 import { findCampaignMarkersByCharacterId } from "./campaignMarkerModel.js";
 import { findDialogueFlagsByCharacterId } from "./dialogueFlagModel.js";
@@ -6,6 +7,7 @@ import { findFactionReputationByCharacterId } from "./factionReputationModel.js"
 import { findInventoryByCharacterId } from "./characterInventoryModel.js";
 import { findRegionStatesByCharacterId } from "./regionStateModel.js";
 
+// Combine separate state tables into one frontend-friendly payload.
 export async function findFullCharacterState(characterId) {
   const inventory = await findInventoryByCharacterId(characterId);
   const equipment = await findEquipmentByCharacterId(characterId);

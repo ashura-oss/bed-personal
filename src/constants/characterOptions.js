@@ -1,3 +1,4 @@
+// Fixed character creation options and starting stat bonuses.
 export const allowedOrigins = [
   "Taxed Village Guard",
   "Milltown Survivor",

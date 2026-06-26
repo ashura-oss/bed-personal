@@ -1,3 +1,4 @@
+// Drizzle Kit configuration used by npm run db.
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
 

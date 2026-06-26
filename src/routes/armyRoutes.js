@@ -1,3 +1,4 @@
+// Army route definitions.
 import { Router } from "express";
 import { getCharacterArmyState, postCharacterArmyBattle, putCharacterArmyState } from "../controllers/armyController.js";
 import { loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";

@@ -1,6 +1,8 @@
+// Region controller functions return fixed region data.
 import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get regions.
 export async function getRegions(req, res, next) {
   try {
     let dangerLevel;
@@ -32,6 +34,7 @@ export async function getRegions(req, res, next) {
   }
 }
 
+// Read one region definition by id.
 export async function getRegionById(req, res, next) {
   try {
     const region = findRegionDefinitionById(req.params.id);

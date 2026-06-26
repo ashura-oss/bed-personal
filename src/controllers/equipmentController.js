@@ -1,8 +1,10 @@
+// Equipment controller functions equip and unequip character items.
 import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById } from "../constants/items.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update equipment.
 export async function putEquipment(req, res, next) {
   try {
     const character = res.locals.character;
@@ -49,6 +51,7 @@ export async function putEquipment(req, res, next) {
   }
 }
 
+// Delete equipment.
 export async function deleteEquipment(req, res, next) {
   try {
     const character = res.locals.character;

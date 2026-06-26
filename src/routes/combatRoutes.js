@@ -1,3 +1,4 @@
+// Combat route definitions.
 import { Router } from "express";
 import { getCombatSession, postCombatSession, postCombatTurn } from "../controllers/combatController.js";
 import { loadCharacterFromBody } from "../controllers/characterController.js";

@@ -1,6 +1,8 @@
+// Item controller functions return fixed item definitions.
 import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get items.
 export async function getItems(req, res, next) {
   try {
     let itemType = req.query.itemType;
@@ -41,6 +43,7 @@ export async function getItems(req, res, next) {
   }
 }
 
+// Read one item definition by id.
 export async function getItemById(req, res, next) {
   try {
     const item = findItemDefinitionById(req.params.itemId);

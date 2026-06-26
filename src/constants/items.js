@@ -1,3 +1,4 @@
+// Item definitions used by inventory, equipment, and rewards.
 export const ITEM_DEFINITIONS = [
   {
     itemId: "item_oak_timber",
@@ -150,10 +151,12 @@ export const ITEM_DEFINITIONS = [
   }
 ];
 
+// Find item definition by id.
 export function findItemDefinitionById(itemId) {
   return ITEM_DEFINITIONS.find((item) => item.itemId === itemId) || null;
 }
 
+// Check whether item definition exists.
 export function hasItemDefinition(itemId) {
   return findItemDefinitionById(itemId) !== null;
 }

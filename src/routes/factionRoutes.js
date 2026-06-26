@@ -1,3 +1,4 @@
+// Faction route definitions.
 import { Router } from "express";
 import { getFactionById, getFactions } from "../controllers/factionController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

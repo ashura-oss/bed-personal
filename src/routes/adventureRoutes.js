@@ -1,3 +1,4 @@
+// Adventure route definitions.
 import { Router } from "express";
 import { postAdventureAttempt } from "../controllers/adventureController.js";
 import { loadCharacterFromBody } from "../controllers/characterController.js";

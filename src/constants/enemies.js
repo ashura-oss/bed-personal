@@ -1,3 +1,4 @@
+// Enemy and boss definitions used by combat and story progression.
 export const ENEMY_DEFINITIONS = [
   {
     enemyId: "enemy_tax_knight",
@@ -141,10 +142,12 @@ export const ENEMY_DEFINITIONS = [
   }
 ];
 
+// Find enemy definition by id.
 export function findEnemyDefinitionById(enemyId) {
   return ENEMY_DEFINITIONS.find((enemy) => enemy.enemyId === enemyId) || null;
 }
 
+// Check whether enemy definition exists.
 export function hasEnemyDefinition(enemyId) {
   return findEnemyDefinitionById(enemyId) !== null;
 }

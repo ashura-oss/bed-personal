@@ -1,3 +1,4 @@
+// Global response/status middleware shared by all route files.
 export function notFound(req, res) {
   res.status(404).json({
     error: "Not Found",
@@ -5,6 +6,7 @@ export function notFound(req, res) {
   });
 }
 
+// Store the route success message before the final response.
 export function withMessage(message, status) {
   return (_req, res, next) => {
     res.locals.message = message;
@@ -17,6 +19,7 @@ export function withMessage(message, status) {
   };
 }
 
+// Send the final JSON success response.
 export function sendResponse(_req, res) {
   const status = res.locals.status || 200;
   const message = res.locals.message || "Success";

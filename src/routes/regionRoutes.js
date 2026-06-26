@@ -1,3 +1,4 @@
+// Region route definitions.
 import { Router } from "express";
 import { getRegionById, getRegions } from "../controllers/regionController.js";
 import { getQuestsByRegionId } from "../controllers/questController.js";

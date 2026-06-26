@@ -1,7 +1,9 @@
+// Faction reputation controller functions save character reputation records.
 import * as factionReputationModel from "../models/factionReputationModel.js";
 import { hasFactionDefinition } from "../constants/factions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update faction reputation.
 export async function putFactionReputation(req, res, next) {
   try {
     const character = res.locals.character;

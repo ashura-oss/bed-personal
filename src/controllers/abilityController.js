@@ -1,9 +1,11 @@
+// Ability controller functions validate requests and prepare ability responses.
 import * as abilityModel from "../models/abilityModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { ABILITY_DEFINITIONS, findAbilityDefinitionById } from "../constants/abilities.js";
 import { createError, sendError } from "../utils/errorCode.js";
 import { validateAffinity, validateClassName } from "../utils/gameRules.js";
 
+// Return fixed ability definitions, optionally filtered by class or affinity.
 export async function getAbilities(req, res, next) {
   try {
     let className = req.query.className;
@@ -52,6 +54,7 @@ export async function getAbilities(req, res, next) {
   }
 }
 
+// Unlock an ability after checking character level, class, affinity, and cost.
 export async function unlockCharacterAbility(req, res, next) {
   try {
     const characterId = Number(req.params.characterId);
@@ -97,6 +100,7 @@ export async function unlockCharacterAbility(req, res, next) {
   }
 }
 
+// Return abilities already unlocked by one character.
 export async function getCharacterAbilities(req, res, next) {
   try {
     const unlockedAbilityRows = await abilityModel.findCharacterAbilityRowsByCharacterId(
@@ -126,6 +130,7 @@ export async function getCharacterAbilities(req, res, next) {
   }
 }
 
+// Requirement helpers keep unlockCharacterAbility readable.
 async function validateAbilityCost(character, ability) {
   const xpCost = Number(ability.xpCost || 0);
 
@@ -153,6 +158,7 @@ async function validateAbilityCost(character, ability) {
   }
 }
 
+// Validate ability unlock.
 function validateAbilityUnlock(character, ability) {
   if (character.level < ability.requiredLevel) {
     throw createError(

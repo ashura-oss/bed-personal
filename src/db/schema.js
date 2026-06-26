@@ -1,5 +1,7 @@
+// Drizzle table definitions for user-created and saved game data.
 import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
 
+// Core player account table.
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
@@ -9,6 +11,7 @@ export const users = sqliteTable("users", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
+// Playable character table linked to users.
 export const characters = sqliteTable("characters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id")
@@ -30,6 +33,7 @@ export const characters = sqliteTable("characters", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
+// History of completed or attempted adventures.
 export const adventureLogs = sqliteTable("adventure_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
@@ -43,6 +47,7 @@ export const adventureLogs = sqliteTable("adventure_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
+// Unlocked ability rows for each character.
 export const characterAbilities = sqliteTable(
   "character_abilities",
   {
@@ -61,6 +66,7 @@ export const characterAbilities = sqliteTable(
   })
 );
 
+// Persistent story and run state for each character.
 export const characterRunStates = sqliteTable(
   "character_run_states",
   {
@@ -81,6 +87,7 @@ export const characterRunStates = sqliteTable(
   })
 );
 
+// Current map location for each character.
 export const characterLocations = sqliteTable(
   "character_locations",
   {
@@ -100,6 +107,7 @@ export const characterLocations = sqliteTable(
   })
 );
 
+// Turn-based combat session state.
 export const combatSessions = sqliteTable("combat_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
@@ -120,6 +128,7 @@ export const combatSessions = sqliteTable("combat_sessions", {
   updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
 });
 
+// Combat turn history for each session.
 export const combatTurnLogs = sqliteTable("combat_turn_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   combatSessionId: integer("combat_session_id")
@@ -135,6 +144,7 @@ export const combatTurnLogs = sqliteTable("combat_turn_logs", {
   createdAt: integer("created_at", { mode: "timestamp" }).notNull()
 });
 
+// Army command state unlocked later in the story.
 export const characterArmyStates = sqliteTable(
   "character_army_states",
   {
@@ -158,6 +168,7 @@ export const characterArmyStates = sqliteTable(
   })
 );
 
+// Completed quest records for each character.
 export const characterQuestCompletions = sqliteTable(
   "character_quest_completions",
   {
@@ -176,6 +187,7 @@ export const characterQuestCompletions = sqliteTable(
   })
 );
 
+// User save slots for frontend save and load screens.
 export const saveSlots = sqliteTable(
   "save_slots",
   {
@@ -200,6 +212,7 @@ export const saveSlots = sqliteTable(
   })
 );
 
+// Character inventory rows for owned items.
 export const characterInventory = sqliteTable(
   "character_inventory",
   {
@@ -220,6 +233,7 @@ export const characterInventory = sqliteTable(
   })
 );
 
+// Equipped items by character and equipment slot.
 export const characterEquipment = sqliteTable(
   "character_equipment",
   {
@@ -239,6 +253,7 @@ export const characterEquipment = sqliteTable(
   })
 );
 
+// Dialogue flags used to remember completed conversations.
 export const characterDialogueFlags = sqliteTable(
   "character_dialogue_flags",
   {
@@ -258,6 +273,7 @@ export const characterDialogueFlags = sqliteTable(
   })
 );
 
+// Boss progress, attempts, and outcomes.
 export const characterBossStates = sqliteTable(
   "character_boss_states",
   {
@@ -281,6 +297,7 @@ export const characterBossStates = sqliteTable(
   })
 );
 
+// Map markers shown or completed in the frontend.
 export const characterCampaignMarkers = sqliteTable(
   "character_campaign_markers",
   {
@@ -304,6 +321,7 @@ export const characterCampaignMarkers = sqliteTable(
   })
 );
 
+// Reputation state with each faction.
 export const characterFactionReputation = sqliteTable(
   "character_faction_reputation",
   {
@@ -323,6 +341,7 @@ export const characterFactionReputation = sqliteTable(
   })
 );
 
+// Per-region unlock, discovery, and world state.
 export const characterRegionStates = sqliteTable(
   "character_region_states",
   {

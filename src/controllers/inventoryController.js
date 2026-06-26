@@ -1,7 +1,9 @@
+// Inventory controller functions save, consume, and remove inventory items.
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById, hasItemDefinition } from "../constants/items.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update inventory item.
 export async function putInventoryItem(req, res, next) {
   try {
     const character = res.locals.character;
@@ -39,6 +41,7 @@ export async function putInventoryItem(req, res, next) {
   }
 }
 
+// Delete inventory item.
 export async function deleteInventoryItem(req, res, next) {
   try {
     const character = res.locals.character;
@@ -59,6 +62,7 @@ export async function deleteInventoryItem(req, res, next) {
   }
 }
 
+// Consume one inventory item and apply its effects.
 export async function postConsumeInventoryItem(req, res, next) {
   try {
     const character = res.locals.character;

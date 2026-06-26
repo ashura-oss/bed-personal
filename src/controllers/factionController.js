@@ -1,6 +1,8 @@
+// Faction controller functions return fixed faction data.
 import { FACTION_DEFINITIONS, findFactionDefinitionById } from "../constants/factions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get factions.
 export async function getFactions(req, res, next) {
   try {
     const factions = [...FACTION_DEFINITIONS].sort((left, right) =>
@@ -14,6 +16,7 @@ export async function getFactions(req, res, next) {
   }
 }
 
+// Read one faction definition by id.
 export async function getFactionById(req, res, next) {
   try {
     const faction = findFactionDefinitionById(req.params.factionId);

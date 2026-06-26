@@ -1,3 +1,4 @@
+// Dialogue definitions used by dialogue routes and completion flags.
 export const DIALOGUE_DEFINITIONS = [
   {
     dialogueId: "dialogue_family_oath",
@@ -109,6 +110,7 @@ export const DIALOGUE_DEFINITIONS = [
   }
 ];
 
+// Find dialogue definition by id.
 export function findDialogueDefinitionById(dialogueId) {
   return DIALOGUE_DEFINITIONS.find((dialogue) => dialogue.dialogueId === dialogueId) || null;
 }

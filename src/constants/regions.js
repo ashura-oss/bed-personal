@@ -1,3 +1,4 @@
+// Region definitions used by map, quest, and region endpoints.
 export const REGION_DEFINITIONS = [
   {
     regionId: "region_middle_earth",
@@ -78,10 +79,12 @@ export const REGION_DEFINITIONS = [
   }
 ];
 
+// Find region definition by id.
 export function findRegionDefinitionById(regionId) {
   return REGION_DEFINITIONS.find((region) => region.regionId === regionId) || null;
 }
 
+// Check whether region definition exists.
 export function hasRegionDefinition(regionId) {
   return findRegionDefinitionById(regionId) !== null;
 }

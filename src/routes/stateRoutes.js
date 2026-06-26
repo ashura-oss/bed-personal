@@ -1,3 +1,4 @@
+// Saved state route definitions.
 import { Router } from "express";
 import { putBossState } from "../controllers/bossStateController.js";
 import { putCampaignMarker } from "../controllers/campaignMarkerController.js";

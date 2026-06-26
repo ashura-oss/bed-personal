@@ -1,7 +1,9 @@
+// Map model functions read and save character location rows.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterInventory, characterLocations, characterRegionStates } from "../db/schema.js";
 
+// Find character location.
 export async function findCharacterLocation(characterId) {
   const result = await db
     .select({
@@ -19,6 +21,7 @@ export async function findCharacterLocation(characterId) {
   return result[0] || null;
 }
 
+// Find node travel access.
 export async function findNodeTravelAccess({ characterId, targetNode }) {
   if (targetNode.isUnlocked === 1) {
     return {
@@ -54,6 +57,7 @@ export async function findNodeTravelAccess({ characterId, targetNode }) {
   };
 }
 
+// Move a character to a new map node.
 export async function moveCharacterToNode({ characterId, currentNode, targetNode }) {
   const now = new Date();
   const existingLocation = await findCharacterLocation(characterId);
@@ -87,6 +91,7 @@ export async function moveCharacterToNode({ characterId, currentNode, targetNode
   return locationResult[0];
 }
 
+// Add an inventory reward found during travel.
 export async function addTravelInventoryReward({ characterId, itemId, quantity }) {
   const now = new Date();
   const existing = await findInventoryItem(characterId, itemId);
@@ -119,6 +124,7 @@ export async function addTravelInventoryReward({ characterId, itemId, quantity }
   return result[0];
 }
 
+// Find inventory item.
 async function findInventoryItem(characterId, itemId) {
   const result = await db
     .select({

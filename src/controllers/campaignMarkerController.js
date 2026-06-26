@@ -1,7 +1,9 @@
+// Campaign marker controller functions save frontend map marker state.
 import * as campaignMarkerModel from "../models/campaignMarkerModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update campaign marker.
 export async function putCampaignMarker(req, res, next) {
   try {
     const character = res.locals.character;

@@ -1,7 +1,9 @@
+// User model functions run Drizzle queries for user rows.
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { users } from "../db/schema.js";
 
+// Find users.
 export async function findUsers(filters = {}) {
   const query = db.select({
     userId: users.id,
@@ -19,6 +21,7 @@ export async function findUsers(filters = {}) {
   return query;
 }
 
+// Find user by id.
 export async function findUserById(userId) {
   const user = await db.query.users.findFirst({
     columns: {
@@ -35,6 +38,7 @@ export async function findUserById(userId) {
   return formatUser(user);
 }
 
+// Find user by username.
 export async function findUserByUsername(username) {
   const user = await db.query.users.findFirst({
     columns: {
@@ -51,6 +55,7 @@ export async function findUserByUsername(username) {
   return formatUser(user);
 }
 
+// Create user.
 export async function createUser({ username }) {
   const result = await db
     .insert(users)
@@ -66,6 +71,7 @@ export async function createUser({ username }) {
   return formatUser(result[0]);
 }
 
+// Update user by id.
 export async function updateUserById(userId, updates) {
   const result = await db
     .update(users)
@@ -76,6 +82,7 @@ export async function updateUserById(userId, updates) {
   return formatUser(result[0]);
 }
 
+// Delete user by id.
 export async function deleteUserById(userId) {
   const result = await db
     .delete(users)
@@ -85,6 +92,7 @@ export async function deleteUserById(userId) {
   return result[0] || null;
 }
 
+// Format user for API responses.
 function formatUser(user) {
   if (!user) {
     return null;

@@ -1,3 +1,4 @@
+// Ability route definitions.
 import { Router } from "express";
 import { getAbilities } from "../controllers/abilityController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

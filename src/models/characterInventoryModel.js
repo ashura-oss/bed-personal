@@ -1,7 +1,9 @@
+// Character inventory model functions read and save inventory rows.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterInventory, characterRunStates, characters } from "../db/schema.js";
 
+// Basic inventory reads and writes.
 export function findInventoryByCharacterId(characterId) {
   return db
     .select({
@@ -17,6 +19,7 @@ export function findInventoryByCharacterId(characterId) {
     .orderBy(asc(characterInventory.itemKey));
 }
 
+// Insert or update inventory item.
 export async function upsertInventoryItem({ characterId, itemId, quantity }) {
   const now = new Date();
   const existing = await findInventoryItemByCharacterId(characterId, itemId);
@@ -48,6 +51,7 @@ export async function upsertInventoryItem({ characterId, itemId, quantity }) {
   return result[0];
 }
 
+// Remove inventory item.
 export async function removeInventoryItem({ characterId, itemId }) {
   const result = await db
     .delete(characterInventory)
@@ -66,6 +70,7 @@ export async function removeInventoryItem({ characterId, itemId }) {
   return result[0] || null;
 }
 
+// Find inventory item by character id.
 export async function findInventoryItemByCharacterId(characterId, itemId) {
   const result = await db
     .select({
@@ -85,6 +90,7 @@ export async function findInventoryItemByCharacterId(characterId, itemId) {
   return result[0] || null;
 }
 
+// Consume an item and apply its saved-game effect in one transaction.
 export async function consumeInventoryItem({ characterId, item }) {
   return db.transaction(async (tx) => {
     const inventoryResult = await tx

@@ -1,3 +1,4 @@
+// Ability definitions used for unlocks and combat choices.
 export const ABILITY_DEFINITIONS = [
   {
     abilityId: "ability_basic_slash",
@@ -251,6 +252,7 @@ export const ABILITY_DEFINITIONS = [
   }
 ];
 
+// Find ability definition by id.
 export function findAbilityDefinitionById(abilityId) {
   return ABILITY_DEFINITIONS.find((ability) => ability.abilityId === abilityId) || null;
 }

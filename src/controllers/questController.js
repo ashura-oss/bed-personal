@@ -1,7 +1,9 @@
+// Quest controller functions return quest definitions and validate quest references.
 import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Load quest from body for the next controller.
 export async function loadQuestFromBody(req, res, next) {
   try {
     const value = req.body?.questId;
@@ -23,6 +25,7 @@ export async function loadQuestFromBody(req, res, next) {
   }
 }
 
+// Get quests.
 export async function getQuests(req, res, next) {
   try {
     const questList = [...QUEST_DEFINITIONS].sort(
@@ -36,6 +39,7 @@ export async function getQuests(req, res, next) {
   }
 }
 
+// Read one quest definition by id.
 export async function getQuestById(req, res, next) {
   try {
     const quest = findQuestDefinitionById(req.params.id);
@@ -51,6 +55,7 @@ export async function getQuestById(req, res, next) {
   }
 }
 
+// Get quests by region id.
 export async function getQuestsByRegionId(req, res, next) {
   try {
     const region = findRegionDefinitionById(req.params.regionId);

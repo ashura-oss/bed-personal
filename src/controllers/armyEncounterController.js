@@ -1,6 +1,8 @@
+// Army encounter controller functions return fixed army encounter data.
 import { ARMY_ENCOUNTER_DEFINITIONS, findArmyEncounterById as findArmyEncounterDefinitionById } from "../constants/armyEncounters.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get army encounters.
 export async function getArmyEncounters(req, res, next) {
   try {
     let requiredStoryPhase = req.query.requiredStoryPhase;
@@ -31,6 +33,7 @@ export async function getArmyEncounters(req, res, next) {
   }
 }
 
+// Read one army encounter definition by id.
 export async function getArmyEncounterById(req, res, next) {
   try {
     const encounter = findArmyEncounterDefinitionById(req.params.armyEncounterId);

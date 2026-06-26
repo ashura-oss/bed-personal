@@ -1,3 +1,4 @@
+// Army encounter definitions used by army battle routes.
 export const ARMY_ENCOUNTER_DEFINITIONS = [
   {
     armyEncounterId: "army_lindon_road",
@@ -29,6 +30,7 @@ export const ARMY_ENCOUNTER_DEFINITIONS = [
   }
 ];
 
+// Find army encounter by id.
 export function findArmyEncounterById(armyEncounterId) {
   return (
     ARMY_ENCOUNTER_DEFINITIONS.find(

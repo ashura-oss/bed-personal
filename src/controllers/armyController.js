@@ -1,3 +1,4 @@
+// Army controller functions read, save, and resolve army state.
 import * as armyModel from "../models/armyModel.js";
 import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as progressionModel from "../models/progressionModel.js";
@@ -11,6 +12,7 @@ const allowedStrategies = ["hold", "attack", "defend", "flank", "retreat"];
 const allowedOrderUnitTypes = ["soldiers", "archers", "cavalry"];
 const allowedOrderCommands = ["attack", "defend", "support"];
 
+// Read the current army state for one character.
 export async function getCharacterArmyState(req, res, next) {
   try {
     const armyState = await armyModel.findArmyStateByCharacterId(res.locals.character.characterId);
@@ -31,6 +33,7 @@ export async function getCharacterArmyState(req, res, next) {
   }
 }
 
+// Save frontend-controlled army state fields.
 export async function putCharacterArmyState(req, res, next) {
   try {
     const strategy = req.body?.strategy;
@@ -90,6 +93,7 @@ export async function putCharacterArmyState(req, res, next) {
   }
 }
 
+// Resolve one army encounter and apply story changes on victory.
 export async function postCharacterArmyBattle(req, res, next) {
   try {
     const characterId = res.locals.character.characterId;
@@ -165,6 +169,7 @@ export async function postCharacterArmyBattle(req, res, next) {
   }
 }
 
+// Validate optional battle orders sent by the frontend.
 function readArmyOrders(body, encounter) {
   const orders = body?.orders;
 

@@ -1,7 +1,9 @@
+// Army model functions read and save army state and battle logs.
 import { eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterArmyStates, characterRunStates } from "../db/schema.js";
 
+// Find army state by character id.
 export async function findArmyStateByCharacterId(characterId) {
   const result = await db
     .select({
@@ -23,6 +25,7 @@ export async function findArmyStateByCharacterId(characterId) {
   return result[0] || null;
 }
 
+// Insert or update army state.
 export async function upsertArmyState({
   characterId,
   isUnlocked,
@@ -111,6 +114,7 @@ export async function upsertArmyState({
   return result[0];
 }
 
+// Save army battle result.
 export async function saveArmyBattleResult({ characterId, battleResult }) {
   const result = await db
     .update(characterArmyStates)

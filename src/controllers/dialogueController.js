@@ -1,7 +1,9 @@
+// Dialogue controller functions return dialogue data and mark dialogue completion.
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get dialogues.
 export async function getDialogues(req, res, next) {
   try {
     let regionId = req.query.regionId;
@@ -42,6 +44,7 @@ export async function getDialogues(req, res, next) {
   }
 }
 
+// Read one dialogue definition by id.
 export async function getDialogueById(req, res, next) {
   try {
     const dialogue = findDialogueDefinitionById(req.params.dialogueId);
@@ -57,6 +60,7 @@ export async function getDialogueById(req, res, next) {
   }
 }
 
+// Complete one dialogue and claim its quest reward.
 export async function postDialogueCompletion(req, res, next) {
   try {
     const character = res.locals.character;

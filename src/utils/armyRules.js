@@ -1,3 +1,4 @@
+// Pure army battle helper functions used by army controllers.
 import { ARMY_UNIT_DAMAGE_RANGES } from "../constants/combatBalance.js";
 
 const strategyModifiers = {
@@ -14,6 +15,7 @@ const orderPower = {
   support: 8
 };
 
+// Resolve one army battle using troops, strategy, equipment, and optional orders.
 export function resolveArmyBattle({
   armyState,
   encounter,
@@ -65,6 +67,7 @@ export function resolveArmyBattle({
   };
 }
 
+// Roll damage from each troop type before strategy and morale are applied.
 function calculateTroopDamage(armyState, rng) {
   let total = 0;
   const units = {};
@@ -88,6 +91,7 @@ function calculateTroopDamage(armyState, rng) {
   };
 }
 
+// Roll enemy power.
 function rollEnemyPower(encounter, rng) {
   const range = encounter.enemyPowerRange || {
     min: encounter.enemyPower,
@@ -97,6 +101,7 @@ function rollEnemyPower(encounter, rng) {
   return roll(range.min, range.max, rng);
 }
 
+// Calculate order result.
 function calculateOrderResult(orders) {
   let powerBonus = 0;
   let lossReduction = 0;
@@ -124,6 +129,7 @@ function calculateOrderResult(orders) {
   };
 }
 
+// Roll helper.
 function roll(min, max, rng) {
   const rollValue = Math.min(Math.max(rng(), 0), 0.999999);
 

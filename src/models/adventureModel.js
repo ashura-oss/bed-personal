@@ -1,8 +1,10 @@
+// Adventure model functions store adventure attempts and reward updates.
 import { desc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { adventureLogs, characters, users } from "../db/schema.js";
 
 
+// Record adventure attempt.
 export async function recordAdventureAttempt({
   userId,
   characterId,
@@ -84,6 +86,7 @@ export async function recordAdventureAttempt({
   });
 }
 
+// Find adventure logs by user id.
 export async function findAdventureLogsByUserId(userId) {
   const rows = await db
     .select({
@@ -108,6 +111,7 @@ export async function findAdventureLogsByUserId(userId) {
   return rows;
 }
 
+// Find adventure logs by character id.
 export async function findAdventureLogsByCharacterId(characterId) {
   const rows = await db
     .select({

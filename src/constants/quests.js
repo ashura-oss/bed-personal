@@ -1,3 +1,4 @@
+// Quest definitions used by adventures, rewards, and progression.
 export const QUEST_DEFINITIONS = [
   {
     questId: "quest_family_oath",
@@ -145,6 +146,7 @@ export const QUEST_DEFINITIONS = [
   }
 ];
 
+// Find quest definition by id.
 export function findQuestDefinitionById(questId) {
   return QUEST_DEFINITIONS.find((quest) => quest.questId === questId) || null;
 }

@@ -1,7 +1,9 @@
+// Character controller functions handle character validation, loading, and CRUD.
 import * as characterModel from "../models/characterModel.js";
 import { calculateCharacterStats, validateAffinity, validateCharacterName, validateClassName, validateOrigin } from "../utils/gameRules.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Shared controller steps used before routes that need an existing character.
 export async function loadCharacterFromCharacterIdParam(req, res, next) {
   try {
     const characterId = Number(req.params.characterId);
@@ -23,6 +25,7 @@ export async function loadCharacterFromCharacterIdParam(req, res, next) {
   }
 }
 
+// Load character from id param for the next controller.
 export async function loadCharacterFromIdParam(req, res, next) {
   try {
     const characterId = Number(req.params.id);
@@ -44,6 +47,7 @@ export async function loadCharacterFromIdParam(req, res, next) {
   }
 }
 
+// Load character from body for the next controller.
 export async function loadCharacterFromBody(req, res, next) {
   try {
     const value = req.body?.characterId;
@@ -66,6 +70,7 @@ export async function loadCharacterFromBody(req, res, next) {
   }
 }
 
+// Character CRUD and related read controllers.
 export async function getCharacters(req, res, next) {
   try {
     let className = req.query.className;
@@ -91,6 +96,7 @@ export async function getCharacters(req, res, next) {
   }
 }
 
+// Read one character by id.
 export async function getCharacterById(req, res, next) {
   try {
     const characterId = Number(req.params.id);
@@ -112,6 +118,7 @@ export async function getCharacterById(req, res, next) {
   }
 }
 
+// Get characters by user id.
 export async function getCharactersByUserId(req, res, next) {
   try {
     const characterList = await characterModel.findCharactersByUserId(res.locals.user.userId);
@@ -123,6 +130,7 @@ export async function getCharactersByUserId(req, res, next) {
   }
 }
 
+// Create a character after validating owner and character choices.
 export async function postCharacter(req, res, next) {
   try {
     const userId = typeof req.body?.userId === "string" ? Number(req.body.userId) : req.body?.userId;
@@ -171,6 +179,7 @@ export async function postCharacter(req, res, next) {
   }
 }
 
+// Update character by id.
 export async function putCharacterById(req, res, next) {
   try {
     const characterId = Number(req.params.id);
@@ -189,6 +198,7 @@ export async function putCharacterById(req, res, next) {
   }
 }
 
+// Delete character.
 export async function deleteCharacter(req, res, next) {
   try {
     const characterId = Number(req.params.id);
@@ -205,6 +215,7 @@ export async function deleteCharacter(req, res, next) {
   }
 }
 
+// Build allowed updates and recalculate stats if class data changes.
 function buildCharacterUpdates(body, existingCharacter) {
   const updates = {};
   let characterName = body?.characterName;

@@ -1,7 +1,9 @@
+// Boss state controller functions save boss progress for a character.
 import * as bossStateModel from "../models/bossStateModel.js";
 import { hasEnemyDefinition } from "../constants/enemies.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update boss state.
 export async function putBossState(req, res, next) {
   try {
     const character = res.locals.character;

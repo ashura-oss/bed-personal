@@ -1,3 +1,4 @@
+// Removes the local database file during development resets.
 import "dotenv/config";
 import { rm } from "node:fs/promises";
 import path from "node:path";

@@ -1,7 +1,9 @@
+// Region state controller functions save per-character region state.
 import * as regionStateModel from "../models/regionStateModel.js";
 import { hasRegionDefinition } from "../constants/regions.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Update region state.
 export async function putRegionState(req, res, next) {
   try {
     const character = res.locals.character;

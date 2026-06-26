@@ -1,3 +1,4 @@
+// Progression route definitions.
 import { Router } from "express";
 import { loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";
 import { getCharacterProgression, putCharacterProgression, putCharacterQuestCompletion } from "../controllers/progressionController.js";

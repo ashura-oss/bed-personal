@@ -1,3 +1,4 @@
+// Faction definitions used by reputation and world state routes.
 export const FACTION_DEFINITIONS = [
   {
     factionId: "faction_hearthvale_survivors",
@@ -36,10 +37,12 @@ export const FACTION_DEFINITIONS = [
   }
 ];
 
+// Find faction definition by id.
 export function findFactionDefinitionById(factionId) {
   return FACTION_DEFINITIONS.find((faction) => faction.factionId === factionId) || null;
 }
 
+// Check whether faction definition exists.
 export function hasFactionDefinition(factionId) {
   return findFactionDefinitionById(factionId) !== null;
 }

@@ -1,3 +1,4 @@
+// Enemy route definitions.
 import { Router } from "express";
 import { getEnemies, getEnemyById } from "../controllers/enemyController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

@@ -1,8 +1,10 @@
+// Quest completion model functions read and save completed quest rows.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterQuestCompletions, characters } from "../db/schema.js";
 import { buildCharacterProgression } from "../utils/leveling.js";
 
+// Claim a character quest completion inside one transaction.
 export async function claimCharacterQuestCompletion({ characterId, questReward }) {
   return db.transaction(async (tx) => {
     const now = new Date();
@@ -94,6 +96,7 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
   });
 }
 
+// Find character in transaction.
 async function findCharacterInTransaction(tx, characterId) {
   const result = await tx
     .select({
@@ -121,6 +124,7 @@ async function findCharacterInTransaction(tx, characterId) {
   return result[0] || null;
 }
 
+// Find quest completion in transaction.
 async function findQuestCompletionInTransaction(tx, characterId, questId) {
   const result = await tx
     .select({

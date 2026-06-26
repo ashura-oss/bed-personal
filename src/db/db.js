@@ -1,3 +1,4 @@
+// Creates the libSQL client and Drizzle database connection.
 import "dotenv/config";
 import { drizzle } from "drizzle-orm/libsql";
 import { createClient } from "@libsql/client";

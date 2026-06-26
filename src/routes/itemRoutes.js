@@ -1,3 +1,4 @@
+// Item route definitions.
 import { Router } from "express";
 import { getItemById, getItems } from "../controllers/itemController.js";
 import { sendResponse, withMessage } from "../middlewares/statusMessage.js";

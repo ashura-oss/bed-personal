@@ -1,3 +1,4 @@
+// Combat balance values used by turn resolution helpers.
 export const CLASS_DAMAGE_RANGES = [
   {
     className: "Medic",
@@ -46,6 +47,7 @@ export const ARMY_UNIT_DAMAGE_RANGES = {
   }
 };
 
+// Find class damage range.
 export function findClassDamageRange(className) {
   return CLASS_DAMAGE_RANGES.find((classDamage) => classDamage.className === className) || null;
 }

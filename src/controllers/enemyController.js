@@ -1,6 +1,8 @@
+// Enemy controller functions return fixed enemy and boss data.
 import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
 import { createError, sendError } from "../utils/errorCode.js";
 
+// Get enemies.
 export async function getEnemies(req, res, next) {
   try {
     let regionId = req.query.regionId;
@@ -33,6 +35,7 @@ export async function getEnemies(req, res, next) {
   }
 }
 
+// Read one enemy definition by id.
 export async function getEnemyById(req, res, next) {
   try {
     const enemy = findEnemyDefinitionById(req.params.enemyId);
@@ -48,6 +51,7 @@ export async function getEnemyById(req, res, next) {
   }
 }
 
+// Read optional binary query.
 function readOptionalBinaryQuery(query, fieldName) {
   const value = query?.[fieldName];
 
