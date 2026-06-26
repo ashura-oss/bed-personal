@@ -1,5 +1,5 @@
 import { findClassDamageRange } from "../constants/combatBalance.js";
-import { createHttpError } from "./httpError.js";
+import { createError } from "./errorCode.js";
 
 const validPlayerActions = ["attack", "ability", "defend"];
 
@@ -82,23 +82,23 @@ export function resolveCombatTurn({
 
 function validateCombatTurn({ session, actionType, ability }) {
   if (!session) {
-    throw createHttpError(404, "Not Found", "Combat session was not found.");
+    throw createError(404, "Not Found", "Combat session was not found.");
   }
 
   if (session.status !== "active") {
-    throw createHttpError(400, "Bad Request", "Combat session is already complete.");
+    throw createError(400, "Bad Request", "Combat session is already complete.");
   }
 
   if (!validPlayerActions.includes(actionType)) {
-    throw createHttpError(400, "Bad Request", "actionType must be attack, ability, or defend.");
+    throw createError(400, "Bad Request", "actionType must be attack, ability, or defend.");
   }
 
   if (actionType === "ability" && !ability) {
-    throw createHttpError(400, "Bad Request", "abilityId is required when actionType is ability.");
+    throw createError(400, "Bad Request", "abilityId is required when actionType is ability.");
   }
 
   if (actionType !== "ability" && ability) {
-    throw createHttpError(400, "Bad Request", "abilityId can only be used with actionType ability.");
+    throw createError(400, "Bad Request", "abilityId can only be used with actionType ability.");
   }
 }
 
@@ -217,7 +217,7 @@ function resolveAbilityAction({ session, character, enemy, ability, rng }) {
   }
 
   if (ability.abilityType !== "attack" && ability.abilityType !== "ultimate") {
-    throw createHttpError(400, "Bad Request", "Ability type cannot be used in combat.");
+    throw createError(400, "Bad Request", "Ability type cannot be used in combat.");
   }
 
   const damageRange = buildPlayerDamageRange({ character, ability });

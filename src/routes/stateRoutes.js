@@ -8,8 +8,8 @@ import { getCharacterFullState } from "../controllers/fullStateController.js";
 import { deleteInventoryItem, postConsumeInventoryItem, putInventoryItem } from "../controllers/inventoryController.js";
 import { putRegionState } from "../controllers/regionStateController.js";
 import { getSaveSlotsForUser, putSaveSlotForUser } from "../controllers/saveSlotController.js";
-import { loadCharacterFromCharacterIdParam, loadUserFromUserIdParam } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromCharacterIdParam, loadUserFromUserIdParam } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

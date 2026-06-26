@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getItemById, getItems } from "../controllers/itemController.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

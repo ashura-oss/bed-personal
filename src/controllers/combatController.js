@@ -13,7 +13,7 @@ import { findQuestDefinitionById } from "../constants/quests.js";
 import { findStoryMilestoneByEnemyId } from "../constants/storyMilestones.js";
 import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
 import { resolveCombatTurn } from "../utils/combatRules.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
 export async function postCombatSession(req, res, next) {
@@ -21,15 +21,15 @@ export async function postCombatSession(req, res, next) {
     const character = res.locals.character;
 
     if (typeof req.body.enemyId !== "string" || req.body.enemyId.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "enemyId is required and must be a non-empty string.");
+      throw createError(400, "Bad Request", "enemyId is required and must be a non-empty string.");
     }
 
     if (req.body.questId !== undefined && (typeof req.body.questId !== "string" || req.body.questId.trim().length === 0)) {
-      throw createHttpError(400, "Bad Request", "questId must be a non-empty string when provided.");
+      throw createError(400, "Bad Request", "questId must be a non-empty string when provided.");
     }
 
     if (req.body.nodeId !== undefined && (typeof req.body.nodeId !== "string" || req.body.nodeId.trim().length === 0)) {
-      throw createHttpError(400, "Bad Request", "nodeId must be a non-empty string when provided.");
+      throw createError(400, "Bad Request", "nodeId must be a non-empty string when provided.");
     }
 
     const enemyId = req.body.enemyId.trim();
@@ -41,7 +41,7 @@ export async function postCombatSession(req, res, next) {
     );
 
     if (activeCombatSession) {
-      throw createHttpError(
+      throw createError(
         409,
         "Conflict",
         "Character already has an active combat session.",
@@ -50,7 +50,7 @@ export async function postCombatSession(req, res, next) {
     }
 
     if (!enemy) {
-      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
+      throw createError(404, "Not Found", "Enemy definition was not found.");
     }
 
     const questId = requestedQuestId ?? enemy.questId ?? null;
@@ -59,7 +59,7 @@ export async function postCombatSession(req, res, next) {
       const quest = findQuestDefinitionById(questId);
 
       if (!quest) {
-        throw createHttpError(404, "Not Found", "Quest was not found.");
+        throw createError(404, "Not Found", "Quest was not found.");
       }
     }
 
@@ -68,7 +68,7 @@ export async function postCombatSession(req, res, next) {
       const location = await mapModel.findCharacterLocation(character.characterId);
 
       if (!location || location.nodeId !== bossNode.nodeId) {
-        throw createHttpError(
+        throw createError(
           400,
           "Bad Request",
           `Character must be at ${bossNode.nodeId} before starting this boss combat.`
@@ -76,7 +76,7 @@ export async function postCombatSession(req, res, next) {
       }
 
       if (nodeId !== null && nodeId !== bossNode.nodeId) {
-        throw createHttpError(400, "Bad Request", "nodeId does not match this boss encounter.");
+        throw createError(400, "Bad Request", "nodeId does not match this boss encounter.");
       }
 
       nodeId = bossNode.nodeId;
@@ -87,7 +87,7 @@ export async function postCombatSession(req, res, next) {
       );
 
       if (bossState?.status === "defeated") {
-        throw createHttpError(409, "Conflict", "Boss has already been defeated.");
+        throw createError(409, "Conflict", "Boss has already been defeated.");
       }
 
       await bossStateModel.upsertBossState({
@@ -119,7 +119,7 @@ export async function postCombatSession(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -128,13 +128,13 @@ export async function getCombatSession(req, res, next) {
     const combatSessionId = Number(req.params.combatSessionId);
 
     if (!Number.isInteger(combatSessionId) || combatSessionId < 1) {
-      throw createHttpError(400, "Bad Request", "combatSessionId must be a positive integer id.");
+      throw createError(400, "Bad Request", "combatSessionId must be a positive integer id.");
     }
 
     const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
     if (!combatSession) {
-      throw createHttpError(404, "Not Found", "Combat session was not found.");
+      throw createError(404, "Not Found", "Combat session was not found.");
     }
 
     const turnLogs = await combatModel.findCombatLogsBySessionId(combatSessionId);
@@ -145,7 +145,7 @@ export async function getCombatSession(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -154,15 +154,15 @@ export async function postCombatTurn(req, res, next) {
     const combatSessionId = Number(req.params.combatSessionId);
 
     if (!Number.isInteger(combatSessionId) || combatSessionId < 1) {
-      throw createHttpError(400, "Bad Request", "combatSessionId must be a positive integer id.");
+      throw createError(400, "Bad Request", "combatSessionId must be a positive integer id.");
     }
 
     if (typeof req.body.actionType !== "string" || req.body.actionType.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "actionType is required and must be a non-empty string.");
+      throw createError(400, "Bad Request", "actionType is required and must be a non-empty string.");
     }
 
     if (req.body.abilityId !== undefined && (typeof req.body.abilityId !== "string" || req.body.abilityId.trim().length === 0)) {
-      throw createHttpError(400, "Bad Request", "abilityId must be a non-empty string when provided.");
+      throw createError(400, "Bad Request", "abilityId must be a non-empty string when provided.");
     }
 
     const actionType = req.body.actionType.trim();
@@ -170,19 +170,19 @@ export async function postCombatTurn(req, res, next) {
     const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
     if (!combatSession) {
-      throw createHttpError(404, "Not Found", "Combat session was not found.");
+      throw createError(404, "Not Found", "Combat session was not found.");
     }
 
     const character = res.locals.character;
 
     if (combatSession.characterId !== character.characterId) {
-      throw createHttpError(400, "Bad Request", "Combat session does not belong to this character.");
+      throw createError(400, "Bad Request", "Combat session does not belong to this character.");
     }
 
     const enemy = findEnemyDefinitionById(combatSession.enemyId);
 
     if (!enemy) {
-      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
+      throw createError(404, "Not Found", "Enemy definition was not found.");
     }
 
     const combatCharacter = await buildCombatCharacter(character);
@@ -230,7 +230,7 @@ export async function postCombatTurn(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -238,7 +238,7 @@ async function findBossNodeForEnemy(enemyId) {
   const bossNode = findMapNodeDefinitionByEnemyId(enemyId);
 
   if (!bossNode) {
-    throw createHttpError(404, "Not Found", "Boss map node was not found.");
+    throw createError(404, "Not Found", "Boss map node was not found.");
   }
 
   return bossNode;
@@ -255,7 +255,7 @@ async function findUnlockedAbility(characterId, abilityId) {
   const ability = unlockedAbility ? findAbilityDefinitionById(abilityId) : null;
 
   if (!ability) {
-    throw createHttpError(400, "Bad Request", "Character has not unlocked this ability.");
+    throw createError(400, "Bad Request", "Character has not unlocked this ability.");
   }
 
   return ability;
@@ -265,7 +265,7 @@ async function awardCombatWin({ character, enemy, combatSession }) {
   const user = await userModel.findUserById(character.userId);
 
   if (!user) {
-    throw createHttpError(404, "Not Found", "User was not found.");
+    throw createError(404, "Not Found", "User was not found.");
   }
 
   const xpGained = Number(enemy.xpReward || 0);

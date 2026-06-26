@@ -17,7 +17,7 @@ import questRoutes from "./src/routes/questRoutes.js";
 import regionRoutes from "./src/routes/regionRoutes.js";
 import stateRoutes from "./src/routes/stateRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import { notFound } from "./src/middlewares/notFound.js";
+import { notFound } from "./src/middlewares/statusMessage.js";
 
 const app = express();
 

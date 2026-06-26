@@ -1,5 +1,5 @@
 import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getItems(req, res, next) {
   try {
@@ -8,7 +8,7 @@ export async function getItems(req, res, next) {
 
     if (itemType !== undefined) {
       if (typeof itemType !== "string" || itemType.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "itemType must be a non-empty string.");
+        throw createError(400, "Bad Request", "itemType must be a non-empty string.");
       }
 
       itemType = itemType.trim();
@@ -16,7 +16,7 @@ export async function getItems(req, res, next) {
 
     if (equipmentSlot !== undefined) {
       if (typeof equipmentSlot !== "string" || equipmentSlot.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "equipmentSlot must be a non-empty string.");
+        throw createError(400, "Bad Request", "equipmentSlot must be a non-empty string.");
       }
 
       equipmentSlot = equipmentSlot.trim();
@@ -37,7 +37,7 @@ export async function getItems(req, res, next) {
     res.locals.data = items;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -46,12 +46,12 @@ export async function getItemById(req, res, next) {
     const item = findItemDefinitionById(req.params.itemId);
 
     if (!item) {
-      throw createHttpError(404, "Not Found", "Item definition was not found.");
+      throw createError(404, "Not Found", "Item definition was not found.");
     }
 
     res.locals.data = item;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

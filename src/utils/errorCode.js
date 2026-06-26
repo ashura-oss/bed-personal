@@ -1,16 +1,16 @@
-export function createHttpError(statusCode, error, message, details) {
-  const httpError = new Error(message);
-  httpError.statusCode = statusCode;
-  httpError.error = error;
+export function createError(statusCode, error, message, details) {
+  const errorObject = new Error(message);
+  errorObject.statusCode = statusCode;
+  errorObject.error = error;
 
   if (details !== undefined) {
-    httpError.details = details;
+    errorObject.details = details;
   }
 
-  return httpError;
+  return errorObject;
 }
 
-export function sendHttpError(res, error) {
+export function sendError(res, error) {
   const statusCode = getStatusCode(error);
 
   if (statusCode >= 500) {

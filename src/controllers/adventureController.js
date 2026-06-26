@@ -2,7 +2,7 @@ import * as adventureModel from "../models/adventureModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
 
 export async function postAdventureAttempt(req, res, next) {
@@ -12,15 +12,15 @@ export async function postAdventureAttempt(req, res, next) {
       typeof req.body?.characterId === "string" ? Number(req.body.characterId) : req.body?.characterId;
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createHttpError(400, "Bad Request", "userId must be a positive integer id.");
+      throw createError(400, "Bad Request", "userId must be a positive integer id.");
     }
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createHttpError(400, "Bad Request", "characterId must be a positive integer id.");
+      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
     }
 
     if (typeof req.body?.questId !== "string" || req.body.questId.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "questId is required.");
+      throw createError(400, "Bad Request", "questId is required.");
     }
 
     const questId = req.body.questId.trim();
@@ -29,11 +29,11 @@ export async function postAdventureAttempt(req, res, next) {
     const quest = res.locals.quest;
 
     if (character.userId !== userId) {
-      throw createHttpError(400, "Bad Request", "Character does not belong to the provided user.");
+      throw createError(400, "Bad Request", "Character does not belong to the provided user.");
     }
 
     if (character.level < quest.requiredLevel) {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         `Character level ${character.level} is too low for this quest. Required level is ${quest.requiredLevel}.`
@@ -41,7 +41,7 @@ export async function postAdventureAttempt(req, res, next) {
     }
 
     if (["combat", "boss", "strategy"].includes(quest.questType)) {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         "This quest type must be resolved through its gameplay route."
@@ -90,7 +90,7 @@ export async function postAdventureAttempt(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -101,7 +101,7 @@ export async function getAdventureLogsByUserId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -114,7 +114,7 @@ export async function getAdventureLogsByCharacterId(req, res, next) {
     res.locals.data = enrichAdventureLogRows(adventureLogList);
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 

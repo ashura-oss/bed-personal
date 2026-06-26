@@ -2,8 +2,8 @@ import { Router } from "express";
 import { deleteCharacter, getCharacterById, getCharacters, postCharacter, putCharacterById } from "../controllers/characterController.js";
 import { getCharacterAbilities, unlockCharacterAbility } from "../controllers/abilityController.js";
 import { getAdventureLogsByCharacterId } from "../controllers/adventureController.js";
-import { loadCharacterFromCharacterIdParam, loadCharacterFromIdParam, loadUserFromBody } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromCharacterIdParam, loadCharacterFromIdParam, loadUserFromBody } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

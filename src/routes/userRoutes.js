@@ -2,8 +2,8 @@ import { Router } from "express";
 import { deleteUser, getUserById, getUsers, postUser, putUserById } from "../controllers/userController.js";
 import { getCharactersByUserId } from "../controllers/characterController.js";
 import { getAdventureLogsByUserId } from "../controllers/adventureController.js";
-import { loadUserFromIdParam, loadUserFromUserIdParam } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadUserFromIdParam, loadUserFromUserIdParam } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

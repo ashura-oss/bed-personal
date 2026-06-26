@@ -1,6 +1,6 @@
 import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getQuests(req, res, next) {
   try {
@@ -11,7 +11,7 @@ export async function getQuests(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -20,13 +20,13 @@ export async function getQuestById(req, res, next) {
     const quest = findQuestDefinitionById(req.params.id);
 
     if (!quest) {
-      throw createHttpError(404, "Not Found", "Quest was not found.");
+      throw createError(404, "Not Found", "Quest was not found.");
     }
 
     res.locals.data = quest;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -35,7 +35,7 @@ export async function getQuestsByRegionId(req, res, next) {
     const region = findRegionDefinitionById(req.params.regionId);
 
     if (!region) {
-      throw createHttpError(404, "Not Found", "Region was not found.");
+      throw createError(404, "Not Found", "Region was not found.");
     }
 
     const questList = QUEST_DEFINITIONS.filter(
@@ -45,6 +45,6 @@ export async function getQuestsByRegionId(req, res, next) {
     res.locals.data = questList;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

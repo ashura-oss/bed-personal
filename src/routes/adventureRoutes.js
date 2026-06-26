@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { postAdventureAttempt } from "../controllers/adventureController.js";
-import { loadCharacterFromBody, loadQuestFromBody, loadUserFromBody } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromBody, loadQuestFromBody, loadUserFromBody } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

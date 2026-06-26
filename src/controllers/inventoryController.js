@@ -1,6 +1,6 @@
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById, hasItemDefinition } from "../constants/items.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function putInventoryItem(req, res, next) {
   try {
@@ -9,11 +9,11 @@ export async function putInventoryItem(req, res, next) {
     const quantity = req.body?.quantity;
 
     if (!hasItemDefinition(itemId)) {
-      throw createHttpError(404, "Not Found", "Item definition was not found.");
+      throw createError(404, "Not Found", "Item definition was not found.");
     }
 
     if (!Number.isInteger(quantity) || quantity < 0) {
-      throw createHttpError(400, "Bad Request", "quantity is required and must be a non-negative integer.");
+      throw createError(400, "Bad Request", "quantity is required and must be a non-negative integer.");
     }
 
     if (quantity === 0) {
@@ -35,7 +35,7 @@ export async function putInventoryItem(req, res, next) {
     res.locals.data = inventoryItem;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -44,7 +44,7 @@ export async function deleteInventoryItem(req, res, next) {
     const character = res.locals.character;
 
     if (!hasItemDefinition(req.params.itemId)) {
-      throw createHttpError(404, "Not Found", "Item definition was not found.");
+      throw createError(404, "Not Found", "Item definition was not found.");
     }
 
     const removed = await characterInventoryModel.removeInventoryItem({
@@ -55,7 +55,7 @@ export async function deleteInventoryItem(req, res, next) {
     res.locals.data = { removed: Boolean(removed), inventoryItem: removed };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -65,11 +65,11 @@ export async function postConsumeInventoryItem(req, res, next) {
     const item = findItemDefinitionById(req.params.itemId);
 
     if (!item) {
-      throw createHttpError(404, "Not Found", "Item definition was not found.");
+      throw createError(404, "Not Found", "Item definition was not found.");
     }
 
     if (item.itemType !== "consumable" || !item.consumeEffect) {
-      throw createHttpError(400, "Bad Request", "Item is not consumable.");
+      throw createError(400, "Bad Request", "Item is not consumable.");
     }
 
     const consumeResult = await characterInventoryModel.consumeInventoryItem({
@@ -78,12 +78,12 @@ export async function postConsumeInventoryItem(req, res, next) {
     });
 
     if (!consumeResult.consumed) {
-      throw createHttpError(404, "Not Found", "Consumable item was not found in inventory.");
+      throw createError(404, "Not Found", "Consumable item was not found in inventory.");
     }
 
     res.locals.data = consumeResult;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

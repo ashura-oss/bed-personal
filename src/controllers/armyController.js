@@ -5,7 +5,7 @@ import * as storyModel from "../models/storyModel.js";
 import { findArmyEncounterById } from "../constants/armyEncounters.js";
 import { resolveArmyBattle } from "../utils/armyRules.js";
 import { calculateArmyEquipmentBonus } from "../utils/equipmentRules.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 const allowedStrategies = ["hold", "attack", "defend", "flank", "retreat"];
 const allowedOrderUnitTypes = ["soldiers", "archers", "cavalry"];
@@ -27,7 +27,7 @@ export async function getCharacterArmyState(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -36,7 +36,7 @@ export async function putCharacterArmyState(req, res, next) {
     const strategy = req.body?.strategy;
 
     if (strategy !== undefined && (typeof strategy !== "string" || !allowedStrategies.includes(strategy))) {
-      throw createHttpError(400, "Bad Request", "strategy must be one of the allowed values.", {
+      throw createError(400, "Bad Request", "strategy must be one of the allowed values.", {
         allowedStrategies
       });
     }
@@ -49,27 +49,27 @@ export async function putCharacterArmyState(req, res, next) {
     const morale = req.body?.morale;
 
     if (isUnlocked !== undefined && (!Number.isInteger(isUnlocked) || isUnlocked < 0 || isUnlocked > 1)) {
-      throw createHttpError(400, "Bad Request", "isUnlocked must be 0 or 1.");
+      throw createError(400, "Bad Request", "isUnlocked must be 0 or 1.");
     }
 
     if (commandRank !== undefined && (typeof commandRank !== "string" || commandRank.trim().length === 0)) {
-      throw createHttpError(400, "Bad Request", "commandRank must be a non-empty string.");
+      throw createError(400, "Bad Request", "commandRank must be a non-empty string.");
     }
 
     if (soldiers !== undefined && (!Number.isInteger(soldiers) || soldiers < 0)) {
-      throw createHttpError(400, "Bad Request", "soldiers must be a non-negative integer.");
+      throw createError(400, "Bad Request", "soldiers must be a non-negative integer.");
     }
 
     if (archers !== undefined && (!Number.isInteger(archers) || archers < 0)) {
-      throw createHttpError(400, "Bad Request", "archers must be a non-negative integer.");
+      throw createError(400, "Bad Request", "archers must be a non-negative integer.");
     }
 
     if (cavalry !== undefined && (!Number.isInteger(cavalry) || cavalry < 0)) {
-      throw createHttpError(400, "Bad Request", "cavalry must be a non-negative integer.");
+      throw createError(400, "Bad Request", "cavalry must be a non-negative integer.");
     }
 
     if (morale !== undefined && (!Number.isInteger(morale) || morale < 0 || morale > 100)) {
-      throw createHttpError(400, "Bad Request", "morale must be an integer from 0 to 100.");
+      throw createError(400, "Bad Request", "morale must be an integer from 0 to 100.");
     }
 
     const armyState = await armyModel.upsertArmyState({
@@ -86,7 +86,7 @@ export async function putCharacterArmyState(req, res, next) {
     res.locals.data = armyState;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -97,13 +97,13 @@ export async function postCharacterArmyBattle(req, res, next) {
     const strategy = req.body?.strategy;
 
     if (typeof armyEncounterIdValue !== "string" || armyEncounterIdValue.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "armyEncounterId is required.");
+      throw createError(400, "Bad Request", "armyEncounterId is required.");
     }
 
     const armyEncounterId = armyEncounterIdValue.trim();
 
     if (strategy !== undefined && (typeof strategy !== "string" || !allowedStrategies.includes(strategy))) {
-      throw createHttpError(400, "Bad Request", "strategy must be one of the allowed values.", {
+      throw createError(400, "Bad Request", "strategy must be one of the allowed values.", {
         allowedStrategies
       });
     }
@@ -111,20 +111,20 @@ export async function postCharacterArmyBattle(req, res, next) {
     const encounter = findArmyEncounterById(armyEncounterId);
 
     if (!encounter) {
-      throw createHttpError(404, "Not Found", "Army encounter was not found.");
+      throw createError(404, "Not Found", "Army encounter was not found.");
     }
 
     const orders = readArmyOrders(req.body, encounter);
     const armyState = await armyModel.findArmyStateByCharacterId(characterId);
 
     if (!armyState || armyState.isUnlocked !== 1) {
-      throw createHttpError(400, "Bad Request", "Army command is not unlocked for this character.");
+      throw createError(400, "Bad Request", "Army command is not unlocked for this character.");
     }
 
     const progression = await progressionModel.findCharacterProgressionById(characterId);
 
     if (progression?.runState?.storyPhase !== encounter.requiredStoryPhase) {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         `Army encounter requires storyPhase ${encounter.requiredStoryPhase}.`
@@ -161,7 +161,7 @@ export async function postCharacterArmyBattle(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -173,18 +173,18 @@ function readArmyOrders(body, encounter) {
   }
 
   if (!Array.isArray(orders)) {
-    throw createHttpError(400, "Bad Request", "orders must be an array when provided.");
+    throw createError(400, "Bad Request", "orders must be an array when provided.");
   }
 
   if (orders.length > 6) {
-    throw createHttpError(400, "Bad Request", "orders cannot contain more than 6 commands.");
+    throw createError(400, "Bad Request", "orders cannot contain more than 6 commands.");
   }
 
   const parsedOrders = [];
 
   for (const order of orders) {
     if (typeof order !== "object" || order === null) {
-      throw createHttpError(400, "Bad Request", "Each army order must be an object.");
+      throw createError(400, "Bad Request", "Each army order must be an object.");
     }
 
     const unitType = order.unitType;
@@ -192,27 +192,27 @@ function readArmyOrders(body, encounter) {
     const target = order.target;
 
     if (typeof unitType !== "string" || unitType.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "unitType is required.");
+      throw createError(400, "Bad Request", "unitType is required.");
     }
 
     if (typeof command !== "string" || command.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "command is required.");
+      throw createError(400, "Bad Request", "command is required.");
     }
 
     if (typeof target !== "string" || target.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "target is required.");
+      throw createError(400, "Bad Request", "target is required.");
     }
 
     if (!allowedOrderUnitTypes.includes(unitType)) {
-      throw createHttpError(400, "Bad Request", "unitType must be soldiers, archers, or cavalry.");
+      throw createError(400, "Bad Request", "unitType must be soldiers, archers, or cavalry.");
     }
 
     if (!allowedOrderCommands.includes(command)) {
-      throw createHttpError(400, "Bad Request", "command must be attack, defend, or support.");
+      throw createError(400, "Bad Request", "command must be attack, defend, or support.");
     }
 
     if (!encounter.enemyForces.includes(target)) {
-      throw createHttpError(400, "Bad Request", "target must match one of the encounter enemy forces.");
+      throw createError(400, "Bad Request", "target must match one of the encounter enemy forces.");
     }
 
     parsedOrders.push({ unitType, command, target });

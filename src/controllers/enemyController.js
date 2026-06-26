@@ -1,5 +1,5 @@
 import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getEnemies(req, res, next) {
   try {
@@ -8,7 +8,7 @@ export async function getEnemies(req, res, next) {
 
     if (regionId !== undefined) {
       if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "regionId must be a non-empty string.");
+        throw createError(400, "Bad Request", "regionId must be a non-empty string.");
       }
 
       regionId = regionId.trim();
@@ -29,7 +29,7 @@ export async function getEnemies(req, res, next) {
     res.locals.data = enemies;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -38,13 +38,13 @@ export async function getEnemyById(req, res, next) {
     const enemy = findEnemyDefinitionById(req.params.enemyId);
 
     if (!enemy) {
-      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
+      throw createError(404, "Not Found", "Enemy definition was not found.");
     }
 
     res.locals.data = enemy;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -56,7 +56,7 @@ function readOptionalBinaryQuery(query, fieldName) {
   }
 
   if (value !== "0" && value !== "1") {
-    throw createHttpError(400, "Bad Request", `${fieldName} query must be 0 or 1.`);
+    throw createError(400, "Bad Request", `${fieldName} query must be 0 or 1.`);
   }
 
   return Number(value);

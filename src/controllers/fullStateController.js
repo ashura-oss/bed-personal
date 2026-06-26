@@ -1,5 +1,5 @@
 import * as fullStateModel from "../models/fullStateModel.js";
-import { sendHttpError } from "../utils/httpError.js";
+import { sendError } from "../utils/errorCode.js";
 
 export async function getCharacterFullState(req, res, next) {
   try {
@@ -12,6 +12,6 @@ export async function getCharacterFullState(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

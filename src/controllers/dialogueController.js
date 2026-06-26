@@ -1,6 +1,6 @@
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getDialogues(req, res, next) {
   try {
@@ -9,7 +9,7 @@ export async function getDialogues(req, res, next) {
 
     if (regionId !== undefined) {
       if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "regionId must be a non-empty string.");
+        throw createError(400, "Bad Request", "regionId must be a non-empty string.");
       }
 
       regionId = regionId.trim();
@@ -17,7 +17,7 @@ export async function getDialogues(req, res, next) {
 
     if (storyPhase !== undefined) {
       if (typeof storyPhase !== "string" || storyPhase.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "storyPhase must be a non-empty string.");
+        throw createError(400, "Bad Request", "storyPhase must be a non-empty string.");
       }
 
       storyPhase = storyPhase.trim();
@@ -38,7 +38,7 @@ export async function getDialogues(req, res, next) {
     res.locals.data = dialogues;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -47,13 +47,13 @@ export async function getDialogueById(req, res, next) {
     const dialogue = findDialogueDefinitionById(req.params.dialogueId);
 
     if (!dialogue) {
-      throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
+      throw createError(404, "Not Found", "Dialogue scene was not found.");
     }
 
     res.locals.data = dialogue;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -63,20 +63,20 @@ export async function postDialogueCompletion(req, res, next) {
     const choiceIdValue = req.body?.choiceId;
 
     if (typeof choiceIdValue !== "string" || choiceIdValue.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "choiceId is required.");
+      throw createError(400, "Bad Request", "choiceId is required.");
     }
 
     const choiceId = choiceIdValue.trim();
     const dialogue = findDialogueDefinitionById(req.params.dialogueId);
 
     if (!dialogue) {
-      throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
+      throw createError(404, "Not Found", "Dialogue scene was not found.");
     }
 
     const selectedChoice = dialogue.choices.find((choice) => choice.choiceId === choiceId) || null;
 
     if (!selectedChoice) {
-      throw createHttpError(400, "Bad Request", "choiceId does not exist for this dialogue.");
+      throw createError(400, "Bad Request", "choiceId does not exist for this dialogue.");
     }
 
     const dialogueFlag = await dialogueFlagModel.upsertDialogueFlag({
@@ -92,6 +92,6 @@ export async function postDialogueCompletion(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

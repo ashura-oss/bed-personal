@@ -1,6 +1,6 @@
 import * as characterModel from "../models/characterModel.js";
 import { calculateCharacterStats, validateAffinity, validateCharacterName, validateClassName, validateOrigin } from "../utils/gameRules.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getCharacters(req, res, next) {
   try {
@@ -8,7 +8,7 @@ export async function getCharacters(req, res, next) {
 
     if (className !== undefined) {
       if (typeof className !== "string" || className.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "className must be a non-empty string.");
+        throw createError(400, "Bad Request", "className must be a non-empty string.");
       }
 
       className = className.trim();
@@ -23,7 +23,7 @@ export async function getCharacters(req, res, next) {
     res.locals.data = characterList;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -32,7 +32,7 @@ export async function getCharacterById(req, res, next) {
     res.locals.data = res.locals.character;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -43,7 +43,7 @@ export async function getCharactersByUserId(req, res, next) {
     res.locals.data = characterList;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -52,23 +52,23 @@ export async function postCharacter(req, res, next) {
     const userId = typeof req.body?.userId === "string" ? Number(req.body.userId) : req.body?.userId;
 
     if (!Number.isInteger(userId) || userId < 1) {
-      throw createHttpError(400, "Bad Request", "userId must be a positive integer id.");
+      throw createError(400, "Bad Request", "userId must be a positive integer id.");
     }
 
     if (typeof req.body?.characterName !== "string" || req.body.characterName.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "characterName is required.");
+      throw createError(400, "Bad Request", "characterName is required.");
     }
 
     if (typeof req.body?.origin !== "string" || req.body.origin.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "origin is required.");
+      throw createError(400, "Bad Request", "origin is required.");
     }
 
     if (typeof req.body?.className !== "string" || req.body.className.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "className is required.");
+      throw createError(400, "Bad Request", "className is required.");
     }
 
     if (typeof req.body?.affinity !== "string" || req.body.affinity.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "affinity is required.");
+      throw createError(400, "Bad Request", "affinity is required.");
     }
 
     const characterName = req.body.characterName.trim();
@@ -91,7 +91,7 @@ export async function postCharacter(req, res, next) {
     res.locals.data = character;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -100,7 +100,7 @@ export async function putCharacterById(req, res, next) {
     const characterId = Number(req.params.id);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createHttpError(400, "Bad Request", "id must be a positive integer id.");
+      throw createError(400, "Bad Request", "id must be a positive integer id.");
     }
 
     const updates = buildCharacterUpdates(req.body, res.locals.character);
@@ -109,7 +109,7 @@ export async function putCharacterById(req, res, next) {
     res.locals.data = updatedCharacter;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -118,14 +118,14 @@ export async function deleteCharacter(req, res, next) {
     const characterId = Number(req.params.id);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createHttpError(400, "Bad Request", "id must be a positive integer id.");
+      throw createError(400, "Bad Request", "id must be a positive integer id.");
     }
 
     await characterModel.deleteCharacterById(characterId);
 
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -138,7 +138,7 @@ function buildCharacterUpdates(body, existingCharacter) {
 
   if (characterName !== undefined) {
     if (typeof characterName !== "string" || characterName.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "characterName must be a non-empty string.");
+      throw createError(400, "Bad Request", "characterName must be a non-empty string.");
     }
 
     characterName = characterName.trim();
@@ -146,7 +146,7 @@ function buildCharacterUpdates(body, existingCharacter) {
 
   if (origin !== undefined) {
     if (typeof origin !== "string" || origin.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "origin must be a non-empty string.");
+      throw createError(400, "Bad Request", "origin must be a non-empty string.");
     }
 
     origin = origin.trim();
@@ -154,7 +154,7 @@ function buildCharacterUpdates(body, existingCharacter) {
 
   if (className !== undefined) {
     if (typeof className !== "string" || className.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "className must be a non-empty string.");
+      throw createError(400, "Bad Request", "className must be a non-empty string.");
     }
 
     className = className.trim();
@@ -162,7 +162,7 @@ function buildCharacterUpdates(body, existingCharacter) {
 
   if (affinity !== undefined) {
     if (typeof affinity !== "string" || affinity.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "affinity must be a non-empty string.");
+      throw createError(400, "Bad Request", "affinity must be a non-empty string.");
     }
 
     affinity = affinity.trim();
@@ -189,7 +189,7 @@ function buildCharacterUpdates(body, existingCharacter) {
   }
 
   if (Object.keys(updates).length === 0) {
-    throw createHttpError(
+    throw createError(
       400,
       "Bad Request",
       "Provide at least one updatable field: characterName, origin, className, or affinity."

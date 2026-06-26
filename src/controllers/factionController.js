@@ -1,5 +1,5 @@
 import { FACTION_DEFINITIONS, findFactionDefinitionById } from "../constants/factions.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getFactions(req, res, next) {
   try {
@@ -10,7 +10,7 @@ export async function getFactions(req, res, next) {
     res.locals.data = factions;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -19,12 +19,12 @@ export async function getFactionById(req, res, next) {
     const faction = findFactionDefinitionById(req.params.factionId);
 
     if (!faction) {
-      throw createHttpError(404, "Not Found", "Faction definition was not found.");
+      throw createError(404, "Not Found", "Faction definition was not found.");
     }
 
     res.locals.data = faction;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

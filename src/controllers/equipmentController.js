@@ -1,7 +1,7 @@
 import * as characterEquipmentModel from "../models/characterEquipmentModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { findItemDefinitionById } from "../constants/items.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function putEquipment(req, res, next) {
   try {
@@ -9,18 +9,18 @@ export async function putEquipment(req, res, next) {
     const itemIdValue = req.body?.itemId;
 
     if (typeof itemIdValue !== "string" || itemIdValue.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "itemId is required.");
+      throw createError(400, "Bad Request", "itemId is required.");
     }
 
     const itemId = itemIdValue.trim();
     const item = findItemDefinitionById(itemId);
 
     if (!item) {
-      throw createHttpError(404, "Not Found", "Item definition was not found.");
+      throw createError(404, "Not Found", "Item definition was not found.");
     }
 
     if (!item.equipmentSlot || item.equipmentSlot !== req.params.equipmentSlot) {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         `Item cannot be equipped in ${req.params.equipmentSlot}.`
@@ -33,7 +33,7 @@ export async function putEquipment(req, res, next) {
     );
 
     if (!inventoryItem || inventoryItem.quantity < 1) {
-      throw createHttpError(400, "Bad Request", "Character does not own this equipment item.");
+      throw createError(400, "Bad Request", "Character does not own this equipment item.");
     }
 
     const equipment = await characterEquipmentModel.upsertEquipment({
@@ -45,7 +45,7 @@ export async function putEquipment(req, res, next) {
     res.locals.data = equipment;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -60,6 +60,6 @@ export async function deleteEquipment(req, res, next) {
     res.locals.data = { removed: Boolean(removed), equipment: removed };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

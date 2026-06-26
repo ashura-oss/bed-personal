@@ -1,7 +1,7 @@
 import * as progressionModel from "../models/progressionModel.js";
 import * as questCompletionModel from "../models/questCompletionModel.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 const DEFAULT_RUN_STATE = {
   supplies: 3,
@@ -19,7 +19,7 @@ export async function getCharacterProgression(req, res, next) {
     res.locals.data = progression;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -28,14 +28,14 @@ export async function putCharacterProgression(req, res, next) {
     const characterId = Number(req.params.characterId);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createHttpError(400, "Bad Request", "characterId must be a positive integer id.");
+      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
     }
 
     const characterUpdates = buildCharacterProgressionUpdates(req.body);
     const runStateChanges = buildRunStateChanges(req.body);
 
     if (Object.keys(characterUpdates).length === 0 && runStateChanges === null) {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked."
@@ -73,7 +73,7 @@ export async function putCharacterProgression(req, res, next) {
     res.locals.data = savedProgression;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -82,7 +82,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
     const characterId = Number(req.params.characterId);
 
     if (!Number.isInteger(characterId) || characterId < 1) {
-      throw createHttpError(400, "Bad Request", "characterId must be a positive integer id.");
+      throw createError(400, "Bad Request", "characterId must be a positive integer id.");
     }
 
     const quest = findQuestDefinitionById(req.params.questId);
@@ -97,7 +97,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
       : null;
 
     if (!questReward) {
-      throw createHttpError(
+      throw createError(
         404,
         "Not Found",
         "Quest completion reward was not found."
@@ -105,7 +105,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
     }
 
     if (questReward.questType !== "dialogue") {
-      throw createHttpError(
+      throw createError(
         400,
         "Bad Request",
         "Only dialogue story milestones can be claimed directly."
@@ -129,7 +129,7 @@ export async function putCharacterQuestCompletion(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -138,11 +138,11 @@ function buildCharacterProgressionUpdates(body) {
 
   if (body.level !== undefined) {
     if (!Number.isInteger(body.level)) {
-      throw createHttpError(400, "Bad Request", "level must be an integer.");
+      throw createError(400, "Bad Request", "level must be an integer.");
     }
 
     if (body.level < 1) {
-      throw createHttpError(400, "Bad Request", "level must be at least 1.");
+      throw createError(400, "Bad Request", "level must be at least 1.");
     }
 
     updates.level = body.level;
@@ -150,11 +150,11 @@ function buildCharacterProgressionUpdates(body) {
 
   if (body.xp !== undefined) {
     if (!Number.isInteger(body.xp)) {
-      throw createHttpError(400, "Bad Request", "xp must be an integer.");
+      throw createError(400, "Bad Request", "xp must be an integer.");
     }
 
     if (body.xp < 0) {
-      throw createHttpError(400, "Bad Request", "xp must be at least 0.");
+      throw createError(400, "Bad Request", "xp must be at least 0.");
     }
 
     updates.xp = body.xp;
@@ -162,11 +162,11 @@ function buildCharacterProgressionUpdates(body) {
 
   if (body.hp !== undefined) {
     if (!Number.isInteger(body.hp)) {
-      throw createHttpError(400, "Bad Request", "hp must be an integer.");
+      throw createError(400, "Bad Request", "hp must be an integer.");
     }
 
     if (body.hp < 0) {
-      throw createHttpError(400, "Bad Request", "hp must be at least 0.");
+      throw createError(400, "Bad Request", "hp must be at least 0.");
     }
 
     updates.hp = body.hp;
@@ -180,11 +180,11 @@ function buildRunStateChanges(body) {
 
   if (body.supplies !== undefined) {
     if (!Number.isInteger(body.supplies)) {
-      throw createHttpError(400, "Bad Request", "supplies must be an integer.");
+      throw createError(400, "Bad Request", "supplies must be an integer.");
     }
 
     if (body.supplies < 0) {
-      throw createHttpError(400, "Bad Request", "supplies must be at least 0.");
+      throw createError(400, "Bad Request", "supplies must be at least 0.");
     }
 
     updates.supplies = body.supplies;
@@ -192,15 +192,15 @@ function buildRunStateChanges(body) {
 
   if (body.morale !== undefined) {
     if (!Number.isInteger(body.morale)) {
-      throw createHttpError(400, "Bad Request", "morale must be an integer.");
+      throw createError(400, "Bad Request", "morale must be an integer.");
     }
 
     if (body.morale < 0) {
-      throw createHttpError(400, "Bad Request", "morale must be at least 0.");
+      throw createError(400, "Bad Request", "morale must be at least 0.");
     }
 
     if (body.morale > 100) {
-      throw createHttpError(400, "Bad Request", "morale must be at most 100.");
+      throw createError(400, "Bad Request", "morale must be at most 100.");
     }
 
     updates.morale = body.morale;
@@ -208,7 +208,7 @@ function buildRunStateChanges(body) {
 
   if (body.storyPhase !== undefined) {
     if (typeof body.storyPhase !== "string" || body.storyPhase.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "storyPhase must be a non-empty string when provided.");
+      throw createError(400, "Bad Request", "storyPhase must be a non-empty string when provided.");
     }
 
     updates.storyPhase = body.storyPhase.trim();
@@ -216,15 +216,15 @@ function buildRunStateChanges(body) {
 
   if (body.commandModeUnlocked !== undefined) {
     if (!Number.isInteger(body.commandModeUnlocked)) {
-      throw createHttpError(400, "Bad Request", "commandModeUnlocked must be an integer.");
+      throw createError(400, "Bad Request", "commandModeUnlocked must be an integer.");
     }
 
     if (body.commandModeUnlocked < 0) {
-      throw createHttpError(400, "Bad Request", "commandModeUnlocked must be at least 0.");
+      throw createError(400, "Bad Request", "commandModeUnlocked must be at least 0.");
     }
 
     if (body.commandModeUnlocked > 1) {
-      throw createHttpError(400, "Bad Request", "commandModeUnlocked must be at most 1.");
+      throw createError(400, "Bad Request", "commandModeUnlocked must be at most 1.");
     }
 
     updates.commandModeUnlocked = body.commandModeUnlocked;

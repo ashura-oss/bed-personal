@@ -4,7 +4,7 @@ import * as mapModel from "../models/mapModel.js";
 import { findEnemyDefinitionById } from "../constants/enemies.js";
 import { MAP_NODE_DEFINITIONS, findMapNodeDefinitionById } from "../constants/mapNodes.js";
 import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 const START_NODE_ID = "node_hearthvale_square";
 
@@ -14,7 +14,7 @@ export async function getMapNodes(req, res, next) {
 
     if (regionId !== undefined) {
       if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "regionId must be a non-empty string.");
+        throw createError(400, "Bad Request", "regionId must be a non-empty string.");
       }
 
       regionId = regionId.trim();
@@ -29,7 +29,7 @@ export async function getMapNodes(req, res, next) {
     res.locals.data = nodes;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -38,13 +38,13 @@ export async function getMapNodeById(req, res, next) {
     const node = findMapNodeDefinitionById(req.params.nodeId);
 
     if (!node) {
-      throw createHttpError(404, "Not Found", "Map node was not found.");
+      throw createError(404, "Not Found", "Map node was not found.");
     }
 
     res.locals.data = node;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -56,7 +56,7 @@ export async function getCharacterMapLocation(req, res, next) {
     res.locals.data = location;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -67,7 +67,7 @@ export async function postTravelToNode(req, res, next) {
     const targetNodeIdValue = req.body?.targetNodeId;
 
     if (typeof targetNodeIdValue !== "string" || targetNodeIdValue.trim().length === 0) {
-      throw createHttpError(400, "Bad Request", "targetNodeId is required.");
+      throw createError(400, "Bad Request", "targetNodeId is required.");
     }
 
     const targetNodeId = targetNodeIdValue.trim();
@@ -77,7 +77,7 @@ export async function postTravelToNode(req, res, next) {
     const activeCombatSession = await combatModel.findActiveCombatSessionByCharacterId(characterId);
 
     if (activeCombatSession) {
-      throw createHttpError(
+      throw createError(
         409,
         "Conflict",
         "Resolve the active combat session before travelling again.",
@@ -86,17 +86,17 @@ export async function postTravelToNode(req, res, next) {
     }
 
     if (!targetNode) {
-      throw createHttpError(404, "Not Found", "Target map node was not found.");
+      throw createError(404, "Not Found", "Target map node was not found.");
     }
 
     if (!currentNode.connectedNodeIds.includes(targetNode.nodeId)) {
-      throw createHttpError(400, "Bad Request", "Target map node is not connected to the current node.");
+      throw createError(400, "Bad Request", "Target map node is not connected to the current node.");
     }
 
     const travelAccess = await mapModel.findNodeTravelAccess({ characterId, targetNode });
 
     if (!travelAccess.canTravel) {
-      throw createHttpError(
+      throw createError(
         403,
         "Forbidden",
         "Target map node is locked by story progression."
@@ -115,7 +115,7 @@ export async function postTravelToNode(req, res, next) {
     };
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -129,7 +129,7 @@ async function findOrCreateReadableLocation(characterId) {
   const startNode = findMapNodeDefinitionById(START_NODE_ID);
 
   if (!startNode) {
-    throw createHttpError(500, "Internal Server Error", "Start map node was not seeded.");
+    throw createError(500, "Internal Server Error", "Start map node was not seeded.");
   }
 
   return mapModel.moveCharacterToNode({ characterId, currentNode: startNode, targetNode: startNode });
@@ -189,7 +189,7 @@ async function createAmbushTravelEvent({ character, targetNode }) {
   const enemy = findEnemyDefinitionById(targetNode.encounterEnemyId);
 
   if (!enemy) {
-    throw createHttpError(500, "Internal Server Error", "Travel encounter enemy was not found.");
+    throw createError(500, "Internal Server Error", "Travel encounter enemy was not found.");
   }
 
   const equipment = await characterEquipmentModel.findEquipmentByCharacterId(character.characterId);

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getArmyEncounterById, getArmyEncounters } from "../controllers/armyEncounterController.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

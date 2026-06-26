@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getCharacterProgression, putCharacterProgression, putCharacterQuestCompletion } from "../controllers/progressionController.js";
-import { loadCharacterFromCharacterIdParam } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromCharacterIdParam } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

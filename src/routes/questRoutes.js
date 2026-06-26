@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { getQuestById, getQuests } from "../controllers/questController.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getCombatSession, postCombatSession, postCombatTurn } from "../controllers/combatController.js";
-import { loadCharacterFromBody } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromBody } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

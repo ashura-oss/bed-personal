@@ -1,5 +1,5 @@
 import { ARMY_ENCOUNTER_DEFINITIONS, findArmyEncounterById as findArmyEncounterDefinitionById } from "../constants/armyEncounters.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function getArmyEncounters(req, res, next) {
   try {
@@ -7,7 +7,7 @@ export async function getArmyEncounters(req, res, next) {
 
     if (requiredStoryPhase !== undefined) {
       if (typeof requiredStoryPhase !== "string" || requiredStoryPhase.trim().length === 0) {
-        throw createHttpError(400, "Bad Request", "requiredStoryPhase must be a non-empty string.");
+        throw createError(400, "Bad Request", "requiredStoryPhase must be a non-empty string.");
       }
 
       requiredStoryPhase = requiredStoryPhase.trim();
@@ -27,7 +27,7 @@ export async function getArmyEncounters(req, res, next) {
     res.locals.data = encounters;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
 
@@ -36,12 +36,12 @@ export async function getArmyEncounterById(req, res, next) {
     const encounter = findArmyEncounterDefinitionById(req.params.armyEncounterId);
 
     if (!encounter) {
-      throw createHttpError(404, "Not Found", "Army encounter definition was not found.");
+      throw createError(404, "Not Found", "Army encounter definition was not found.");
     }
 
     res.locals.data = encounter;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }

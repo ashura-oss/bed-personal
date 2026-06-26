@@ -1,5 +1,5 @@
 import { affinityBonuses, allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins, baseStats, classBonuses, originBonuses } from "../constants/characterOptions.js";
-import { createHttpError } from "./httpError.js";
+import { createError } from "./errorCode.js";
 
 const MIN_CHARACTER_NAME_LENGTH = 2;
 const MAX_CHARACTER_NAME_LENGTH = 40;
@@ -20,7 +20,7 @@ export function validateAffinity(affinity) {
 
 export function validateCharacterName(characterName) {
   if (typeof characterName !== "string" || characterName.trim().length === 0) {
-    throw createHttpError(
+    throw createError(
       400,
       "Bad Request",
       "characterName is required and must be a non-empty string."
@@ -29,7 +29,7 @@ export function validateCharacterName(characterName) {
 
   const length = characterName.trim().length;
   if (length < MIN_CHARACTER_NAME_LENGTH || length > MAX_CHARACTER_NAME_LENGTH) {
-    throw createHttpError(
+    throw createError(
       400,
       "Bad Request",
       `characterName must be between ${MIN_CHARACTER_NAME_LENGTH} and ${MAX_CHARACTER_NAME_LENGTH} characters.`
@@ -47,7 +47,7 @@ export function resolveQuestAttempt(character, quest) {
   const characterStat = character[quest.requiredStat];
 
   if (!Number.isInteger(characterStat)) {
-    throw createHttpError(
+    throw createError(
       500,
       "Internal Server Error",
       `Character is missing the required stat ${quest.requiredStat}.`
@@ -113,7 +113,7 @@ function calculateFailureXp(quest) {
 
 function validateAllowedValue(fieldName, value, allowedValues) {
   if (!allowedValues.includes(value)) {
-    throw createHttpError(400, "Bad Request", `${fieldName} must be one of the allowed values.`, {
+    throw createError(400, "Bad Request", `${fieldName} must be one of the allowed values.`, {
       allowedValues
     });
   }

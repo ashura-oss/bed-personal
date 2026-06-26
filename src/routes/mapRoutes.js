@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getCharacterMapLocation, getMapNodeById, getMapNodes, postTravelToNode } from "../controllers/mapController.js";
-import { loadCharacterFromBody, loadCharacterFromCharacterIdParam } from "../middlewares/resourceMiddleware.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { loadCharacterFromBody, loadCharacterFromCharacterIdParam } from "../middlewares/loadMiddleware.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

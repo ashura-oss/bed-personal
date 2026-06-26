@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { getRegionById, getRegions } from "../controllers/regionController.js";
 import { getQuestsByRegionId } from "../controllers/questController.js";
-import { sendResponse, withMessage } from "../middlewares/response.js";
+import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 
 const router = Router();
 

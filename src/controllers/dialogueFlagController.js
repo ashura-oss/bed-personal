@@ -1,5 +1,5 @@
 import * as dialogueFlagModel from "../models/dialogueFlagModel.js";
-import { createHttpError, sendHttpError } from "../utils/httpError.js";
+import { createError, sendError } from "../utils/errorCode.js";
 
 export async function putDialogueFlag(req, res, next) {
   try {
@@ -7,11 +7,11 @@ export async function putDialogueFlag(req, res, next) {
     const value = req.body?.value;
 
     if (value === undefined) {
-      throw createHttpError(400, "Bad Request", "value is required.");
+      throw createError(400, "Bad Request", "value is required.");
     }
 
     if (typeof value !== "boolean" && value !== 0 && value !== 1) {
-      throw createHttpError(400, "Bad Request", "value must be a boolean or 0/1.");
+      throw createError(400, "Bad Request", "value must be a boolean or 0/1.");
     }
 
     const flagValue = typeof value === "boolean" ? Number(value) : value;
@@ -24,6 +24,6 @@ export async function putDialogueFlag(req, res, next) {
     res.locals.data = dialogueFlag;
     next();
   } catch (error) {
-    sendHttpError(res, error);
+    sendError(res, error);
   }
 }
