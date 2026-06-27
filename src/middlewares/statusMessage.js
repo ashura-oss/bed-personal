@@ -1,11 +1,3 @@
-// Global response/status middleware shared by all route files.
-export function notFound(req, res) {
-  res.status(404).json({
-    error: "Not Found",
-    message: `No route found for ${req.method} ${req.originalUrl}`
-  });
-}
-
 // Store the route success message before the final response.
 export function withMessage(message, status) {
   return (_req, res, next) => {

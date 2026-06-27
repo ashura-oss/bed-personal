@@ -17,7 +17,7 @@ import questRoutes from "./src/routes/questRoutes.js";
 import regionRoutes from "./src/routes/regionRoutes.js";
 import stateRoutes from "./src/routes/stateRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import { errorHandler, notFound } from "./src/middlewares/statusMessage.js";
+import { errorHandler } from "./src/middlewares/statusMessage.js";
 import { handleJsonParseError } from "./src/middlewares/validation.js";
 
 const app = express();
@@ -42,7 +42,12 @@ app.use("/army", armyRoutes);
 app.use("/progression", progressionRoutes);
 app.use("/state", stateRoutes);
 
-app.use(notFound);
+app.use((req, res) => {
+  res.status(404).json({
+    message: "Route was not found."
+  });
+});
+
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
