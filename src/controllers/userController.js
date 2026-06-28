@@ -1,6 +1,7 @@
 // User controller functions validate requests, call user models, and send responses.
 // User models store account-level progress such as level, XP, and gold.
 import * as userModel from "../models/userModel.js";
+import { hashPassword, validatePassword, verifyPassword } from "../utils/password.js";
 import {
   createHttpError,
   getOptionalInteger,
@@ -53,16 +54,48 @@ export async function getUserById(req, res) {
 export async function postUser(req, res) {
   try {
     const username = getRequiredString(req.body, "username");
+    const password = getRequiredString(req.body, "password");
+    const passwordError = validatePassword(password);
+
+    if (passwordError) {
+      throw createHttpError(400, "Bad Request", passwordError);
+    }
+
     const existingUser = await userModel.findUserByUsername(username);
 
     if (existingUser) {
       throw createHttpError(409, "Conflict", "Username is already taken.");
     }
 
-    const user = await userModel.createUser({ username });
+    const user = await userModel.createUser({
+      username,
+      passwordHash: hashPassword(password)
+    });
 
     return res.status(201).json({
       message: "User created.",
+      data: user
+    });
+  } catch (error) {
+    return sendErrorResponse(res, error);
+  }
+}
+
+// Logs in one user by checking username and password.
+export async function postUserLogin(req, res) {
+  try {
+    const username = getRequiredString(req.body, "username");
+    const password = getRequiredString(req.body, "password");
+    const userCredentials = await userModel.findUserCredentialsByUsername(username);
+
+    if (!userCredentials || !verifyPassword(password, userCredentials.passwordHash)) {
+      throw createHttpError(401, "Unauthorized", "Username or password is incorrect.");
+    }
+
+    const user = await userModel.findUserById(userCredentials.id);
+
+    return res.status(200).json({
+      message: "Login successful.",
       data: user
     });
   } catch (error) {
@@ -131,12 +164,23 @@ export async function deleteUser(req, res) {
 function buildUserUpdates(body) {
   const updates = {};
   const username = getOptionalString(body, "username");
+  const password = getOptionalString(body, "password");
   const level = getOptionalInteger(body, "level", { min: 1 });
   const xp = getOptionalInteger(body, "xp", { min: 0 });
   const gold = getOptionalInteger(body, "gold", { min: 0 });
 
   if (username !== undefined) {
     updates.username = username;
+  }
+
+  if (password !== undefined) {
+    const passwordError = validatePassword(password);
+
+    if (passwordError) {
+      throw createHttpError(400, "Bad Request", passwordError);
+    }
+
+    updates.passwordHash = hashPassword(password);
   }
 
   if (level !== undefined) {
@@ -155,7 +199,7 @@ function buildUserUpdates(body) {
     throw createHttpError(
       400,
       "Bad Request",
-      "Provide at least one updatable field: username, level, xp, or gold."
+      "Provide at least one updatable field: username, password, level, xp, or gold."
     );
   }
 

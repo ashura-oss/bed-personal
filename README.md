@@ -24,6 +24,13 @@ Create or update the database tables and seed the starter data:
 npm run db
 ```
 
+The seed creates a local demo user for quick testing:
+
+```text
+username: demoDawn
+password: demo123
+```
+
 Reset the local database when you want a fresh test database:
 
 ```powershell
@@ -121,6 +128,7 @@ Common status codes:
 - Status `201`: Resource was created.
 - Status `204`: Resource was deleted with no response body.
 - Status `400`: Required data is missing or invalid.
+- Status `401`: Username or password is incorrect.
 - Status `403`: The action is blocked by progression or access rules.
 - Status `404`: The requested resource or definition was not found.
 - Status `409`: The action conflicts with existing state.
@@ -148,11 +156,15 @@ Common status codes:
   - Success response: `200`, returns an array of adventure logs.
 - `POST` `/users`
   - What it does: Creates one user.
-  - Request data: Body: `username`
+  - Request data: Body: `username`, `password`
   - Success response: `201`, returns the created user.
+- `POST` `/users/login`
+  - What it does: Checks a username and password for one user.
+  - Request data: Body: `username`, `password`
+  - Success response: `200`, returns the matching user without password data.
 - `PUT` `/users/:id`
   - What it does: Updates one user.
-  - Request data: Param: `id`; body can contain `username`, `level`, `xp`, `gold`
+  - Request data: Param: `id`; body can contain `username`, `password`, `level`, `xp`, `gold`
   - Success response: `200`, returns the updated user.
 - `DELETE` `/users/:id`
   - What it does: Deletes one user and cascades linked user data.
@@ -163,7 +175,17 @@ Create user request:
 
 ```json
 {
-  "username": "demoPlayer"
+  "username": "demoPlayer",
+  "password": "secret123"
+}
+```
+
+Login request:
+
+```json
+{
+  "username": "demoPlayer",
+  "password": "secret123"
 }
 ```
 
@@ -171,6 +193,8 @@ Update user request:
 
 ```json
 {
+  "username": "newDemoPlayer",
+  "password": "newSecret123",
   "level": 2,
   "xp": 50,
   "gold": 20
@@ -319,15 +343,15 @@ These routes read fixed game definitions stored in `src/constants`.
   - What it does: Gets one faction definition.
   - Request data: Param: `factionId`
   - Success response: `200`, returns one faction.
-- `GET` `/dialogues`
+- `GET` `/dialogue`
   - What it does: Gets dialogue definitions.
   - Request data: Optional query: `regionId`, `storyPhase`
   - Success response: `200`, returns dialogues.
-- `GET` `/dialogues/:dialogueId`
+- `GET` `/dialogue/:dialogueId`
   - What it does: Gets one dialogue definition.
   - Request data: Param: `dialogueId`
   - Success response: `200`, returns one dialogue.
-- `POST` `/dialogues/:dialogueId/complete`
+- `POST` `/dialogue/:dialogueId/complete`
   - What it does: Marks a dialogue as completed for one character.
   - Request data: Param: `dialogueId`; body: `characterId`, `choiceId`
   - Success response: `200`, returns dialogue, selected choice, and saved flag.
@@ -751,7 +775,7 @@ The database stores player-created and player-changing data, while fixed game de
 
 Player and save tables:
 
-- `users`: Stores account-level player data.
+- `users`: Stores account-level player data and a password hash for simple login.
 - `characters`: Stores player characters and their stats.
 - `save_slots`: Stores user save slot metadata.
 - `character_run_states`: Stores supplies, morale, story phase, and army command unlock state.

@@ -3,7 +3,7 @@
 import { Router } from "express";
 import { getAdventureLogsByUserId } from "../controllers/adventureController.js";
 import { getCharactersByUserId } from "../controllers/characterController.js";
-import { deleteUser, getUserById, getUsers, postUser, putUserById } from "../controllers/userController.js";
+import { deleteUser, getUserById, getUsers, postUser, postUserLogin, putUserById } from "../controllers/userController.js";
 import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
 
 const router = Router();
@@ -51,12 +51,21 @@ router.get(
 // POST
 // ------------------------------------------------------------
 
+// Login one user.
+// Required fields: username, password
+// Optional fields: none
+router.post(
+  "/login",
+  requireBodyFields("username", "password"),
+  postUserLogin
+);
+
 // Create one user.
-// Required fields: username
+// Required fields: username, password
 // Optional fields: none
 router.post(
   "/",
-  requireBodyFields("username"),
+  requireBodyFields("username", "password"),
   postUser
 );
 
@@ -66,11 +75,11 @@ router.post(
 
 // Update one user by id.
 // Required fields: id parameter, one update field
-// Optional fields: username, level, xp, gold
+// Optional fields: username, password, level, xp, gold
 router.put(
   "/:id",
   requireParamFields("id"),
-  requireAnyBodyField("username", "level", "xp", "gold"),
+  requireAnyBodyField("username", "password", "level", "xp", "gold"),
   putUserById
 );
 
