@@ -17,23 +17,16 @@ import * as userModel from "../models/userModel.js";
 import { resolveCombatTurn } from "../utils/combatRules.js";
 import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
-import {
-  createHttpError,
-  getOptionalString,
-  getRequiredId,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // COMBAT SESSION CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets one combat session together with its turn logs.
-export async function getCombatSession(req, res) {
+export async function getCombatSession(_req, res, next) {
   try {
-    const combatSessionId = getRequiredIdParam(req.params, "combatSessionId");
+    const { combatSessionId } = res.locals;
     const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
     if (!combatSession) {
@@ -42,13 +35,11 @@ export async function getCombatSession(req, res) {
 
     const turnLogs = await combatModel.findCombatLogsBySessionId(combatSessionId);
 
-    return res.status(200).json({
-      message: "Combat session retrieved.",
-      data: {
-        combatSession,
-        turnLogs
-      }
-    });
+    res.locals.data = {
+      combatSession,
+      turnLogs
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -59,12 +50,11 @@ export async function getCombatSession(req, res) {
 // ------------------------------------------------------------
 
 // Starts one combat session against an enemy or boss.
-export async function postCombatSession(req, res) {
+export async function postCombatSession(_req, res, next) {
   try {
-    const characterId = getRequiredId(req.body, "characterId");
-    const enemyId = getRequiredString(req.body, "enemyId");
-    const requestedQuestId = getOptionalString(req.body, "questId") ?? null;
-    let nodeId = getOptionalString(req.body, "nodeId") ?? null;
+    const { characterId, enemyId } = res.locals;
+    const requestedQuestId = res.locals.questId ?? null;
+    let nodeId = res.locals.nodeId ?? null;
     const character = await findRequiredCharacter(characterId);
     const enemy = findEnemyDefinitionById(enemyId);
     const activeCombatSession = await combatModel.findActiveCombatSessionByCharacterId(
@@ -134,26 +124,22 @@ export async function postCombatSession(req, res) {
       enemyHp: enemy.maxHp
     });
 
-    return res.status(201).json({
-      message: "Combat session started.",
-      data: {
-        combatSession,
-        enemy,
-        equipmentBonuses: combatCharacter.equipmentBonuses
-      }
-    });
+    res.locals.data = {
+      combatSession,
+      enemy,
+      equipmentBonuses: combatCharacter.equipmentBonuses
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Resolves one player action and saves resulting turn logs.
-export async function postCombatTurn(req, res) {
+export async function postCombatTurn(_req, res, next) {
   try {
-    const combatSessionId = getRequiredIdParam(req.params, "combatSessionId");
-    const characterId = getRequiredId(req.body, "characterId");
-    const actionType = getRequiredString(req.body, "actionType");
-    const abilityId = getOptionalString(req.body, "abilityId") ?? null;
+    const { combatSessionId, characterId, actionType } = res.locals;
+    const abilityId = res.locals.abilityId ?? null;
     const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
     if (!combatSession) {
@@ -214,15 +200,13 @@ export async function postCombatTurn(req, res) {
       });
     }
 
-    return res.status(200).json({
-      message: "Combat turn resolved.",
-      data: {
-        combatSession: savedTurn.session,
-        turnLogs: savedTurn.turnLogs,
-        rewardResult,
-        equipmentBonuses: combatCharacter.equipmentBonuses
-      }
-    });
+    res.locals.data = {
+      combatSession: savedTurn.session,
+      turnLogs: savedTurn.turnLogs,
+      rewardResult,
+      equipmentBonuses: combatCharacter.equipmentBonuses
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -233,7 +217,6 @@ export async function postCombatTurn(req, res) {
 // ------------------------------------------------------------
 
 // Finds the map node connected to a boss enemy.
-// Boss sessions use this to make sure the fight is started from the correct map location.
 async function findBossNodeForEnemy(enemyId) {
   const bossNode = findMapNodeDefinitionByEnemyId(enemyId);
 
@@ -245,7 +228,6 @@ async function findBossNodeForEnemy(enemyId) {
 }
 
 // Applies equipment bonuses before combat damage is calculated.
-// The returned copy of the character includes weapon range, defence, and stat bonuses.
 async function buildCombatCharacter(character) {
   const equipment = await characterInventoryModel.findEquipmentByCharacterId(character.characterId);
 
@@ -253,7 +235,6 @@ async function buildCombatCharacter(character) {
 }
 
 // Finds an ability only if the character already unlocked it.
-// The fixed ability definition is returned after the saved unlock row is confirmed.
 async function findUnlockedAbility(characterId, abilityId) {
   const unlockedAbility = await abilityModel.findCharacterAbility(characterId, abilityId);
   const ability = unlockedAbility ? findAbilityDefinitionById(abilityId) : null;
@@ -266,7 +247,6 @@ async function findUnlockedAbility(characterId, abilityId) {
 }
 
 // Applies XP, gold, adventure log, and story updates after a combat win.
-// Boss wins can also apply story milestones and update saved world state.
 async function awardCombatWin({ character, enemy, combatSession }) {
   const user = await userModel.findUserById(character.userId);
 

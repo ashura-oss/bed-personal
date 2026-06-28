@@ -79,15 +79,17 @@ DATABASE_URL=file:dawn-of-man.db
 ```text
 src/
   constants/      fixed game data such as abilities, enemies, quests, items, map nodes, and army encounters.
-  controllers/    Request validation, route flow, game checks, and calls to models.
+  controllers/    Game checks, model calls, and response data stored in res.locals.data.
   db/             Drizzle database client, schema, seed, and reset files.
-  middlewares/    Shared request validation middleware.
+  middlewares/    Shared request validation and success response middleware.
   models/         Database interaction functions.
   routes/         Express route definitions.
-  utils/          Pure helper logic such as combat rules, equipment rules, validation helpers, and leveling.
+  utils/          Pure helper logic such as combat rules, equipment rules, error helpers, and leveling.
 ```
 
 ## Response Format
+
+Successful responses are sent by response middleware after controllers finish their work.
 
 Most successful routes return:
 

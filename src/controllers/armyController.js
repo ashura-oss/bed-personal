@@ -8,14 +8,7 @@ import * as progressionModel from "../models/progressionModel.js";
 import * as storyModel from "../models/storyModel.js";
 import { resolveArmyBattle } from "../utils/armyRules.js";
 import { calculateArmyEquipmentBonus } from "../utils/equipmentRules.js";
-import {
-  createHttpError,
-  getOptionalInteger,
-  getOptionalString,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 const allowedStrategies = ["hold", "attack", "defend", "flank", "retreat"];
 const allowedOrderUnitTypes = ["soldiers", "archers", "cavalry"];
@@ -26,10 +19,11 @@ const allowedOrderCommands = ["attack", "defend", "support"];
 // ------------------------------------------------------------
 
 // Gets all army encounter definitions, optionally filtered by story phase.
-export async function getArmyEncounters(req, res) {
+export async function getArmyEncounters(_req, res, next) {
   try {
-    const requiredStoryPhase = getOptionalString(req.query, "requiredStoryPhase");
-    const encounters = ARMY_ENCOUNTER_DEFINITIONS.filter((encounter) => {
+    const { requiredStoryPhase } = res.locals;
+
+    res.locals.data = ARMY_ENCOUNTER_DEFINITIONS.filter((encounter) => {
       if (
         requiredStoryPhase !== undefined &&
         encounter.requiredStoryPhase !== requiredStoryPhase
@@ -39,57 +33,49 @@ export async function getArmyEncounters(req, res) {
 
       return true;
     }).sort((left, right) => left.name.localeCompare(right.name));
-
-    return res.status(200).json({
-      message: "Army encounters retrieved.",
-      data: encounters
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one army encounter definition by id.
-export async function getArmyEncounterById(req, res) {
+export async function getArmyEncounterById(_req, res, next) {
   try {
-    const encounter = findArmyEncounterById(req.params.armyEncounterId);
+    const encounter = findArmyEncounterById(res.locals.armyEncounterId);
 
     if (!encounter) {
       throw createHttpError(404, "Not Found", "Army encounter definition was not found.");
     }
 
-    return res.status(200).json({
-      message: "Army encounter retrieved.",
-      data: encounter
-    });
+    res.locals.data = encounter;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one character's current army state.
-export async function getCharacterArmyState(req, res) {
+export async function getCharacterArmyState(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
     const armyState = await armyModel.findArmyStateByCharacterId(characterId);
 
-    return res.status(200).json({
-      message: "Character army state retrieved.",
-      data:
-        armyState || {
-          characterId,
-          isUnlocked: 0,
-          commandRank: "none",
-          soldiers: 0,
-          archers: 0,
-          cavalry: 0,
-          morale: 50,
-          strategy: "hold"
-        }
-    });
+    res.locals.data =
+      armyState || {
+        characterId,
+        isUnlocked: 0,
+        commandRank: "none",
+        soldiers: 0,
+        archers: 0,
+        cavalry: 0,
+        morale: 50,
+        strategy: "hold"
+      };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -100,19 +86,12 @@ export async function getCharacterArmyState(req, res) {
 // ------------------------------------------------------------
 
 // Resolves one army encounter and applies story changes on victory.
-export async function postCharacterArmyBattle(req, res) {
+export async function postCharacterArmyBattle(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
-    const armyEncounterId = getRequiredString(req.body, "armyEncounterId");
-    const strategy = getOptionalString(req.body, "strategy");
+    const { characterId, armyEncounterId, strategy } = res.locals;
 
     await findRequiredCharacter(characterId);
-
-    if (strategy !== undefined && !allowedStrategies.includes(strategy)) {
-      throw createHttpError(400, "Bad Request", "strategy must be one of the allowed values.", {
-        allowedStrategies
-      });
-    }
+    validateStrategy(strategy);
 
     const encounter = findArmyEncounterById(armyEncounterId);
 
@@ -120,7 +99,7 @@ export async function postCharacterArmyBattle(req, res) {
       throw createHttpError(404, "Not Found", "Army encounter was not found.");
     }
 
-    const orders = readArmyOrders(req.body, encounter);
+    const orders = readArmyOrders(res.locals.orders, encounter);
     const armyState = await armyModel.findArmyStateByCharacterId(characterId);
 
     if (!armyState || armyState.isUnlocked !== 1) {
@@ -158,16 +137,14 @@ export async function postCharacterArmyBattle(req, res) {
         ? await storyModel.applyArmyVictoryStory({ characterId, encounter })
         : null;
 
-    return res.status(200).json({
-      message: "Army battle resolved.",
-      data: {
-        encounter,
-        battleResult,
-        equipmentBonus,
-        armyState: savedArmyState,
-        storyResult
-      }
-    });
+    res.locals.data = {
+      encounter,
+      battleResult,
+      equipmentBonus,
+      armyState: savedArmyState,
+      storyResult
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -178,34 +155,24 @@ export async function postCharacterArmyBattle(req, res) {
 // ------------------------------------------------------------
 
 // Saves controlled army state fields.
-export async function putCharacterArmyState(req, res) {
+export async function putCharacterArmyState(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
-    const strategy = getOptionalString(req.body, "strategy");
+    const { characterId, strategy } = res.locals;
 
     await findRequiredCharacter(characterId);
+    validateStrategy(strategy);
 
-    if (strategy !== undefined && !allowedStrategies.includes(strategy)) {
-      throw createHttpError(400, "Bad Request", "strategy must be one of the allowed values.", {
-        allowedStrategies
-      });
-    }
-
-    const armyState = await armyModel.upsertArmyState({
+    res.locals.data = await armyModel.upsertArmyState({
       characterId,
-      isUnlocked: getOptionalInteger(req.body, "isUnlocked", { min: 0, max: 1 }),
-      commandRank: getOptionalString(req.body, "commandRank"),
-      soldiers: getOptionalInteger(req.body, "soldiers", { min: 0 }),
-      archers: getOptionalInteger(req.body, "archers", { min: 0 }),
-      cavalry: getOptionalInteger(req.body, "cavalry", { min: 0 }),
-      morale: getOptionalInteger(req.body, "morale", { min: 0, max: 100 }),
+      isUnlocked: res.locals.isUnlocked,
+      commandRank: res.locals.commandRank,
+      soldiers: res.locals.soldiers,
+      archers: res.locals.archers,
+      cavalry: res.locals.cavalry,
+      morale: res.locals.morale,
       strategy
     });
-
-    return res.status(200).json({
-      message: "Character army state saved.",
-      data: armyState
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -215,17 +182,19 @@ export async function putCharacterArmyState(req, res) {
 // CONTROLLER HELPERS
 // ------------------------------------------------------------
 
-// Reads optional army orders and validates unit, command, and target.
-// Orders are request-only battle instructions, so they are checked before army math runs.
-function readArmyOrders(body, encounter) {
-  const orders = body?.orders;
+// Validates army strategy values when the request provides one.
+function validateStrategy(strategy) {
+  if (strategy !== undefined && !allowedStrategies.includes(strategy)) {
+    throw createHttpError(400, "Bad Request", "strategy must be one of the allowed values.", {
+      allowedStrategies
+    });
+  }
+}
 
+// Reads optional army orders and validates unit, command, and target.
+function readArmyOrders(orders, encounter) {
   if (orders === undefined) {
     return [];
-  }
-
-  if (!Array.isArray(orders)) {
-    throw createHttpError(400, "Bad Request", "orders must be an array when provided.");
   }
 
   if (orders.length > 6) {
@@ -239,9 +208,9 @@ function readArmyOrders(body, encounter) {
       throw createHttpError(400, "Bad Request", "Each army order must be an object.");
     }
 
-    const unitType = getRequiredString(order, "unitType");
-    const command = getRequiredString(order, "command");
-    const target = getRequiredString(order, "target");
+    const unitType = readRequiredOrderString(order, "unitType");
+    const command = readRequiredOrderString(order, "command");
+    const target = readRequiredOrderString(order, "target");
 
     if (!allowedOrderUnitTypes.includes(unitType)) {
       throw createHttpError(400, "Bad Request", "unitType must be soldiers, archers, or cavalry.");
@@ -259,6 +228,17 @@ function readArmyOrders(body, encounter) {
   }
 
   return parsedOrders;
+}
+
+// Reads a required string from one nested army order object.
+function readRequiredOrderString(order, fieldName) {
+  const value = order[fieldName];
+
+  if (typeof value !== "string" || value.trim().length === 0) {
+    throw createHttpError(400, "Bad Request", `${fieldName} is required for each army order.`);
+  }
+
+  return value.trim();
 }
 
 // Finds one character or raises a 404 controller error.

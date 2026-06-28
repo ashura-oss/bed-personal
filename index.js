@@ -17,7 +17,7 @@ import questRoutes from "./src/routes/questRoutes.js";
 import regionRoutes from "./src/routes/regionRoutes.js";
 import stateRoutes from "./src/routes/stateRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import { handleJsonParseError } from "./src/middlewares/validation.js";
+import { handleJsonParseError, initRequestContext } from "./src/middlewares/validation.js";
 
 const app = express();
 
@@ -25,6 +25,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(handleJsonParseError);
+app.use(initRequestContext);
 
 // Route modules are grouped by resource so each file handles one area of the backend.
 app.use("/users", userRoutes);

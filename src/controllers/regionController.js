@@ -1,16 +1,16 @@
 // Region controller functions return fixed region data.
 // Region unlock progress is saved separately in state models.
 import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regions.js";
-import { createHttpError, getOptionalPositiveIntegerQuery, sendErrorResponse } from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // REGION LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all region definitions, optionally filtered by danger level.
-export async function getRegions(req, res) {
+export async function getRegions(_req, res, next) {
   try {
-    const dangerLevel = getOptionalPositiveIntegerQuery(req.query, "dangerLevel");
+    const { dangerLevel } = res.locals;
     let regionList = [...REGION_DEFINITIONS].sort(
       (left, right) => left.dangerLevel - right.dangerLevel
     );
@@ -19,33 +19,25 @@ export async function getRegions(req, res) {
       regionList = regionList.filter((region) => region.dangerLevel === dangerLevel);
     }
 
-    return res.status(200).json({
-      message: "Regions retrieved.",
-      data: regionList
-    });
+    res.locals.data = regionList;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one region definition by id.
-export async function getRegionById(req, res) {
+export async function getRegionById(_req, res, next) {
   try {
-    const region = findRegionDefinitionById(req.params.id);
+    const region = findRegionDefinitionById(res.locals.id);
 
     if (!region) {
       throw createHttpError(404, "Not Found", "Region was not found.");
     }
 
-    return res.status(200).json({
-      message: "Region retrieved.",
-      data: region
-    });
+    res.locals.data = region;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
-
-// ------------------------------------------------------------
-// CONTROLLER HELPERS
-// ------------------------------------------------------------

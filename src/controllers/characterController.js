@@ -1,5 +1,5 @@
-// Character controller functions validate requests, call character models, and send responses.
-// Character option validation uses constants, while saved character rows are handled by models.
+// Character controller functions validate game choices, call character models, and pass data forward.
+// Character option checks use fixed game content, while saved character rows use models.
 import * as characterModel from "../models/characterModel.js";
 import * as userModel from "../models/userModel.js";
 import {
@@ -9,67 +9,47 @@ import {
   validateClassName,
   validateOrigin
 } from "../utils/gameRules.js";
-import {
-  createHttpError,
-  getOptionalString,
-  getRequiredId,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // CHARACTER LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all characters, optionally filtered by class.
-export async function getCharacters(req, res) {
+export async function getCharacters(_req, res, next) {
   try {
-    const className = getOptionalString(req.query, "className");
+    const { className } = res.locals;
 
     if (className !== undefined) {
       validateClassNameOrThrow(className);
     }
 
-    const characterList = await characterModel.findCharacters({ className });
-
-    return res.status(200).json({
-      message: "Characters retrieved.",
-      data: characterList
-    });
+    res.locals.data = await characterModel.findCharacters({ className });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one character by id.
-export async function getCharacterById(req, res) {
+export async function getCharacterById(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "id");
-    const character = await findRequiredCharacter(characterId);
-
-    return res.status(200).json({
-      message: "Character retrieved.",
-      data: character
-    });
+    res.locals.data = await findRequiredCharacter(res.locals.characterId);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets all characters owned by one user.
-export async function getCharactersByUserId(req, res) {
+export async function getCharactersByUserId(_req, res, next) {
   try {
-    const userId = getRequiredIdParam(req.params, "userId");
+    const { userId } = res.locals;
 
     await findRequiredUser(userId);
 
-    const characterList = await characterModel.findCharactersByUserId(userId);
-
-    return res.status(200).json({
-      message: "User characters retrieved.",
-      data: characterList
-    });
+    res.locals.data = await characterModel.findCharactersByUserId(userId);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -80,13 +60,9 @@ export async function getCharactersByUserId(req, res) {
 // ------------------------------------------------------------
 
 // Creates one character after validating owner and character choices.
-export async function postCharacter(req, res) {
+export async function postCharacter(_req, res, next) {
   try {
-    const userId = getRequiredId(req.body, "userId");
-    const characterName = getRequiredString(req.body, "characterName");
-    const origin = getRequiredString(req.body, "origin");
-    const className = getRequiredString(req.body, "className");
-    const affinity = getRequiredString(req.body, "affinity");
+    const { userId, characterName, origin, className, affinity } = res.locals;
 
     await findRequiredUser(userId);
     validateCharacterNameOrThrow(characterName);
@@ -95,7 +71,8 @@ export async function postCharacter(req, res) {
     validateAffinityOrThrow(affinity);
 
     const stats = calculateCharacterStats({ origin, className, affinity });
-    const character = await characterModel.createCharacter({
+
+    res.locals.data = await characterModel.createCharacter({
       userId,
       characterName,
       origin,
@@ -103,11 +80,7 @@ export async function postCharacter(req, res) {
       affinity,
       stats
     });
-
-    return res.status(201).json({
-      message: "Character created.",
-      data: character
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -117,18 +90,15 @@ export async function postCharacter(req, res) {
 // CHARACTER UPDATE CONTROLLERS
 // ------------------------------------------------------------
 
-// Updates one character.
-export async function putCharacterById(req, res) {
+// Updates one character and recalculates stats when build choices change.
+export async function putCharacterById(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "id");
+    const { characterId } = res.locals;
     const existingCharacter = await findRequiredCharacter(characterId);
-    const updates = buildCharacterUpdates(req.body, existingCharacter);
-    const updatedCharacter = await characterModel.updateCharacterById(characterId, updates);
+    const updates = buildCharacterUpdates(res.locals, existingCharacter);
 
-    return res.status(200).json({
-      message: "Character updated.",
-      data: updatedCharacter
-    });
+    res.locals.data = await characterModel.updateCharacterById(characterId, updates);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -138,17 +108,16 @@ export async function putCharacterById(req, res) {
 // CHARACTER DELETE CONTROLLERS
 // ------------------------------------------------------------
 
-// Deletes one character.
-export async function deleteCharacter(req, res) {
+// Deletes one character and lets the model clean up dependent gameplay rows.
+export async function deleteCharacter(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "id");
-    const deletedCharacter = await characterModel.deleteCharacterById(characterId);
+    const deletedCharacter = await characterModel.deleteCharacterById(res.locals.characterId);
 
     if (!deletedCharacter) {
       throw createHttpError(404, "Not Found", "Character was not found.");
     }
 
-    return res.status(204).send();
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -158,14 +127,10 @@ export async function deleteCharacter(req, res) {
 // CONTROLLER HELPERS
 // ------------------------------------------------------------
 
-// Builds allowed character update fields.
-// If origin, class, or affinity changes, stats are recalculated using the same creation rules.
-function buildCharacterUpdates(body, existingCharacter) {
+// Builds allowed character update fields from validated res.locals values.
+function buildCharacterUpdates(locals, existingCharacter) {
   const updates = {};
-  const characterName = getOptionalString(body, "characterName");
-  const origin = getOptionalString(body, "origin");
-  const className = getOptionalString(body, "className");
-  const affinity = getOptionalString(body, "affinity");
+  const { characterName, origin, className, affinity } = locals;
 
   if (characterName !== undefined) {
     validateCharacterNameOrThrow(characterName);
@@ -185,14 +150,6 @@ function buildCharacterUpdates(body, existingCharacter) {
   if (affinity !== undefined) {
     validateAffinityOrThrow(affinity);
     updates.affinity = affinity;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    throw createHttpError(
-      400,
-      "Bad Request",
-      "Provide at least one updatable field: characterName, origin, className, or affinity."
-    );
   }
 
   if (origin !== undefined || className !== undefined || affinity !== undefined) {
@@ -215,8 +172,7 @@ function buildCharacterUpdates(body, existingCharacter) {
   return updates;
 }
 
-// Converts game rule validation results into controller errors.
-// This keeps game-rule validation errors in the same JSON format as request errors.
+// Converts fixed game content validation messages into API errors.
 function throwIfValidationError(errorMessage) {
   if (errorMessage) {
     throw createHttpError(400, "Bad Request", errorMessage);

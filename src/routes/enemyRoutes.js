@@ -1,8 +1,9 @@
 // Enemy route definitions.
-// Route order: optional query input goes straight to the controller for filtering fixed enemy data.
+// Route order: validate filters, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getEnemies, getEnemyById } from "../controllers/enemyController.js";
-import { requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -11,20 +12,26 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all enemy definitions.
-// Required fields: none
 // Optional fields: regionId query, isBoss query
 router.get(
   "/",
-  getEnemies
+  validateQuery({
+    regionId: { type: "string" },
+    isBoss: { type: "bit" }
+  }),
+  getEnemies,
+  withMessage("Enemies retrieved."),
+  sendResponse
 );
 
 // Get one enemy definition.
 // Required fields: enemyId parameter
-// Optional fields: none
 router.get(
   "/:enemyId",
-  requireParamFields("enemyId"),
-  getEnemyById
+  validateParams({ enemyId: { type: "string" } }),
+  getEnemyById,
+  withMessage("Enemy retrieved."),
+  sendResponse
 );
 
 export default router;

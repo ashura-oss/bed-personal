@@ -1,5 +1,5 @@
 // Character route definitions.
-// Route order: validate required params/body fields first, then let the controller handle character logic.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getCharacterAbilities, unlockCharacterAbility } from "../controllers/abilityController.js";
 import { getAdventureLogsByCharacterId } from "../controllers/adventureController.js";
@@ -10,7 +10,8 @@ import {
   postCharacter,
   putCharacterById
 } from "../controllers/characterController.js";
-import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateAnyBody, validateBody, validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -19,38 +20,43 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all characters.
-// Required fields: none
 // Optional fields: className query
 router.get(
   "/",
-  getCharacters
+  validateQuery({ className: { type: "string" } }),
+  getCharacters,
+  withMessage("Characters retrieved."),
+  sendResponse
 );
 
 // Get all adventure logs for one character.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/:characterId/adventure-logs",
-  requireParamFields("characterId"),
-  getAdventureLogsByCharacterId
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getAdventureLogsByCharacterId,
+  withMessage("Character adventure logs retrieved."),
+  sendResponse
 );
 
 // Get all unlocked abilities for one character.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/:characterId/abilities",
-  requireParamFields("characterId"),
-  getCharacterAbilities
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getCharacterAbilities,
+  withMessage("Character abilities retrieved."),
+  sendResponse
 );
 
 // Get one character by id.
 // Required fields: id parameter
-// Optional fields: none
 router.get(
   "/:id",
-  requireParamFields("id"),
-  getCharacterById
+  validateParams({ id: { type: "integer", min: 1, localName: "characterId" } }),
+  getCharacterById,
+  withMessage("Character retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -59,21 +65,29 @@ router.get(
 
 // Create one character for an existing user.
 // Required fields: userId, characterName, origin, className, affinity
-// Optional fields: none
 router.post(
   "/",
-  requireBodyFields("userId", "characterName", "origin", "className", "affinity"),
-  postCharacter
+  validateBody({
+    userId: { type: "integer", min: 1 },
+    characterName: { type: "string" },
+    origin: { type: "string" },
+    className: { type: "string" },
+    affinity: { type: "string" }
+  }),
+  postCharacter,
+  withMessage("Character created.", 201),
+  sendResponse
 );
 
 // Unlock one ability for a character.
 // Required fields: characterId parameter, abilityId
-// Optional fields: none
 router.post(
   "/:characterId/unlock-ability",
-  requireParamFields("characterId"),
-  requireBodyFields("abilityId"),
-  unlockCharacterAbility
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  validateBody({ abilityId: { type: "string" } }),
+  unlockCharacterAbility,
+  withMessage("Character ability unlocked.", 201),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -85,9 +99,16 @@ router.post(
 // Optional fields: characterName, origin, className, affinity
 router.put(
   "/:id",
-  requireParamFields("id"),
-  requireAnyBodyField("characterName", "origin", "className", "affinity"),
-  putCharacterById
+  validateParams({ id: { type: "integer", min: 1, localName: "characterId" } }),
+  validateAnyBody({
+    characterName: { type: "string" },
+    origin: { type: "string" },
+    className: { type: "string" },
+    affinity: { type: "string" }
+  }),
+  putCharacterById,
+  withMessage("Character updated."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -96,11 +117,12 @@ router.put(
 
 // Delete one character by id.
 // Required fields: id parameter
-// Optional fields: none
 router.delete(
   "/:id",
-  requireParamFields("id"),
-  deleteCharacter
+  validateParams({ id: { type: "integer", min: 1, localName: "characterId" } }),
+  deleteCharacter,
+  withMessage("Character deleted.", 204),
+  sendResponse
 );
 
 export default router;

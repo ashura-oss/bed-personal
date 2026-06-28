@@ -1,15 +1,9 @@
 // Progression controller functions read and save story and quest progression.
-// The controller validates editable fields before progression models save character/run rows.
+// The controller validates gameplay rules before progression models save character/run rows.
 import { findQuestDefinitionById } from "../constants/quests.js";
 import * as characterModel from "../models/characterModel.js";
 import * as progressionModel from "../models/progressionModel.js";
-import {
-  createHttpError,
-  getOptionalInteger,
-  getOptionalString,
-  getRequiredIdParam,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 const DEFAULT_RUN_STATE = {
   supplies: 3,
@@ -23,18 +17,14 @@ const DEFAULT_RUN_STATE = {
 // ------------------------------------------------------------
 
 // Gets the current story, run, and quest progression for one character.
-export async function getCharacterProgression(req, res) {
+export async function getCharacterProgression(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
-    const progression = await progressionModel.findCharacterProgressionById(characterId);
-
-    return res.status(200).json({
-      message: "Character progression retrieved.",
-      data: progression
-    });
+    res.locals.data = await progressionModel.findCharacterProgressionById(characterId);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -45,24 +35,14 @@ export async function getCharacterProgression(req, res) {
 // ------------------------------------------------------------
 
 // Saves editable progression fields for one character.
-// Character stats and run state are prepared separately before the model writes both.
-export async function putCharacterProgression(req, res) {
+export async function putCharacterProgression(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
-    const characterUpdates = buildCharacterProgressionUpdates(req.body);
-    const runStateChanges = buildRunStateChanges(req.body);
-
-    if (Object.keys(characterUpdates).length === 0 && runStateChanges === null) {
-      throw createHttpError(
-        400,
-        "Bad Request",
-        "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked."
-      );
-    }
-
+    const characterUpdates = buildCharacterProgressionUpdates(res.locals);
+    const runStateChanges = buildRunStateChanges(res.locals);
     let runStateUpdates = null;
 
     if (runStateChanges !== null) {
@@ -85,30 +65,25 @@ export async function putCharacterProgression(req, res) {
       };
     }
 
-    const savedProgression = await progressionModel.saveCharacterProgression({
+    res.locals.data = await progressionModel.saveCharacterProgression({
       characterId,
       characterUpdates,
       runStateUpdates
     });
-
-    return res.status(200).json({
-      message: "Character progression saved.",
-      data: savedProgression
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Claims dialogue quest rewards that are not handled by combat.
-// Combat and army quests are resolved elsewhere so direct claims stay limited to dialogue.
-export async function putCharacterQuestCompletion(req, res) {
+export async function putCharacterQuestCompletion(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId, questId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
-    const quest = findQuestDefinitionById(req.params.questId);
+    const quest = findQuestDefinitionById(questId);
     const questReward = quest
       ? {
           questId: quest.questId,
@@ -132,19 +107,17 @@ export async function putCharacterQuestCompletion(req, res) {
       questReward
     });
 
-    return res.status(200).json({
-      message: "Quest completion claimed.",
-      data: {
-        awarded: claimResult.awarded,
-        rewards: {
-          xp: claimResult.awardedXp
-        },
-        quest: questReward,
-        characterProgression: claimResult.characterProgression,
-        character: claimResult.character,
-        questCompletion: claimResult.questCompletion
-      }
-    });
+    res.locals.data = {
+      awarded: claimResult.awarded,
+      rewards: {
+        xp: claimResult.awardedXp
+      },
+      quest: questReward,
+      characterProgression: claimResult.characterProgression,
+      character: claimResult.character,
+      questCompletion: claimResult.questCompletion
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -154,55 +127,43 @@ export async function putCharacterQuestCompletion(req, res) {
 // CONTROLLER HELPERS
 // ------------------------------------------------------------
 
-// Builds valid character stat updates from the request body.
-// Only fields provided in the request are added to the update object.
-function buildCharacterProgressionUpdates(body) {
+// Builds valid character stat updates from validated res.locals values.
+function buildCharacterProgressionUpdates(locals) {
   const updates = {};
-  const level = getOptionalInteger(body, "level", { min: 1 });
-  const xp = getOptionalInteger(body, "xp", { min: 0 });
-  const hp = getOptionalInteger(body, "hp", { min: 0 });
 
-  if (level !== undefined) {
-    updates.level = level;
+  if (locals.level !== undefined) {
+    updates.level = locals.level;
   }
 
-  if (xp !== undefined) {
-    updates.xp = xp;
+  if (locals.xp !== undefined) {
+    updates.xp = locals.xp;
   }
 
-  if (hp !== undefined) {
-    updates.hp = hp;
+  if (locals.hp !== undefined) {
+    updates.hp = locals.hp;
   }
 
   return updates;
 }
 
-// Builds valid run state updates from the request body.
-// Missing fields are filled from the current run state before saving.
-function buildRunStateChanges(body) {
+// Builds valid run state updates from validated res.locals values.
+function buildRunStateChanges(locals) {
   const updates = {};
-  const supplies = getOptionalInteger(body, "supplies", { min: 0 });
-  const morale = getOptionalInteger(body, "morale", { min: 0, max: 100 });
-  const storyPhase = getOptionalString(body, "storyPhase");
-  const commandModeUnlocked = getOptionalInteger(body, "commandModeUnlocked", {
-    min: 0,
-    max: 1
-  });
 
-  if (supplies !== undefined) {
-    updates.supplies = supplies;
+  if (locals.supplies !== undefined) {
+    updates.supplies = locals.supplies;
   }
 
-  if (morale !== undefined) {
-    updates.morale = morale;
+  if (locals.morale !== undefined) {
+    updates.morale = locals.morale;
   }
 
-  if (storyPhase !== undefined) {
-    updates.storyPhase = storyPhase;
+  if (locals.storyPhase !== undefined) {
+    updates.storyPhase = locals.storyPhase;
   }
 
-  if (commandModeUnlocked !== undefined) {
-    updates.commandModeUnlocked = commandModeUnlocked;
+  if (locals.commandModeUnlocked !== undefined) {
+    updates.commandModeUnlocked = locals.commandModeUnlocked;
   }
 
   return Object.keys(updates).length > 0 ? updates : null;

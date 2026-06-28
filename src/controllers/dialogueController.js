@@ -3,24 +3,18 @@
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
 import * as characterModel from "../models/characterModel.js";
 import * as stateModel from "../models/stateModel.js";
-import {
-  createHttpError,
-  getOptionalString,
-  getRequiredId,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // DIALOGUE LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets dialogue definitions, optionally filtered by region or story phase.
-export async function getDialogues(req, res) {
+export async function getDialogues(_req, res, next) {
   try {
-    const regionId = getOptionalString(req.query, "regionId");
-    const storyPhase = getOptionalString(req.query, "storyPhase");
-    const dialogues = DIALOGUE_DEFINITIONS.filter((dialogue) => {
+    const { regionId, storyPhase } = res.locals;
+
+    res.locals.data = DIALOGUE_DEFINITIONS.filter((dialogue) => {
       if (regionId !== undefined && dialogue.regionId !== regionId) {
         return false;
       }
@@ -31,29 +25,23 @@ export async function getDialogues(req, res) {
 
       return true;
     }).sort((left, right) => left.dialogueId.localeCompare(right.dialogueId));
-
-    return res.status(200).json({
-      message: "Dialogues retrieved.",
-      data: dialogues
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one dialogue definition by id.
-export async function getDialogueById(req, res) {
+export async function getDialogueById(_req, res, next) {
   try {
-    const dialogue = findDialogueDefinitionById(req.params.dialogueId);
+    const dialogue = findDialogueDefinitionById(res.locals.dialogueId);
 
     if (!dialogue) {
       throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
     }
 
-    return res.status(200).json({
-      message: "Dialogue retrieved.",
-      data: dialogue
-    });
+    res.locals.data = dialogue;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -64,13 +52,11 @@ export async function getDialogueById(req, res) {
 // ------------------------------------------------------------
 
 // Completes one dialogue and saves its completion flag.
-// The chosen option must exist in the fixed dialogue definition before the flag is saved.
-export async function postDialogueCompletion(req, res) {
+export async function postDialogueCompletion(_req, res, next) {
   try {
-    const characterId = getRequiredId(req.body, "characterId");
-    const choiceId = getRequiredString(req.body, "choiceId");
+    const { characterId, choiceId, dialogueId } = res.locals;
     const character = await findRequiredCharacter(characterId);
-    const dialogue = findDialogueDefinitionById(req.params.dialogueId);
+    const dialogue = findDialogueDefinitionById(dialogueId);
 
     if (!dialogue) {
       throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
@@ -88,14 +74,12 @@ export async function postDialogueCompletion(req, res) {
       flagValue: 1
     });
 
-    return res.status(200).json({
-      message: "Dialogue completed.",
-      data: {
-        dialogue,
-        selectedChoice,
-        dialogueFlag
-      }
-    });
+    res.locals.data = {
+      dialogue,
+      selectedChoice,
+      dialogueFlag
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }

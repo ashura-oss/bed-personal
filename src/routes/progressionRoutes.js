@@ -1,12 +1,13 @@
 // Progression route definitions.
-// Route order: validate required params/body fields first, then let the controller save progression changes.
+// Each route validates request input before the controller saves progression data.
 import { Router } from "express";
 import {
   getCharacterProgression,
   putCharacterProgression,
   putCharacterQuestCompletion
 } from "../controllers/progressionController.js";
-import { requireAnyBodyField, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateAnyBody, validateParams } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -16,11 +17,12 @@ const router = Router();
 
 // Get story and quest progression for one character.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/characters/:characterId",
-  requireParamFields("characterId"),
-  getCharacterProgression
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getCharacterProgression,
+  withMessage("Character progression retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -32,18 +34,32 @@ router.get(
 // Optional fields: level, xp, hp, supplies, morale, storyPhase, commandModeUnlocked
 router.put(
   "/characters/:characterId",
-  requireParamFields("characterId"),
-  requireAnyBodyField("level", "xp", "hp", "supplies", "morale", "storyPhase", "commandModeUnlocked"),
-  putCharacterProgression
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  validateAnyBody({
+    level: { type: "integer", min: 1 },
+    xp: { type: "integer", min: 0 },
+    hp: { type: "integer", min: 0 },
+    supplies: { type: "integer", min: 0 },
+    morale: { type: "integer", min: 0, max: 100 },
+    storyPhase: { type: "string" },
+    commandModeUnlocked: { type: "bit" }
+  }),
+  putCharacterProgression,
+  withMessage("Character progression saved."),
+  sendResponse
 );
 
-// Claim one quest completion for a character.
+// Claim one dialogue quest completion for a character.
 // Required fields: characterId parameter, questId parameter
-// Optional fields: none
 router.put(
   "/characters/:characterId/quest-completions/:questId",
-  requireParamFields("characterId", "questId"),
-  putCharacterQuestCompletion
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    questId: { type: "string" }
+  }),
+  putCharacterQuestCompletion,
+  withMessage("Quest completion claimed."),
+  sendResponse
 );
 
 export default router;

@@ -1,45 +1,31 @@
-// User controller functions validate requests, call user models, and send responses.
-// User models store account-level progress such as level, XP, and gold.
+// User controller functions validate account rules, call user models, and pass data forward.
+// Success status codes and messages are attached in the route middleware.
 import * as userModel from "../models/userModel.js";
-import {
-  createHttpError,
-  getOptionalInteger,
-  getOptionalPositiveIntegerQuery,
-  getOptionalString,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // USER LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all users, optionally filtered by level.
-export async function getUsers(req, res) {
+export async function getUsers(_req, res, next) {
   try {
-    const level = getOptionalPositiveIntegerQuery(req.query, "level");
-    const userList = await userModel.findUsers({ level });
+    const userList = await userModel.findUsers({ level: res.locals.level });
 
-    return res.status(200).json({
-      message: "Users retrieved.",
-      data: userList
-    });
+    res.locals.data = userList;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one user by id.
-export async function getUserById(req, res) {
+export async function getUserById(_req, res, next) {
   try {
-    const userId = getRequiredIdParam(req.params, "id");
-    const user = await findRequiredUser(userId);
+    const user = await findRequiredUser(res.locals.userId);
 
-    return res.status(200).json({
-      message: "User retrieved.",
-      data: user
-    });
+    res.locals.data = user;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -49,50 +35,35 @@ export async function getUserById(req, res) {
 // USER CREATION CONTROLLERS
 // ------------------------------------------------------------
 
-// Creates one user.
-export async function postUser(req, res) {
+// Creates one user after checking username uniqueness.
+export async function postUser(_req, res, next) {
   try {
-    const username = getRequiredString(req.body, "username");
-    const password = getRequiredString(req.body, "password");
-    validatePassword(password);
-
+    const { username, password } = res.locals;
     const existingUser = await userModel.findUserByUsername(username);
 
     if (existingUser) {
       throw createHttpError(409, "Conflict", "Username is already taken.");
     }
 
-    const user = await userModel.createUser({
-      username,
-      password
-    });
-
-    return res.status(201).json({
-      message: "User created.",
-      data: user
-    });
+    res.locals.data = await userModel.createUser({ username, password });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Logs in one user by checking username and password.
-export async function postUserLogin(req, res) {
+export async function postUserLogin(_req, res, next) {
   try {
-    const username = getRequiredString(req.body, "username");
-    const password = getRequiredString(req.body, "password");
+    const { username, password } = res.locals;
     const userCredentials = await userModel.findUserCredentialsByUsername(username);
 
     if (!userCredentials || userCredentials.password !== password) {
       throw createHttpError(401, "Unauthorized", "Username or password is incorrect.");
     }
 
-    const user = await userModel.findUserById(userCredentials.id);
-
-    return res.status(200).json({
-      message: "Login successful.",
-      data: user
-    });
+    res.locals.data = await userModel.findUserById(userCredentials.id);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -102,14 +73,14 @@ export async function postUserLogin(req, res) {
 // USER UPDATE CONTROLLERS
 // ------------------------------------------------------------
 
-// Updates one user.
-export async function putUserById(req, res) {
+// Updates one user after checking the target user and username ownership.
+export async function putUserById(_req, res, next) {
   try {
-    const userId = getRequiredIdParam(req.params, "id");
+    const { userId } = res.locals;
 
     await findRequiredUser(userId);
 
-    const updates = buildUserUpdates(req.body);
+    const updates = buildUserUpdates(res.locals);
 
     if (updates.username !== undefined) {
       const usernameOwner = await userModel.findUserByUsername(updates.username);
@@ -119,12 +90,8 @@ export async function putUserById(req, res) {
       }
     }
 
-    const updatedUser = await userModel.updateUserById(userId, updates);
-
-    return res.status(200).json({
-      message: "User updated.",
-      data: updatedUser
-    });
+    res.locals.data = await userModel.updateUserById(userId, updates);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -134,17 +101,16 @@ export async function putUserById(req, res) {
 // USER DELETE CONTROLLERS
 // ------------------------------------------------------------
 
-// Deletes one user.
-export async function deleteUser(req, res) {
+// Deletes one user and lets the model clean up dependent rows.
+export async function deleteUser(_req, res, next) {
   try {
-    const userId = getRequiredIdParam(req.params, "id");
-    const deletedUser = await userModel.deleteUserById(userId);
+    const deletedUser = await userModel.deleteUserById(res.locals.userId);
 
     if (!deletedUser) {
       throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    return res.status(204).send();
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -154,43 +120,28 @@ export async function deleteUser(req, res) {
 // CONTROLLER HELPERS
 // ------------------------------------------------------------
 
-// Builds allowed user update fields.
-// Only fields present in the request body are sent to the model update.
-function buildUserUpdates(body) {
+// Builds allowed user update fields from validated res.locals values.
+function buildUserUpdates(locals) {
   const updates = {};
-  const username = getOptionalString(body, "username");
-  const password = getOptionalString(body, "password");
-  const level = getOptionalInteger(body, "level", { min: 1 });
-  const xp = getOptionalInteger(body, "xp", { min: 0 });
-  const gold = getOptionalInteger(body, "gold", { min: 0 });
 
-  if (username !== undefined) {
-    updates.username = username;
+  if (locals.username !== undefined) {
+    updates.username = locals.username;
   }
 
-  if (password !== undefined) {
-    validatePassword(password);
-    updates.password = password;
+  if (locals.password !== undefined) {
+    updates.password = locals.password;
   }
 
-  if (level !== undefined) {
-    updates.level = level;
+  if (locals.level !== undefined) {
+    updates.level = locals.level;
   }
 
-  if (xp !== undefined) {
-    updates.xp = xp;
+  if (locals.xp !== undefined) {
+    updates.xp = locals.xp;
   }
 
-  if (gold !== undefined) {
-    updates.gold = gold;
-  }
-
-  if (Object.keys(updates).length === 0) {
-    throw createHttpError(
-      400,
-      "Bad Request",
-      "Provide at least one updatable field: username, password, level, xp, or gold."
-    );
+  if (locals.gold !== undefined) {
+    updates.gold = locals.gold;
   }
 
   return updates;
@@ -205,15 +156,4 @@ async function findRequiredUser(userId) {
   }
 
   return user;
-}
-
-// Checks simple password rules before storing or comparing it.
-function validatePassword(password) {
-  if (password.length < 6) {
-    throw createHttpError(
-      400,
-      "Bad Request",
-      "password must be at least 6 characters long."
-    );
-  }
 }

@@ -21,7 +21,8 @@ export const QUEST_DEFINITIONS = [
     regionId: "region_middle_earth",
     title: "Tax Knight Reckoning",
     description:
-      "Confront the decorated elven tax knights who killed the player's family after the village failed to pay tribute.",
+      "Confront the decorated elven tax knights who killed the player's family after " +
+      "the village failed to pay tribute.",
     questType: "combat",
     requiredLevel: 1,
     difficulty: 1,

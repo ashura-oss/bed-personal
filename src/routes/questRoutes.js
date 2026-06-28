@@ -1,8 +1,9 @@
 // Quest route definitions.
-// Route order: validate required params when needed, then let the controller return fixed quest data.
+// Quest data is fixed game content, so these routes only validate lookup fields.
 import { Router } from "express";
 import { getQuestById, getQuests } from "../controllers/questController.js";
-import { requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateParams } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -12,19 +13,21 @@ const router = Router();
 
 // Get all quest definitions.
 // Required fields: none
-// Optional fields: none
 router.get(
   "/",
-  getQuests
+  getQuests,
+  withMessage("Quests retrieved."),
+  sendResponse
 );
 
 // Get one quest definition.
 // Required fields: id parameter
-// Optional fields: none
 router.get(
   "/:id",
-  requireParamFields("id"),
-  getQuestById
+  validateParams({ id: { type: "string" } }),
+  getQuestById,
+  withMessage("Quest retrieved."),
+  sendResponse
 );
 
 export default router;

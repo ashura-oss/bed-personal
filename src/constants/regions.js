@@ -15,7 +15,8 @@ export const REGION_DEFINITIONS = [
     regionId: "region_kingsroad",
     name: "King's Road",
     description:
-      "A broken road between human villages, patrol towers, and raider camps where travel events can trigger fights or supplies.",
+      "A broken road between human villages, patrol towers, and raider camps where " +
+      "travel events can trigger fights or supplies.",
     dangerLevel: 1,
     recommendedLevel: 1,
     faction: "Road Militia",
@@ -48,7 +49,8 @@ export const REGION_DEFINITIONS = [
     regionId: "region_crownfield",
     name: "Crownfield",
     description:
-      "A liberated plain where mankind crowns its first king and begins commanding armies instead of fighting every skirmish alone.",
+      "A liberated plain where mankind crowns its first king and begins commanding armies " +
+      "instead of fighting every skirmish alone.",
     dangerLevel: 3,
     recommendedLevel: 3,
     faction: "Army of Mankind",

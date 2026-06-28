@@ -1,5 +1,5 @@
 // Saved state route definitions.
-// Route order: validate required params/body fields first, then let controllers save game state rows.
+// These routes save persistent gameplay state such as inventory, slots, flags, and markers.
 import { Router } from "express";
 import {
   deleteEquipment,
@@ -18,7 +18,8 @@ import {
   putRegionState,
   putSaveSlotForUser
 } from "../controllers/stateController.js";
-import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateAnyBody, validateBody, validateParams } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -28,20 +29,22 @@ const router = Router();
 
 // Get save slots for one user.
 // Required fields: userId parameter
-// Optional fields: none
 router.get(
   "/users/:userId/save-slots",
-  requireParamFields("userId"),
-  getSaveSlotsForUser
+  validateParams({ userId: { type: "integer", min: 1 } }),
+  getSaveSlotsForUser,
+  withMessage("Save slots retrieved."),
+  sendResponse
 );
 
 // Get full saved state for one character.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/characters/:characterId/full",
-  requireParamFields("characterId"),
-  getCharacterFullState
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getCharacterFullState,
+  withMessage("Character state retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -50,11 +53,15 @@ router.get(
 
 // Consume one inventory item for a character.
 // Required fields: characterId parameter, itemId parameter
-// Optional fields: none
 router.post(
   "/characters/:characterId/consume/:itemId",
-  requireParamFields("characterId", "itemId"),
-  postConsumeInventoryItem
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    itemId: { type: "string" }
+  }),
+  postConsumeInventoryItem,
+  withMessage("Inventory item consumed."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -66,39 +73,59 @@ router.post(
 // Optional fields: characterId, slotName
 router.put(
   "/users/:userId/save-slots/:slotIndex",
-  requireParamFields("userId", "slotIndex"),
-  requireAnyBodyField("characterId", "slotName"),
-  putSaveSlotForUser
+  validateParams({
+    userId: { type: "integer", min: 1 },
+    slotIndex: { type: "integer", min: 1 }
+  }),
+  validateAnyBody({
+    characterId: { type: "integer", min: 1, nullable: true },
+    slotName: { type: "string" }
+  }),
+  putSaveSlotForUser,
+  withMessage("Save slot saved."),
+  sendResponse
 );
 
 // Save one inventory item for a character.
 // Required fields: characterId parameter, itemId parameter, quantity
-// Optional fields: none
 router.put(
   "/characters/:characterId/inventory/:itemId",
-  requireParamFields("characterId", "itemId"),
-  requireBodyFields("quantity"),
-  putInventoryItem
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    itemId: { type: "string" }
+  }),
+  validateBody({ quantity: { type: "integer", min: 0 } }),
+  putInventoryItem,
+  withMessage("Inventory item saved."),
+  sendResponse
 );
 
 // Equip one item for a character.
 // Required fields: characterId parameter, equipmentSlot parameter, itemId
-// Optional fields: none
 router.put(
   "/characters/:characterId/equipment/:equipmentSlot",
-  requireParamFields("characterId", "equipmentSlot"),
-  requireBodyFields("itemId"),
-  putEquipment
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    equipmentSlot: { type: "string" }
+  }),
+  validateBody({ itemId: { type: "string" } }),
+  putEquipment,
+  withMessage("Equipment saved."),
+  sendResponse
 );
 
 // Save one dialogue flag for a character.
 // Required fields: characterId parameter, flagId parameter, value
-// Optional fields: none
 router.put(
   "/characters/:characterId/dialogue-flags/:flagId",
-  requireParamFields("characterId", "flagId"),
-  requireBodyFields("value"),
-  putDialogueFlag
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    flagId: { type: "string" }
+  }),
+  validateBody({ value: { type: "bit" } }),
+  putDialogueFlag,
+  withMessage("Dialogue flag saved."),
+  sendResponse
 );
 
 // Save one boss state for a character.
@@ -106,9 +133,20 @@ router.put(
 // Optional fields: status, attempts, defeats, bestTimeSeconds, lastOutcome
 router.put(
   "/characters/:characterId/boss-states/:bossId",
-  requireParamFields("characterId", "bossId"),
-  requireAnyBodyField("status", "attempts", "defeats", "bestTimeSeconds", "lastOutcome"),
-  putBossState
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    bossId: { type: "string" }
+  }),
+  validateAnyBody({
+    status: { type: "string" },
+    attempts: { type: "integer", min: 0 },
+    defeats: { type: "integer", min: 0 },
+    bestTimeSeconds: { type: "number", nullable: true },
+    lastOutcome: { type: "string" }
+  }),
+  putBossState,
+  withMessage("Boss state saved."),
+  sendResponse
 );
 
 // Save one campaign marker for a character.
@@ -116,9 +154,21 @@ router.put(
 // Optional fields: isRevealed, isCompleted, positionX, positionY
 router.put(
   "/characters/:characterId/campaign-markers/:markerId",
-  requireParamFields("characterId", "markerId"),
-  requireBodyFields("regionId", "markerType"),
-  putCampaignMarker
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    markerId: { type: "string" }
+  }),
+  validateBody({
+    regionId: { type: "string" },
+    markerType: { type: "string" },
+    isRevealed: { type: "bit", optional: true },
+    isCompleted: { type: "bit", optional: true },
+    positionX: { type: "number", optional: true },
+    positionY: { type: "number", optional: true }
+  }),
+  putCampaignMarker,
+  withMessage("Campaign marker saved."),
+  sendResponse
 );
 
 // Save one faction reputation record for a character.
@@ -126,9 +176,17 @@ router.put(
 // Optional fields: reputation, rank
 router.put(
   "/characters/:characterId/faction-reputation/:factionId",
-  requireParamFields("characterId", "factionId"),
-  requireAnyBodyField("reputation", "rank"),
-  putFactionReputation
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    factionId: { type: "string" }
+  }),
+  validateAnyBody({
+    reputation: { type: "integer" },
+    rank: { type: "string" }
+  }),
+  putFactionReputation,
+  withMessage("Faction reputation saved."),
+  sendResponse
 );
 
 // Save one region state for a character.
@@ -136,9 +194,19 @@ router.put(
 // Optional fields: isUnlocked, isDiscovered, threatLevel, worldState
 router.put(
   "/characters/:characterId/region-states/:regionId",
-  requireParamFields("characterId", "regionId"),
-  requireAnyBodyField("isUnlocked", "isDiscovered", "threatLevel", "worldState"),
-  putRegionState
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    regionId: { type: "string" }
+  }),
+  validateAnyBody({
+    isUnlocked: { type: "bit" },
+    isDiscovered: { type: "bit" },
+    threatLevel: { type: "integer", min: 0 },
+    worldState: { type: "string" }
+  }),
+  putRegionState,
+  withMessage("Region state saved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -147,20 +215,28 @@ router.put(
 
 // Remove one inventory item from a character.
 // Required fields: characterId parameter, itemId parameter
-// Optional fields: none
 router.delete(
   "/characters/:characterId/inventory/:itemId",
-  requireParamFields("characterId", "itemId"),
-  deleteInventoryItem
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    itemId: { type: "string" }
+  }),
+  deleteInventoryItem,
+  withMessage("Inventory item removed."),
+  sendResponse
 );
 
 // Unequip one item for a character.
 // Required fields: characterId parameter, equipmentSlot parameter
-// Optional fields: none
 router.delete(
   "/characters/:characterId/equipment/:equipmentSlot",
-  requireParamFields("characterId", "equipmentSlot"),
-  deleteEquipment
+  validateParams({
+    characterId: { type: "integer", min: 1 },
+    equipmentSlot: { type: "string" }
+  }),
+  deleteEquipment,
+  withMessage("Equipment removed."),
+  sendResponse
 );
 
 export default router;

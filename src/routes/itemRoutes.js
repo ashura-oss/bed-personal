@@ -1,8 +1,9 @@
 // Item route definitions.
-// Route order: optional query input goes straight to the controller for filtering fixed item data.
+// Route order: validate filters, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getItemById, getItems } from "../controllers/itemController.js";
-import { requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -11,20 +12,26 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all item definitions.
-// Required fields: none
 // Optional fields: itemType query, equipmentSlot query
 router.get(
   "/",
-  getItems
+  validateQuery({
+    itemType: { type: "string" },
+    equipmentSlot: { type: "string" }
+  }),
+  getItems,
+  withMessage("Items retrieved."),
+  sendResponse
 );
 
 // Get one item definition.
 // Required fields: itemId parameter
-// Optional fields: none
 router.get(
   "/:itemId",
-  requireParamFields("itemId"),
-  getItemById
+  validateParams({ itemId: { type: "string" } }),
+  getItemById,
+  withMessage("Item retrieved."),
+  sendResponse
 );
 
 export default router;

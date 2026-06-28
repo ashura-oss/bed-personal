@@ -1,8 +1,9 @@
 // Dialogue route definitions.
-// Route order: validate required params/body fields first, then let the controller read or save dialogue state.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getDialogueById, getDialogues, postDialogueCompletion } from "../controllers/dialogueController.js";
-import { requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateBody, validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -11,20 +12,26 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all dialogue definitions.
-// Required fields: none
 // Optional fields: regionId query, storyPhase query
 router.get(
   "/",
-  getDialogues
+  validateQuery({
+    regionId: { type: "string" },
+    storyPhase: { type: "string" }
+  }),
+  getDialogues,
+  withMessage("Dialogues retrieved."),
+  sendResponse
 );
 
 // Get one dialogue definition.
 // Required fields: dialogueId parameter
-// Optional fields: none
 router.get(
   "/:dialogueId",
-  requireParamFields("dialogueId"),
-  getDialogueById
+  validateParams({ dialogueId: { type: "string" } }),
+  getDialogueById,
+  withMessage("Dialogue retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -33,12 +40,16 @@ router.get(
 
 // Mark one dialogue as completed by a character.
 // Required fields: dialogueId parameter, characterId, choiceId
-// Optional fields: none
 router.post(
   "/:dialogueId/complete",
-  requireParamFields("dialogueId"),
-  requireBodyFields("characterId", "choiceId"),
-  postDialogueCompletion
+  validateParams({ dialogueId: { type: "string" } }),
+  validateBody({
+    characterId: { type: "integer", min: 1 },
+    choiceId: { type: "string" }
+  }),
+  postDialogueCompletion,
+  withMessage("Dialogue completed."),
+  sendResponse
 );
 
 export default router;

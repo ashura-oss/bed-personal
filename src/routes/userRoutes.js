@@ -1,10 +1,18 @@
 // User route definitions.
-// Route order: validate required params/body fields first, then let the controller handle user logic.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getAdventureLogsByUserId } from "../controllers/adventureController.js";
 import { getCharactersByUserId } from "../controllers/characterController.js";
-import { deleteUser, getUserById, getUsers, postUser, postUserLogin, putUserById } from "../controllers/userController.js";
-import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import {
+  deleteUser,
+  getUserById,
+  getUsers,
+  postUser,
+  postUserLogin,
+  putUserById
+} from "../controllers/userController.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateAnyBody, validateBody, validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -13,38 +21,43 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all users.
-// Required fields: none
 // Optional fields: level query
 router.get(
   "/",
-  getUsers
+  validateQuery({ level: { type: "integer", min: 1 } }),
+  getUsers,
+  withMessage("Users retrieved."),
+  sendResponse
 );
 
 // Get all characters owned by one user.
 // Required fields: userId parameter
-// Optional fields: none
 router.get(
   "/:userId/characters",
-  requireParamFields("userId"),
-  getCharactersByUserId
+  validateParams({ userId: { type: "integer", min: 1 } }),
+  getCharactersByUserId,
+  withMessage("User characters retrieved."),
+  sendResponse
 );
 
 // Get all adventure logs owned by one user.
 // Required fields: userId parameter
-// Optional fields: none
 router.get(
   "/:userId/adventure-logs",
-  requireParamFields("userId"),
-  getAdventureLogsByUserId
+  validateParams({ userId: { type: "integer", min: 1 } }),
+  getAdventureLogsByUserId,
+  withMessage("User adventure logs retrieved."),
+  sendResponse
 );
 
 // Get one user by id.
 // Required fields: id parameter
-// Optional fields: none
 router.get(
   "/:id",
-  requireParamFields("id"),
-  getUserById
+  validateParams({ id: { type: "integer", min: 1, localName: "userId" } }),
+  getUserById,
+  withMessage("User retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -53,20 +66,28 @@ router.get(
 
 // Login one user.
 // Required fields: username, password
-// Optional fields: none
 router.post(
   "/login",
-  requireBodyFields("username", "password"),
-  postUserLogin
+  validateBody({
+    username: { type: "string" },
+    password: { type: "string", minLength: 6 }
+  }),
+  postUserLogin,
+  withMessage("Login successful."),
+  sendResponse
 );
 
 // Create one user.
 // Required fields: username, password
-// Optional fields: none
 router.post(
   "/",
-  requireBodyFields("username", "password"),
-  postUser
+  validateBody({
+    username: { type: "string" },
+    password: { type: "string", minLength: 6 }
+  }),
+  postUser,
+  withMessage("User created.", 201),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -78,9 +99,17 @@ router.post(
 // Optional fields: username, password, level, xp, gold
 router.put(
   "/:id",
-  requireParamFields("id"),
-  requireAnyBodyField("username", "password", "level", "xp", "gold"),
-  putUserById
+  validateParams({ id: { type: "integer", min: 1, localName: "userId" } }),
+  validateAnyBody({
+    username: { type: "string" },
+    password: { type: "string", minLength: 6 },
+    level: { type: "integer", min: 1 },
+    xp: { type: "integer", min: 0 },
+    gold: { type: "integer", min: 0 }
+  }),
+  putUserById,
+  withMessage("User updated."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -89,11 +118,12 @@ router.put(
 
 // Delete one user by id.
 // Required fields: id parameter
-// Optional fields: none
 router.delete(
   "/:id",
-  requireParamFields("id"),
-  deleteUser
+  validateParams({ id: { type: "integer", min: 1, localName: "userId" } }),
+  deleteUser,
+  withMessage("User deleted.", 204),
+  sendResponse
 );
 
 export default router;

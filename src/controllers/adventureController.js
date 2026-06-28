@@ -1,4 +1,4 @@
-// Adventure controller functions resolve non-combat quest attempts and return rewards.
+// Adventure controller functions resolve non-combat quest attempts and pass reward data forward.
 // The controller validates ownership and quest type before the model saves logs and rewards.
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
@@ -7,49 +7,39 @@ import * as characterModel from "../models/characterModel.js";
 import * as userModel from "../models/userModel.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
-import {
-  createHttpError,
-  getRequiredId,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
 // ADVENTURE LOG CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets adventure logs owned by one user.
-export async function getAdventureLogsByUserId(req, res) {
+export async function getAdventureLogsByUserId(_req, res, next) {
   try {
-    const userId = getRequiredIdParam(req.params, "userId");
+    const { userId } = res.locals;
 
     await findRequiredUser(userId);
 
     const adventureLogList = await adventureModel.findAdventureLogsByUserId(userId);
 
-    return res.status(200).json({
-      message: "User adventure logs retrieved.",
-      data: enrichAdventureLogRows(adventureLogList)
-    });
+    res.locals.data = enrichAdventureLogRows(adventureLogList);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets adventure logs for one character.
-export async function getAdventureLogsByCharacterId(req, res) {
+export async function getAdventureLogsByCharacterId(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
     const adventureLogList = await adventureModel.findAdventureLogsByCharacterId(characterId);
 
-    return res.status(200).json({
-      message: "Character adventure logs retrieved.",
-      data: enrichAdventureLogRows(adventureLogList)
-    });
+    res.locals.data = enrichAdventureLogRows(adventureLogList);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -60,11 +50,9 @@ export async function getAdventureLogsByCharacterId(req, res) {
 // ------------------------------------------------------------
 
 // Resolves one non-combat quest attempt and applies rewards.
-export async function postAdventureAttempt(req, res) {
+export async function postAdventureAttempt(_req, res, next) {
   try {
-    const userId = getRequiredId(req.body, "userId");
-    const characterId = getRequiredId(req.body, "characterId");
-    const questId = getRequiredString(req.body, "questId");
+    const { userId, characterId, questId } = res.locals;
     const user = await findRequiredUser(userId);
     const character = await findRequiredCharacter(characterId);
     const quest = findQuestDefinitionById(questId);
@@ -121,30 +109,28 @@ export async function postAdventureAttempt(req, res) {
       userUpdates: userProgression.updates
     });
 
-    return res.status(200).json({
-      message: "Adventure attempt resolved.",
-      data: {
-        outcome: attemptResult.outcome,
-        resultText: attemptResult.resultText,
-        rewards: {
-          xp: attemptResult.xpGained,
-          gold: attemptResult.goldGained
-        },
-        challenge: attemptResult.challenge,
-        quest: {
-          questId: quest.questId,
-          title: quest.title,
-          questType: quest.questType,
-          requiredLevel: quest.requiredLevel,
-          difficulty: quest.difficulty
-        },
-        characterProgression: characterProgression.summary,
-        userProgression: userProgression.summary,
-        character: savedAttempt.character,
-        user: savedAttempt.user,
-        adventureLog: savedAttempt.adventureLog
-      }
-    });
+    res.locals.data = {
+      outcome: attemptResult.outcome,
+      resultText: attemptResult.resultText,
+      rewards: {
+        xp: attemptResult.xpGained,
+        gold: attemptResult.goldGained
+      },
+      challenge: attemptResult.challenge,
+      quest: {
+        questId: quest.questId,
+        title: quest.title,
+        questType: quest.questType,
+        requiredLevel: quest.requiredLevel,
+        difficulty: quest.difficulty
+      },
+      characterProgression: characterProgression.summary,
+      userProgression: userProgression.summary,
+      character: savedAttempt.character,
+      user: savedAttempt.user,
+      adventureLog: savedAttempt.adventureLog
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -155,7 +141,6 @@ export async function postAdventureAttempt(req, res) {
 // ------------------------------------------------------------
 
 // Adds fixed quest and region details to adventure log rows.
-// Log rows store ids, so this attaches readable names for API responses.
 function enrichAdventureLogRows(rows) {
   return rows.map((row) => {
     const quest = findQuestDefinitionById(row.questId);

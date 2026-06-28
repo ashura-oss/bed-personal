@@ -1,8 +1,9 @@
 // Combat route definitions.
-// Route order: validate required combat input first, then let the controller create or resolve sessions.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { getCombatSession, postCombatSession, postCombatTurn } from "../controllers/combatController.js";
-import { requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateBody, validateParams } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -12,11 +13,12 @@ const router = Router();
 
 // Get one combat session and its turn logs.
 // Required fields: combatSessionId parameter
-// Optional fields: none
 router.get(
   "/sessions/:combatSessionId",
-  requireParamFields("combatSessionId"),
-  getCombatSession
+  validateParams({ combatSessionId: { type: "integer", min: 1 } }),
+  getCombatSession,
+  withMessage("Combat session retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -28,8 +30,15 @@ router.get(
 // Optional fields: questId, nodeId
 router.post(
   "/sessions",
-  requireBodyFields("characterId", "enemyId"),
-  postCombatSession
+  validateBody({
+    characterId: { type: "integer", min: 1 },
+    enemyId: { type: "string" },
+    questId: { type: "string", optional: true },
+    nodeId: { type: "string", optional: true }
+  }),
+  postCombatSession,
+  withMessage("Combat session started.", 201),
+  sendResponse
 );
 
 // Resolve one turn in a combat session.
@@ -37,9 +46,15 @@ router.post(
 // Optional fields: abilityId
 router.post(
   "/sessions/:combatSessionId/turns",
-  requireParamFields("combatSessionId"),
-  requireBodyFields("characterId", "actionType"),
-  postCombatTurn
+  validateParams({ combatSessionId: { type: "integer", min: 1 } }),
+  validateBody({
+    characterId: { type: "integer", min: 1 },
+    actionType: { type: "string" },
+    abilityId: { type: "string", optional: true }
+  }),
+  postCombatTurn,
+  withMessage("Combat turn resolved."),
+  sendResponse
 );
 
 export default router;

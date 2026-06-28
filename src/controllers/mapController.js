@@ -2,19 +2,12 @@
 // Map definitions are constants; current character location is saved through models.
 import { findEnemyDefinitionById } from "../constants/enemies.js";
 import { MAP_NODE_DEFINITIONS, findMapNodeDefinitionById } from "../constants/mapNodes.js";
-import * as characterModel from "../models/characterModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
+import * as characterModel from "../models/characterModel.js";
 import * as combatModel from "../models/combatModel.js";
 import * as mapModel from "../models/mapModel.js";
 import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
-import {
-  createHttpError,
-  getOptionalString,
-  getRequiredId,
-  getRequiredIdParam,
-  getRequiredString,
-  sendErrorResponse
-} from "../utils/requestHelpers.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 const START_NODE_ID = "node_hearthvale_square";
 
@@ -23,55 +16,47 @@ const START_NODE_ID = "node_hearthvale_square";
 // ------------------------------------------------------------
 
 // Gets map definitions, optionally filtered by region.
-export async function getMapNodes(req, res) {
+export async function getMapNodes(_req, res, next) {
   try {
-    const regionId = getOptionalString(req.query, "regionId");
+    const { regionId } = res.locals;
     let nodes = [...MAP_NODE_DEFINITIONS].sort((left, right) => left.positionX - right.positionX);
 
     if (regionId !== undefined) {
       nodes = nodes.filter((node) => node.regionId === regionId);
     }
 
-    return res.status(200).json({
-      message: "Map nodes retrieved.",
-      data: nodes
-    });
+    res.locals.data = nodes;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one map node definition by id.
-export async function getMapNodeById(req, res) {
+export async function getMapNodeById(_req, res, next) {
   try {
-    const node = findMapNodeDefinitionById(req.params.nodeId);
+    const node = findMapNodeDefinitionById(res.locals.nodeId);
 
     if (!node) {
       throw createHttpError(404, "Not Found", "Map node was not found.");
     }
 
-    return res.status(200).json({
-      message: "Map node retrieved.",
-      data: node
-    });
+    res.locals.data = node;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one character's current map location.
-export async function getCharacterMapLocation(req, res) {
+export async function getCharacterMapLocation(_req, res, next) {
   try {
-    const characterId = getRequiredIdParam(req.params, "characterId");
+    const { characterId } = res.locals;
 
     await findRequiredCharacter(characterId);
 
-    const location = await findOrCreateReadableLocation(characterId);
-
-    return res.status(200).json({
-      message: "Character map location retrieved.",
-      data: location
-    });
+    res.locals.data = await findOrCreateReadableLocation(characterId);
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -82,10 +67,9 @@ export async function getCharacterMapLocation(req, res) {
 // ------------------------------------------------------------
 
 // Moves one character only if the target node is connected and unlocked.
-export async function postTravelToNode(req, res) {
+export async function postTravelToNode(_req, res, next) {
   try {
-    const characterId = getRequiredId(req.body, "characterId");
-    const targetNodeId = getRequiredString(req.body, "targetNodeId");
+    const { characterId, targetNodeId } = res.locals;
     const character = await findRequiredCharacter(characterId);
     const currentLocation = await findOrCreateReadableLocation(characterId);
     const currentNode = findMapNodeDefinitionById(currentLocation.nodeId);
@@ -117,16 +101,14 @@ export async function postTravelToNode(req, res) {
     const location = await mapModel.moveCharacterToNode({ characterId, currentNode, targetNode });
     const travelEvent = await buildTravelEvent(character, targetNode);
 
-    return res.status(200).json({
-      message: "Travel resolved.",
-      data: {
-        location,
-        fromNode: currentNode,
-        toNode: targetNode,
-        transitionEffect: targetNode.transitionEffect,
-        travelEvent
-      }
-    });
+    res.locals.data = {
+      location,
+      fromNode: currentNode,
+      toNode: targetNode,
+      transitionEffect: targetNode.transitionEffect,
+      travelEvent
+    };
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
@@ -137,7 +119,6 @@ export async function postTravelToNode(req, res) {
 // ------------------------------------------------------------
 
 // Creates a missing location at the starting node.
-// This gives old or newly-created characters a safe starting map position.
 async function findOrCreateReadableLocation(characterId) {
   const existingLocation = await mapModel.findCharacterLocation(characterId);
 
@@ -155,7 +136,6 @@ async function findOrCreateReadableLocation(characterId) {
 }
 
 // Builds the result returned after movement.
-// Travel can return a normal movement result or an ambush combat session.
 async function buildTravelEvent(character, targetNode) {
   if (targetNode.nodeType === "gathering") {
     const inventoryItem = await mapModel.addTravelInventoryReward({
@@ -207,7 +187,6 @@ async function buildTravelEvent(character, targetNode) {
 }
 
 // Creates an ambush combat session when travel triggers a random encounter.
-// Equipment bonuses are applied before enemy HP and player HP are saved.
 async function createAmbushTravelEvent({ character, targetNode }) {
   const enemy = findEnemyDefinitionById(targetNode.encounterEnemyId);
 
@@ -236,7 +215,6 @@ async function createAmbushTravelEvent({ character, targetNode }) {
 }
 
 // Decides whether travel should trigger a random encounter.
-// Nodes without an encounter enemy never trigger combat.
 function shouldTriggerEncounter(targetNode) {
   const encounterChance = Number(targetNode.encounterChance || 0);
 

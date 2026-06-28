@@ -1,8 +1,9 @@
 // Adventure route definitions.
-// Route order: validate required body fields first, then let the controller resolve the attempt.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import { postAdventureAttempt } from "../controllers/adventureController.js";
-import { requireBodyFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateBody } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -12,11 +13,16 @@ const router = Router();
 
 // Attempt one non-combat quest with a user and character.
 // Required fields: userId, characterId, questId
-// Optional fields: none
 router.post(
   "/attempt",
-  requireBodyFields("userId", "characterId", "questId"),
-  postAdventureAttempt
+  validateBody({
+    userId: { type: "integer", min: 1 },
+    characterId: { type: "integer", min: 1 },
+    questId: { type: "string" }
+  }),
+  postAdventureAttempt,
+  withMessage("Adventure attempt resolved."),
+  sendResponse
 );
 
 export default router;

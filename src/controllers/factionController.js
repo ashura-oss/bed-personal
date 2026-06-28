@@ -8,39 +8,29 @@ import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 // ------------------------------------------------------------
 
 // Gets all faction definitions.
-export async function getFactions(_req, res) {
+export async function getFactions(_req, res, next) {
   try {
-    const factions = [...FACTION_DEFINITIONS].sort((left, right) =>
+    res.locals.data = [...FACTION_DEFINITIONS].sort((left, right) =>
       left.name.localeCompare(right.name)
     );
-
-    return res.status(200).json({
-      message: "Factions retrieved.",
-      data: factions
-    });
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
 
 // Gets one faction definition by id.
-export async function getFactionById(req, res) {
+export async function getFactionById(_req, res, next) {
   try {
-    const faction = findFactionDefinitionById(req.params.factionId);
+    const faction = findFactionDefinitionById(res.locals.factionId);
 
     if (!faction) {
       throw createHttpError(404, "Not Found", "Faction definition was not found.");
     }
 
-    return res.status(200).json({
-      message: "Faction retrieved.",
-      data: faction
-    });
+    res.locals.data = faction;
+    next();
   } catch (error) {
     return sendErrorResponse(res, error);
   }
 }
-
-// ------------------------------------------------------------
-// CONTROLLER HELPERS
-// ------------------------------------------------------------

@@ -1,5 +1,5 @@
 // Map route definitions.
-// Route order: validate required params/body fields first, then let the controller handle travel rules.
+// Each route validates request input before the controller handles map rules.
 import { Router } from "express";
 import {
   getCharacterMapLocation,
@@ -7,7 +7,8 @@ import {
   getMapNodes,
   postTravelToNode
 } from "../controllers/mapController.js";
-import { requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateBody, validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -16,29 +17,33 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all map node definitions.
-// Required fields: none
 // Optional fields: regionId query
 router.get(
   "/nodes",
-  getMapNodes
+  validateQuery({ regionId: { type: "string" } }),
+  getMapNodes,
+  withMessage("Map nodes retrieved."),
+  sendResponse
 );
 
 // Get one map node definition.
 // Required fields: nodeId parameter
-// Optional fields: none
 router.get(
   "/nodes/:nodeId",
-  requireParamFields("nodeId"),
-  getMapNodeById
+  validateParams({ nodeId: { type: "string" } }),
+  getMapNodeById,
+  withMessage("Map node retrieved."),
+  sendResponse
 );
 
 // Get one character's current map location.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/characters/:characterId/location",
-  requireParamFields("characterId"),
-  getCharacterMapLocation
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getCharacterMapLocation,
+  withMessage("Character map location retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -47,11 +52,15 @@ router.get(
 
 // Travel one character to another map node.
 // Required fields: characterId, targetNodeId
-// Optional fields: none
 router.post(
   "/travel",
-  requireBodyFields("characterId", "targetNodeId"),
-  postTravelToNode
+  validateBody({
+    characterId: { type: "integer", min: 1 },
+    targetNodeId: { type: "string" }
+  }),
+  postTravelToNode,
+  withMessage("Travel resolved."),
+  sendResponse
 );
 
 export default router;

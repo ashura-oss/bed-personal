@@ -1,5 +1,5 @@
 // Army route definitions.
-// Route order: validate required params/body fields first, then let the controller handle army logic.
+// Route order: validate input, run controller logic, attach success response, then send.
 import { Router } from "express";
 import {
   getArmyEncounterById,
@@ -8,7 +8,8 @@ import {
   postCharacterArmyBattle,
   putCharacterArmyState
 } from "../controllers/armyController.js";
-import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
+import { sendResponse, withMessage } from "../middlewares/response.js";
+import { validateAnyBody, validateBody, validateParams, validateQuery } from "../middlewares/validation.js";
 
 const router = Router();
 
@@ -17,29 +18,33 @@ const router = Router();
 // ------------------------------------------------------------
 
 // Get all army encounter definitions.
-// Required fields: none
 // Optional fields: requiredStoryPhase query
 router.get(
   "/encounters",
-  getArmyEncounters
+  validateQuery({ requiredStoryPhase: { type: "string" } }),
+  getArmyEncounters,
+  withMessage("Army encounters retrieved."),
+  sendResponse
 );
 
 // Get one army encounter definition.
 // Required fields: armyEncounterId parameter
-// Optional fields: none
 router.get(
   "/encounters/:armyEncounterId",
-  requireParamFields("armyEncounterId"),
-  getArmyEncounterById
+  validateParams({ armyEncounterId: { type: "string" } }),
+  getArmyEncounterById,
+  withMessage("Army encounter retrieved."),
+  sendResponse
 );
 
 // Get one character's army state.
 // Required fields: characterId parameter
-// Optional fields: none
 router.get(
   "/characters/:characterId",
-  requireParamFields("characterId"),
-  getCharacterArmyState
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  getCharacterArmyState,
+  withMessage("Character army state retrieved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -51,9 +56,15 @@ router.get(
 // Optional fields: strategy, orders
 router.post(
   "/characters/:characterId/battles",
-  requireParamFields("characterId"),
-  requireBodyFields("armyEncounterId"),
-  postCharacterArmyBattle
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  validateBody({
+    armyEncounterId: { type: "string" },
+    strategy: { type: "string", optional: true },
+    orders: { type: "array", optional: true }
+  }),
+  postCharacterArmyBattle,
+  withMessage("Army battle resolved."),
+  sendResponse
 );
 
 // ------------------------------------------------------------
@@ -65,9 +76,19 @@ router.post(
 // Optional fields: isUnlocked, commandRank, soldiers, archers, cavalry, morale, strategy
 router.put(
   "/characters/:characterId",
-  requireParamFields("characterId"),
-  requireAnyBodyField("isUnlocked", "commandRank", "soldiers", "archers", "cavalry", "morale", "strategy"),
-  putCharacterArmyState
+  validateParams({ characterId: { type: "integer", min: 1 } }),
+  validateAnyBody({
+    isUnlocked: { type: "integer", min: 0, max: 1 },
+    commandRank: { type: "string" },
+    soldiers: { type: "integer", min: 0 },
+    archers: { type: "integer", min: 0 },
+    cavalry: { type: "integer", min: 0 },
+    morale: { type: "integer", min: 0, max: 100 },
+    strategy: { type: "string" }
+  }),
+  putCharacterArmyState,
+  withMessage("Character army state saved."),
+  sendResponse
 );
 
 export default router;
