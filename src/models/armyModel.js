@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { characterArmyStates, characterRunStates } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// ARMY STATE READS
+// ARMY STATE LOOKUPS
 // ------------------------------------------------------------
 
 // Find one character's army state row.
@@ -32,7 +32,7 @@ export async function findArmyStateByCharacterId(characterId) {
 }
 
 // ------------------------------------------------------------
-// ARMY STATE WRITES
+// ARMY STATE SAVES
 // ------------------------------------------------------------
 
 // Insert or update one character's army state row.
@@ -144,7 +144,7 @@ export async function upsertArmyState({
 }
 
 // ------------------------------------------------------------
-// ARMY BATTLE WRITES
+// ARMY BATTLE SAVES
 // ------------------------------------------------------------
 
 // Save troop losses and morale changes after one army battle.

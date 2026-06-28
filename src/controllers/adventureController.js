@@ -16,7 +16,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// ADVENTURE LOG CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets adventure logs owned by one user.
@@ -56,7 +56,7 @@ export async function getAdventureLogsByCharacterId(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// ADVENTURE ATTEMPT CONTROLLERS
 // ------------------------------------------------------------
 
 // Resolves one non-combat quest attempt and applies rewards.
@@ -151,7 +151,7 @@ export async function postAdventureAttempt(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Adds fixed quest and region details to adventure log rows.

@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { adventureLogs, characters, users } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// ADVENTURE LOG LOOKUPS
 // ------------------------------------------------------------
 
 // Find adventure logs by user id.
@@ -61,7 +61,7 @@ export async function findAdventureLogsByCharacterId(characterId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE INSERTS
+// ADVENTURE ATTEMPT SAVES
 // ------------------------------------------------------------
 
 // Insert one adventure log and apply its user and character rewards.

@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { combatSessions, combatTurnLogs } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// COMBAT SESSION LOOKUPS
 // ------------------------------------------------------------
 
 // Find combat session by id.
@@ -86,7 +86,7 @@ export async function findCombatLogsBySessionId(combatSessionId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE INSERTS
+// COMBAT SESSION CREATION
 // ------------------------------------------------------------
 
 // Create one combat session row for a character and enemy.
@@ -141,7 +141,7 @@ export async function createCombatSession({
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// COMBAT TURN SAVES
 // ------------------------------------------------------------
 
 // Save the updated session and turn logs together.

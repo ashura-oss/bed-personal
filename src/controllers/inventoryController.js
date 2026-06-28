@@ -12,7 +12,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// POST
+// INVENTORY ACTION CONTROLLERS
 // ------------------------------------------------------------
 
 // Consumes one inventory item and applies its effects.
@@ -51,7 +51,7 @@ export async function postConsumeInventoryItem(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// INVENTORY SAVE CONTROLLERS
 // ------------------------------------------------------------
 
 // Saves one inventory item quantity for a character.
@@ -142,7 +142,7 @@ export async function putEquipment(req, res) {
 }
 
 // ------------------------------------------------------------
-// DELETE
+// INVENTORY REMOVE CONTROLLERS
 // ------------------------------------------------------------
 
 // Removes one inventory item from a character.
@@ -198,7 +198,7 @@ export async function deleteEquipment(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Finds one character or raises a 404 controller error.

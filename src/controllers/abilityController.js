@@ -14,7 +14,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// ABILITY LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets ability definitions, optionally filtered by class or affinity.
@@ -87,7 +87,7 @@ export async function getCharacterAbilities(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// ABILITY UNLOCK CONTROLLERS
 // ------------------------------------------------------------
 
 // Unlocks an ability after checking character level, class, affinity, and cost.
@@ -129,7 +129,7 @@ export async function unlockCharacterAbility(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Converts game rule validation results into controller errors.

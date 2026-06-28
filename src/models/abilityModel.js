@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { characterAbilities, characterInventory, characters } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// ABILITY UNLOCK LOOKUPS
 // ------------------------------------------------------------
 
 // Find one unlocked ability for one character.
@@ -45,7 +45,7 @@ export async function findCharacterAbilityRowsByCharacterId(characterId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE INSERTS
+// ABILITY UNLOCK SAVES
 // ------------------------------------------------------------
 
 // Insert one unlocked ability for one character.

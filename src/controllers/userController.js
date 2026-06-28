@@ -12,7 +12,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// USER LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all users, optionally filtered by level.
@@ -46,7 +46,7 @@ export async function getUserById(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// USER CREATION CONTROLLERS
 // ------------------------------------------------------------
 
 // Creates one user.
@@ -71,7 +71,7 @@ export async function postUser(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// USER UPDATE CONTROLLERS
 // ------------------------------------------------------------
 
 // Updates one user.
@@ -103,7 +103,7 @@ export async function putUserById(req, res) {
 }
 
 // ------------------------------------------------------------
-// DELETE
+// USER DELETE CONTROLLERS
 // ------------------------------------------------------------
 
 // Deletes one user.
@@ -123,7 +123,7 @@ export async function deleteUser(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Builds allowed user update fields.

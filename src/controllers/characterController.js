@@ -19,7 +19,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// CHARACTER LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all characters, optionally filtered by class.
@@ -76,7 +76,7 @@ export async function getCharactersByUserId(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// CHARACTER CREATION CONTROLLERS
 // ------------------------------------------------------------
 
 // Creates one character after validating owner and character choices.
@@ -114,7 +114,7 @@ export async function postCharacter(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// CHARACTER UPDATE CONTROLLERS
 // ------------------------------------------------------------
 
 // Updates one character.
@@ -135,7 +135,7 @@ export async function putCharacterById(req, res) {
 }
 
 // ------------------------------------------------------------
-// DELETE
+// CHARACTER DELETE CONTROLLERS
 // ------------------------------------------------------------
 
 // Deletes one character.
@@ -155,7 +155,7 @@ export async function deleteCharacter(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Builds allowed character update fields.

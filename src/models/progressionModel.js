@@ -6,7 +6,7 @@ import { characterQuestCompletions, characterRunStates, characters } from "../db
 import { buildCharacterProgression } from "../utils/leveling.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// PROGRESSION LOOKUPS
 // ------------------------------------------------------------
 
 // Find one character with run state and quest completion progress.
@@ -49,7 +49,7 @@ export async function findCharacterProgressionById(characterId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// PROGRESSION SAVES
 // ------------------------------------------------------------
 
 // Save character stats and run state changes together.
@@ -244,7 +244,7 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Find one character row inside an existing transaction.

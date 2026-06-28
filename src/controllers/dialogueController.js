@@ -12,7 +12,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// DIALOGUE LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets dialogue definitions, optionally filtered by region or story phase.
@@ -60,7 +60,7 @@ export async function getDialogueById(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// DIALOGUE COMPLETION CONTROLLERS
 // ------------------------------------------------------------
 
 // Completes one dialogue and saves its completion flag.
@@ -102,7 +102,7 @@ export async function postDialogueCompletion(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Finds one character or raises a 404 controller error.

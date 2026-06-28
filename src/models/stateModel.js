@@ -13,7 +13,7 @@ import {
 import { findEquipmentByCharacterId, findInventoryByCharacterId } from "./characterInventoryModel.js";
 
 // ------------------------------------------------------------
-// FULL STATE READS
+// FULL STATE LOOKUPS
 // ------------------------------------------------------------
 
 // Combines separate state tables into one payload for full state loading.
@@ -39,7 +39,7 @@ export async function findFullCharacterState(characterId) {
 }
 
 // ------------------------------------------------------------
-// SAVE SLOT READS AND WRITES
+// SAVE SLOT STATE
 // ------------------------------------------------------------
 
 // Find all save slot rows for one user.
@@ -123,7 +123,7 @@ export async function upsertSaveSlot({ userId, characterId = null, slotIndex, sl
 }
 
 // ------------------------------------------------------------
-// DIALOGUE FLAG READS AND WRITES
+// DIALOGUE FLAG STATE
 // ------------------------------------------------------------
 
 // Find dialogue flags by character id.
@@ -198,7 +198,7 @@ export async function upsertDialogueFlag({ characterId, flagId, flagValue }) {
 }
 
 // ------------------------------------------------------------
-// BOSS STATE READS AND WRITES
+// BOSS STATE
 // ------------------------------------------------------------
 
 // Find all boss state rows for one character.
@@ -301,7 +301,7 @@ export async function upsertBossState({
 }
 
 // ------------------------------------------------------------
-// CAMPAIGN MARKER READS AND WRITES
+// CAMPAIGN MARKER STATE
 // ------------------------------------------------------------
 
 // Find all campaign marker rows for one character.
@@ -404,7 +404,7 @@ export async function upsertCampaignMarker({
 }
 
 // ------------------------------------------------------------
-// FACTION REPUTATION READS AND WRITES
+// FACTION REPUTATION STATE
 // ------------------------------------------------------------
 
 // Find all faction reputation rows for one character.
@@ -474,7 +474,7 @@ export async function upsertFactionReputation({ characterId, factionId, reputati
 }
 
 // ------------------------------------------------------------
-// REGION STATE READS AND WRITES
+// REGION STATE
 // ------------------------------------------------------------
 
 // Find all region state rows for one character.
@@ -569,7 +569,7 @@ export async function upsertRegionState({
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Find one boss state helper row by character and boss.

@@ -4,7 +4,7 @@ import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regio
 import { createHttpError, getOptionalPositiveIntegerQuery, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// REGION LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all region definitions, optionally filtered by danger level.
@@ -47,5 +47,5 @@ export async function getRegionById(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------

@@ -27,7 +27,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// COMBAT SESSION CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets one combat session together with its turn logs.
@@ -55,7 +55,7 @@ export async function getCombatSession(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// COMBAT ACTION CONTROLLERS
 // ------------------------------------------------------------
 
 // Starts one combat session against an enemy or boss.
@@ -229,7 +229,7 @@ export async function postCombatTurn(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Finds the map node connected to a boss enemy.

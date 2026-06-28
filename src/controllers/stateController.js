@@ -16,7 +16,7 @@ import {
 } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// SAVED STATE LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets one character's full saved state.
@@ -59,7 +59,7 @@ export async function getSaveSlotsForUser(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// SAVED STATE SAVE CONTROLLERS
 // ------------------------------------------------------------
 
 // Saves one save slot for one user.
@@ -269,7 +269,7 @@ export async function putRegionState(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Reads a required boolean or 0/1 value as a database integer flag.

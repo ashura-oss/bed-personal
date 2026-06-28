@@ -19,7 +19,7 @@ const DEFAULT_RUN_STATE = {
 };
 
 // ------------------------------------------------------------
-// GET
+// PROGRESSION LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets the current story, run, and quest progression for one character.
@@ -41,7 +41,7 @@ export async function getCharacterProgression(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// PROGRESSION SAVE CONTROLLERS
 // ------------------------------------------------------------
 
 // Saves editable progression fields for one character.
@@ -151,7 +151,7 @@ export async function putCharacterQuestCompletion(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Builds valid character stat updates from the request body.

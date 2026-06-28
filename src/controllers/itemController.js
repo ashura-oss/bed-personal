@@ -4,7 +4,7 @@ import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js"
 import { createHttpError, getOptionalString, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// ITEM LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets item definitions, optionally filtered by type or equipment slot.
@@ -52,5 +52,5 @@ export async function getItemById(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------

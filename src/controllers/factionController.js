@@ -4,7 +4,7 @@ import { FACTION_DEFINITIONS, findFactionDefinitionById } from "../constants/fac
 import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// FACTION LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all faction definitions.
@@ -42,5 +42,5 @@ export async function getFactionById(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------

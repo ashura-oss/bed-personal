@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { characterInventory, characterLocations, characterRegionStates } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// MAP STATE LOOKUPS
 // ------------------------------------------------------------
 
 // Find one character's current map location row.
@@ -65,7 +65,7 @@ export async function findNodeTravelAccess({ characterId, targetNode }) {
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// MAP STATE SAVES
 // ------------------------------------------------------------
 
 // Save one character's current map node after travel.
@@ -164,7 +164,7 @@ export async function addTravelInventoryReward({ characterId, itemId, quantity }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Find one inventory item helper row by character and item.

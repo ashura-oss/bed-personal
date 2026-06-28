@@ -22,7 +22,7 @@ const allowedOrderUnitTypes = ["soldiers", "archers", "cavalry"];
 const allowedOrderCommands = ["attack", "defend", "support"];
 
 // ------------------------------------------------------------
-// GET
+// ARMY LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all army encounter definitions, optionally filtered by story phase.
@@ -96,7 +96,7 @@ export async function getCharacterArmyState(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// ARMY BATTLE CONTROLLERS
 // ------------------------------------------------------------
 
 // Resolves one army encounter and applies story changes on victory.
@@ -174,7 +174,7 @@ export async function postCharacterArmyBattle(req, res) {
 }
 
 // ------------------------------------------------------------
-// PUT
+// ARMY STATE CONTROLLERS
 // ------------------------------------------------------------
 
 // Saves controlled army state fields.
@@ -212,7 +212,7 @@ export async function putCharacterArmyState(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Reads optional army orders and validates unit, command, and target.

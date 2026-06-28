@@ -14,7 +14,7 @@ import {
 } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// STORY PROGRESSION SAVES
 // ------------------------------------------------------------
 
 // Apply all campaign changes caused by defeating a boss.
@@ -116,7 +116,7 @@ export async function applyArmyVictoryStory({ characterId, encounter }) {
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Mark one boss as defeated inside a story transaction.

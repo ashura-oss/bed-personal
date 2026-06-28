@@ -23,7 +23,7 @@ import {
 } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// CHARACTER LOOKUPS
 // ------------------------------------------------------------
 
 // Find all characters, with optional class filtering.
@@ -112,7 +112,7 @@ export async function findCharactersByUserId(userId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE INSERTS
+// CHARACTER CREATION
 // ------------------------------------------------------------
 
 // Insert one character row.
@@ -150,7 +150,7 @@ export async function createCharacter({
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// CHARACTER UPDATES
 // ------------------------------------------------------------
 
 // Update one character row by id.
@@ -166,7 +166,7 @@ export async function updateCharacterById(characterId, updates) {
 }
 
 // ------------------------------------------------------------
-// DATABASE DELETES
+// CHARACTER REMOVALS
 // ------------------------------------------------------------
 
 // Delete one character row by id.
@@ -183,7 +183,7 @@ export async function deleteCharacterById(characterId) {
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Convert a character database row into the API response shape.

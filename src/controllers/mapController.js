@@ -19,7 +19,7 @@ import {
 const START_NODE_ID = "node_hearthvale_square";
 
 // ------------------------------------------------------------
-// GET
+// MAP LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets map definitions, optionally filtered by region.
@@ -78,7 +78,7 @@ export async function getCharacterMapLocation(req, res) {
 }
 
 // ------------------------------------------------------------
-// POST
+// MAP TRAVEL CONTROLLERS
 // ------------------------------------------------------------
 
 // Moves one character only if the target node is connected and unlocked.
@@ -133,7 +133,7 @@ export async function postTravelToNode(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Creates a missing location at the starting node.

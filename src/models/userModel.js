@@ -6,7 +6,7 @@ import { characters, saveSlots, users } from "../db/schema.js";
 import { deleteCharacterById } from "./characterModel.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// USER LOOKUPS
 // ------------------------------------------------------------
 
 // Find all users, with optional level filtering.
@@ -67,7 +67,7 @@ export async function findUserByUsername(username) {
 }
 
 // ------------------------------------------------------------
-// DATABASE INSERTS
+// USER CREATION
 // ------------------------------------------------------------
 
 // Insert one user row.
@@ -88,7 +88,7 @@ export async function createUser({ username }) {
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// USER UPDATES
 // ------------------------------------------------------------
 
 // Update one user row by id.
@@ -104,7 +104,7 @@ export async function updateUserById(userId, updates) {
 }
 
 // ------------------------------------------------------------
-// DATABASE DELETES
+// USER REMOVALS
 // ------------------------------------------------------------
 
 // Delete one user row by id.
@@ -132,7 +132,7 @@ export async function deleteUserById(userId) {
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// MODEL HELPERS
 // ------------------------------------------------------------
 
 // Convert a user database row into the API response shape.

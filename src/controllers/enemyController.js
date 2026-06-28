@@ -4,7 +4,7 @@ import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies
 import { createHttpError, getOptionalString, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// ENEMY LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets enemy definitions, optionally filtered by region or boss flag.
@@ -52,7 +52,7 @@ export async function getEnemyById(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
 
 // Reads optional 0/1 query values.

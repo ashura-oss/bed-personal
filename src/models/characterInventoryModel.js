@@ -5,7 +5,7 @@ import { db } from "../db/db.js";
 import { characterEquipment, characterInventory, characterRunStates, characters } from "../db/schema.js";
 
 // ------------------------------------------------------------
-// DATABASE READS
+// INVENTORY AND EQUIPMENT LOOKUPS
 // ------------------------------------------------------------
 
 // Find every inventory item owned by one character.
@@ -63,7 +63,7 @@ export function findEquipmentByCharacterId(characterId) {
 }
 
 // ------------------------------------------------------------
-// DATABASE WRITES
+// INVENTORY AND EQUIPMENT SAVES
 // ------------------------------------------------------------
 
 // Insert or update one inventory item quantity.
@@ -360,7 +360,7 @@ export async function consumeInventoryItem({ characterId, item }) {
 }
 
 // ------------------------------------------------------------
-// DATABASE DELETES
+// INVENTORY AND EQUIPMENT REMOVALS
 // ------------------------------------------------------------
 
 // Delete one inventory item row.

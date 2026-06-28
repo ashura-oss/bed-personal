@@ -5,7 +5,7 @@ import { findRegionDefinitionById } from "../constants/regions.js";
 import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// GET
+// QUEST LOOKUP CONTROLLERS
 // ------------------------------------------------------------
 
 // Gets all quest definitions.
@@ -66,5 +66,5 @@ export async function getQuestsByRegionId(req, res) {
 }
 
 // ------------------------------------------------------------
-// Helpers
+// CONTROLLER HELPERS
 // ------------------------------------------------------------
