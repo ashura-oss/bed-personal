@@ -47,7 +47,10 @@ app.use("/state", stateRoutes);
 app.use((req, res) => {
   res.status(404).json({
     error: "Not Found",
-    message: `No route found for ${req.method} ${req.originalUrl}`
+    message: `No route found for ${req.method} ${req.originalUrl}`,
+    details: {
+      action: "Check the HTTP method and route path against the README API documentation."
+    }
   });
 });
 

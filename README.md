@@ -98,7 +98,9 @@ Expected validation errors return:
 ```json
 {
   "message": "What went wrong.",
-  "details": {}
+  "details": {
+    "action": "What the client should fix before trying again."
+  }
 }
 ```
 
@@ -107,7 +109,10 @@ Unknown routes return:
 ```json
 {
   "error": "Not Found",
-  "message": "No route found for GET /wrong-route"
+  "message": "No route found for GET /wrong-route",
+  "details": {
+    "action": "Check the HTTP method and route path against the README API documentation."
+  }
 }
 ```
 
