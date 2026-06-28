@@ -1,7 +1,6 @@
 // User controller functions validate requests, call user models, and send responses.
 // User models store account-level progress such as level, XP, and gold.
 import * as userModel from "../models/userModel.js";
-import { hashPassword, validatePassword, verifyPassword } from "../utils/password.js";
 import {
   createHttpError,
   getOptionalInteger,
@@ -55,11 +54,7 @@ export async function postUser(req, res) {
   try {
     const username = getRequiredString(req.body, "username");
     const password = getRequiredString(req.body, "password");
-    const passwordError = validatePassword(password);
-
-    if (passwordError) {
-      throw createHttpError(400, "Bad Request", passwordError);
-    }
+    validatePassword(password);
 
     const existingUser = await userModel.findUserByUsername(username);
 
@@ -69,7 +64,7 @@ export async function postUser(req, res) {
 
     const user = await userModel.createUser({
       username,
-      passwordHash: hashPassword(password)
+      password
     });
 
     return res.status(201).json({
@@ -88,7 +83,7 @@ export async function postUserLogin(req, res) {
     const password = getRequiredString(req.body, "password");
     const userCredentials = await userModel.findUserCredentialsByUsername(username);
 
-    if (!userCredentials || !verifyPassword(password, userCredentials.passwordHash)) {
+    if (!userCredentials || userCredentials.password !== password) {
       throw createHttpError(401, "Unauthorized", "Username or password is incorrect.");
     }
 
@@ -174,13 +169,8 @@ function buildUserUpdates(body) {
   }
 
   if (password !== undefined) {
-    const passwordError = validatePassword(password);
-
-    if (passwordError) {
-      throw createHttpError(400, "Bad Request", passwordError);
-    }
-
-    updates.passwordHash = hashPassword(password);
+    validatePassword(password);
+    updates.password = password;
   }
 
   if (level !== undefined) {
@@ -215,4 +205,15 @@ async function findRequiredUser(userId) {
   }
 
   return user;
+}
+
+// Checks simple password rules before storing or comparing it.
+function validatePassword(password) {
+  if (password.length < 6) {
+    throw createHttpError(
+      400,
+      "Bad Request",
+      "password must be at least 6 characters long."
+    );
+  }
 }

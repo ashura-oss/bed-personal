@@ -12,11 +12,11 @@ import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // Stores account-level player data.
 // Linked records: characters, save slots.
-// Required minimum from CA: user id and username. passwordHash stores login data securely.
+// Required minimum from CA: user id and username. password stores the basic login password.
 export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   username: text("username").notNull().unique(),
-  passwordHash: text("password_hash").notNull(),
+  password: text("password").notNull(),
   level: integer("level").notNull().default(1),
   xp: integer("xp").notNull().default(0),
   gold: integer("gold").notNull().default(0),

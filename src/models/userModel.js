@@ -66,14 +66,14 @@ export async function findUserByUsername(username) {
   return formatUser(result[0]);
 }
 
-// Find one user row with password hash by username.
-// Used only by login so password hashes are not returned in normal API responses.
+// Find one user row with password by username.
+// Used only by login so passwords are not returned in normal API responses.
 export async function findUserCredentialsByUsername(username) {
   const result = await db
     .select({
       id: users.id,
       username: users.username,
-      passwordHash: users.passwordHash,
+      password: users.password,
       level: users.level,
       xp: users.xp,
       gold: users.gold,
@@ -92,12 +92,12 @@ export async function findUserCredentialsByUsername(username) {
 
 // Insert one user row.
 // New users always start with default level, XP, and gold.
-export async function createUser({ username, passwordHash }) {
+export async function createUser({ username, password }) {
   const result = await db
     .insert(users)
     .values({
       username,
-      passwordHash,
+      password,
       level: 1,
       xp: 0,
       gold: 0,

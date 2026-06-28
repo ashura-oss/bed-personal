@@ -343,15 +343,15 @@ These routes read fixed game definitions stored in `src/constants`.
   - What it does: Gets one faction definition.
   - Request data: Param: `factionId`
   - Success response: `200`, returns one faction.
-- `GET` `/dialogue`
+- `GET` `/dialogues`
   - What it does: Gets dialogue definitions.
   - Request data: Optional query: `regionId`, `storyPhase`
   - Success response: `200`, returns dialogues.
-- `GET` `/dialogue/:dialogueId`
+- `GET` `/dialogues/:dialogueId`
   - What it does: Gets one dialogue definition.
   - Request data: Param: `dialogueId`
   - Success response: `200`, returns one dialogue.
-- `POST` `/dialogue/:dialogueId/complete`
+- `POST` `/dialogues/:dialogueId/complete`
   - What it does: Marks a dialogue as completed for one character.
   - Request data: Param: `dialogueId`; body: `characterId`, `choiceId`
   - Success response: `200`, returns dialogue, selected choice, and saved flag.
@@ -775,7 +775,7 @@ The database stores player-created and player-changing data, while fixed game de
 
 Player and save tables:
 
-- `users`: Stores account-level player data and a password hash for simple login.
+- `users`: Stores account-level player data and a basic login password.
 - `characters`: Stores player characters and their stats.
 - `save_slots`: Stores user save slot metadata.
 - `character_run_states`: Stores supplies, morale, story phase, and army command unlock state.
@@ -854,4 +854,4 @@ Fixed content is stored in constants:
 - A character cannot travel while an active combat session is unresolved.
 - Combat damage uses class, weapon, ability, and enemy damage ranges.
 - Army battles require army command to be unlocked and the correct story phase.
-- Authentication is not included in this backend version.
+- Basic username and password login is included.

@@ -15,7 +15,6 @@ import {
   characters,
   users
 } from "./schema.js";
-import { hashPassword } from "../utils/password.js";
 
 const now = new Date();
 
@@ -54,7 +53,7 @@ async function findOrCreateDemoUser() {
     .insert(users)
     .values({
       username: "demoDawn",
-      passwordHash: hashPassword("demo123"),
+      password: "demo123",
       level: 1,
       xp: 0,
       gold: 25,
