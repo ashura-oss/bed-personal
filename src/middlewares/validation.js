@@ -4,20 +4,14 @@ export function requireBodyFields(...fieldNames) {
   return (req, res, next) => {
     if (!hasJsonObjectBody(req.body)) {
       return res.status(400).json({
-        message: "Request body cannot be empty.",
-        details: {
-          action: "Send a JSON object with the required fields for this route."
-        }
+        message: "Request body cannot be empty. This route expects a JSON object."
       });
     }
 
     for (const fieldName of fieldNames) {
       if (isMissing(req.body[fieldName])) {
         return res.status(400).json({
-          message: `${fieldName} is required.`,
-          details: {
-            action: `Add ${fieldName} to the request body and send the request again.`
-          }
+          message: `${fieldName} is required in the request body.`
         });
       }
     }
@@ -32,10 +26,7 @@ export function requireAnyBodyField(...fieldNames) {
   return (req, res, next) => {
     if (!hasJsonObjectBody(req.body)) {
       return res.status(400).json({
-        message: "Request body cannot be empty.",
-        details: {
-          action: "Send a JSON object with at least one updatable field."
-        }
+        message: "Request body cannot be empty. This update route expects a JSON object."
       });
     }
 
@@ -43,10 +34,7 @@ export function requireAnyBodyField(...fieldNames) {
 
     if (!hasAllowedField) {
       return res.status(400).json({
-        message: `Provide at least one field: ${fieldNames.join(", ")}.`,
-        details: {
-          action: `Add one of these fields to the request body: ${fieldNames.join(", ")}.`
-        }
+        message: `Request body must include at least one of these fields: ${fieldNames.join(", ")}.`
       });
     }
 
@@ -61,10 +49,7 @@ export function requireParamFields(...fieldNames) {
     for (const fieldName of fieldNames) {
       if (isMissing(req.params?.[fieldName])) {
         return res.status(400).json({
-          message: `${fieldName} parameter is required.`,
-          details: {
-            action: `Include ${fieldName} in the route path and send the request again.`
-          }
+          message: `${fieldName} route parameter is required.`
         });
       }
     }
@@ -78,10 +63,7 @@ export function requireParamFields(...fieldNames) {
 export function handleJsonParseError(error, _req, res, _next) {
   if (error.type === "entity.parse.failed") {
     return res.status(400).json({
-      message: "Request body must be valid JSON.",
-      details: {
-        action: "Fix the JSON syntax in the request body and send the request again."
-      }
+      message: "Request body must be valid JSON. Check for invalid quotes, commas, braces, or trailing characters."
     });
   }
 

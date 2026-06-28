@@ -13,7 +13,7 @@ export function createHttpError(statusCode, error, message, details) {
 }
 
 // Sends controller errors in one consistent JSON format.
-// Expected errors keep their own status code and include an action for the client.
+// Expected errors keep their own status code and optional structured details.
 export function sendErrorResponse(res, error) {
   const statusCode = error.statusCode || 500;
 
@@ -23,49 +23,8 @@ export function sendErrorResponse(res, error) {
 
   return res.status(statusCode).json({
     message: error.message || "Internal Server Error.",
-    details: buildErrorDetails(statusCode, error.message, error.details)
+    details: error.details
   });
-}
-
-// Builds the details object returned with error responses.
-// Existing error details are kept, then action tells the client how to fix the request.
-function buildErrorDetails(statusCode, message, details) {
-  const existingDetails = details && typeof details === "object" && !Array.isArray(details)
-    ? details
-    : {};
-
-  return {
-    ...existingDetails,
-    action: getClientAction(statusCode, message)
-  };
-}
-
-// Chooses a short next step based on the status code and message.
-// This keeps error responses helpful without repeating action text in every controller.
-function getClientAction(statusCode, message = "") {
-  const lowerMessage = message.toLowerCase();
-
-  if (lowerMessage.includes("username is already taken")) {
-    return "Use a different username and send the request again.";
-  }
-
-  if (lowerMessage.includes("not found") || statusCode === 404) {
-    return "Check that the id or fixed game key exists, then send the request again.";
-  }
-
-  if (lowerMessage.includes("already") || statusCode === 409) {
-    return "Resolve the existing conflict before sending this request again.";
-  }
-
-  if (lowerMessage.includes("required") || lowerMessage.includes("must be") || statusCode === 400) {
-    return "Check the request body, route parameters, and query values against the README.";
-  }
-
-  if (statusCode === 403) {
-    return "Use a character or game state that has permission and progression for this action.";
-  }
-
-  return "Try again later. If the problem continues, check the server logs.";
 }
 
 // Reads a required string field and trims it before controller or model logic uses it.

@@ -97,22 +97,21 @@ Expected validation errors return:
 
 ```json
 {
-  "message": "What went wrong.",
+  "message": "What went wrong in detail.",
   "details": {
-    "action": "What the client should fix before trying again."
+    "allowedValues": ["example"]
   }
 }
 ```
+
+Some error responses do not need `details` and only return a clear `message`.
 
 Unknown routes return:
 
 ```json
 {
   "error": "Not Found",
-  "message": "No route found for GET /wrong-route",
-  "details": {
-    "action": "Check the HTTP method and route path against the README API documentation."
-  }
+  "message": "No route found for GET /wrong-route. The requested endpoint is not defined."
 }
 ```
 
