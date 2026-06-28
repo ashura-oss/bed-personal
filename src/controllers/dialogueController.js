@@ -1,33 +1,25 @@
 // Dialogue controller functions return dialogue data and mark dialogue completion.
-import * as stateModel from "../models/stateModel.js";
+// Dialogue definitions come from constants; completion flags are saved through state models.
 import { DIALOGUE_DEFINITIONS, findDialogueDefinitionById } from "../constants/dialogues.js";
+import * as characterModel from "../models/characterModel.js";
+import * as stateModel from "../models/stateModel.js";
+import {
+  createHttpError,
+  getOptionalString,
+  getRequiredId,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return all dialogue definitions, optionally filtered by story phase.
-export async function getDialogues(req, res, next) {
+// Gets dialogue definitions, optionally filtered by region or story phase.
+export async function getDialogues(req, res) {
   try {
-    let regionId = req.query.regionId;
-    let storyPhase = req.query.storyPhase;
-
-    if (regionId !== undefined) {
-      if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        return res.status(400).json({ message: "regionId must be a non-empty string." });
-      }
-
-      regionId = regionId.trim();
-    }
-
-    if (storyPhase !== undefined) {
-      if (typeof storyPhase !== "string" || storyPhase.trim().length === 0) {
-        return res.status(400).json({ message: "storyPhase must be a non-empty string." });
-      }
-
-      storyPhase = storyPhase.trim();
-    }
-
+    const regionId = getOptionalString(req.query, "regionId");
+    const storyPhase = getOptionalString(req.query, "storyPhase");
     const dialogues = DIALOGUE_DEFINITIONS.filter((dialogue) => {
       if (regionId !== undefined && dialogue.regionId !== regionId) {
         return false;
@@ -40,54 +32,54 @@ export async function getDialogues(req, res, next) {
       return true;
     }).sort((left, right) => left.dialogueId.localeCompare(right.dialogueId));
 
-    res.locals.data = dialogues;
-    next();
+    return res.status(200).json({
+      message: "Dialogues retrieved.",
+      data: dialogues
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one dialogue definition by id.
-export async function getDialogueById(req, res, next) {
+// Gets one dialogue definition by id.
+export async function getDialogueById(req, res) {
   try {
     const dialogue = findDialogueDefinitionById(req.params.dialogueId);
 
     if (!dialogue) {
-      return res.status(404).json({ message: "Dialogue scene was not found." });
+      throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
     }
 
-    res.locals.data = dialogue;
-    next();
+    return res.status(200).json({
+      message: "Dialogue retrieved.",
+      data: dialogue
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// POST
 // ------------------------------------------------------------
 
-// Complete one dialogue and claim its quest reward.
-export async function postDialogueCompletion(req, res, next) {
+// Completes one dialogue and saves its completion flag.
+// The chosen option must exist in the fixed dialogue definition before the flag is saved.
+export async function postDialogueCompletion(req, res) {
   try {
-    const character = res.locals.character;
-    const choiceIdValue = req.body?.choiceId;
-
-    if (typeof choiceIdValue !== "string" || choiceIdValue.trim().length === 0) {
-      return res.status(400).json({ message: "choiceId is required." });
-    }
-
-    const choiceId = choiceIdValue.trim();
+    const characterId = getRequiredId(req.body, "characterId");
+    const choiceId = getRequiredString(req.body, "choiceId");
+    const character = await findRequiredCharacter(characterId);
     const dialogue = findDialogueDefinitionById(req.params.dialogueId);
 
     if (!dialogue) {
-      return res.status(404).json({ message: "Dialogue scene was not found." });
+      throw createHttpError(404, "Not Found", "Dialogue scene was not found.");
     }
 
     const selectedChoice = dialogue.choices.find((choice) => choice.choiceId === choiceId) || null;
 
     if (!selectedChoice) {
-      return res.status(400).json({ message: "choiceId does not exist for this dialogue." });
+      throw createHttpError(400, "Bad Request", "choiceId does not exist for this dialogue.");
     }
 
     const dialogueFlag = await stateModel.upsertDialogueFlag({
@@ -96,13 +88,30 @@ export async function postDialogueCompletion(req, res, next) {
       flagValue: 1
     });
 
-    res.locals.data = {
-      dialogue,
-      selectedChoice,
-      dialogueFlag
-    };
-    next();
+    return res.status(200).json({
+      message: "Dialogue completed.",
+      data: {
+        dialogue,
+        selectedChoice,
+        dialogueFlag
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
+}
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

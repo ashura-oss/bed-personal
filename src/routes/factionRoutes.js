@@ -1,7 +1,7 @@
 // Faction route definitions.
+// Route order: validate required params when needed, then let the controller return fixed faction data.
 import { Router } from "express";
 import { getFactionById, getFactions } from "../controllers/factionController.js";
-import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
 import { requireParamFields } from "../middlewares/validation.js";
 
 const router = Router();
@@ -10,25 +10,21 @@ const router = Router();
 // GET
 // ------------------------------------------------------------
 
-//Get all faction definitions.
-//Required fields: none
-//Optional fields: none
+// Get all faction definitions.
+// Required fields: none
+// Optional fields: none
 router.get(
   "/",
-  getFactions,
-  withMessage("Factions retrieved."),
-  sendResponse
+  getFactions
 );
 
-//Get one faction definition.
-//Required fields: factionId parameter
-//Optional fields: none
+// Get one faction definition.
+// Required fields: factionId parameter
+// Optional fields: none
 router.get(
   "/:factionId",
   requireParamFields("factionId"),
-  getFactionById,
-  withMessage("Faction retrieved."),
-  sendResponse
+  getFactionById
 );
 
 export default router;

@@ -1,32 +1,17 @@
 // Item controller functions return fixed item definitions.
+// Inventory state stores item ids; this controller returns the fixed item details.
 import { ITEM_DEFINITIONS, findItemDefinitionById } from "../constants/items.js";
+import { createHttpError, getOptionalString, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return all item definitions, optionally filtered by type or slot.
-export async function getItems(req, res, next) {
+// Gets item definitions, optionally filtered by type or equipment slot.
+export async function getItems(req, res) {
   try {
-    let itemType = req.query.itemType;
-    let equipmentSlot = req.query.equipmentSlot;
-
-    if (itemType !== undefined) {
-      if (typeof itemType !== "string" || itemType.trim().length === 0) {
-        return res.status(400).json({ message: "itemType must be a non-empty string." });
-      }
-
-      itemType = itemType.trim();
-    }
-
-    if (equipmentSlot !== undefined) {
-      if (typeof equipmentSlot !== "string" || equipmentSlot.trim().length === 0) {
-        return res.status(400).json({ message: "equipmentSlot must be a non-empty string." });
-      }
-
-      equipmentSlot = equipmentSlot.trim();
-    }
-
+    const itemType = getOptionalString(req.query, "itemType");
+    const equipmentSlot = getOptionalString(req.query, "equipmentSlot");
     const items = ITEM_DEFINITIONS.filter((item) => {
       if (itemType !== undefined && item.itemType !== itemType) {
         return false;
@@ -39,25 +24,33 @@ export async function getItems(req, res, next) {
       return true;
     }).sort((left, right) => left.name.localeCompare(right.name));
 
-    res.locals.data = items;
-    next();
+    return res.status(200).json({
+      message: "Items retrieved.",
+      data: items
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one item definition by id.
-export async function getItemById(req, res, next) {
+// Gets one item definition by id.
+export async function getItemById(req, res) {
   try {
     const item = findItemDefinitionById(req.params.itemId);
 
     if (!item) {
-      return res.status(404).json({ message: "Item definition was not found." });
+      throw createHttpError(404, "Not Found", "Item definition was not found.");
     }
 
-    res.locals.data = item;
-    next();
+    return res.status(200).json({
+      message: "Item retrieved.",
+      data: item
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------

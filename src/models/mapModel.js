@@ -1,4 +1,5 @@
 // Map model functions read and save character location rows.
+// Map node definitions stay in constants; this file stores the character's current node.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterInventory, characterLocations, characterRegionStates } from "../db/schema.js";
@@ -8,6 +9,7 @@ import { characterInventory, characterLocations, characterRegionStates } from ".
 // ------------------------------------------------------------
 
 // Find one character's current map location row.
+// Returns null for a new character that has not travelled yet.
 export async function findCharacterLocation(characterId) {
   const result = await db
     .select({
@@ -26,6 +28,7 @@ export async function findCharacterLocation(characterId) {
 }
 
 // Check whether one character can travel to a map node.
+// Uses saved region unlock state when the target node is not open by default.
 export async function findNodeTravelAccess({ characterId, targetNode }) {
   if (targetNode.isUnlocked === 1) {
     return {
@@ -66,68 +69,96 @@ export async function findNodeTravelAccess({ characterId, targetNode }) {
 // ------------------------------------------------------------
 
 // Save one character's current map node after travel.
+// Keeps the current and previous node so the game can show where the player moved from.
 export async function moveCharacterToNode({ characterId, currentNode, targetNode }) {
   const now = new Date();
   const existingLocation = await findCharacterLocation(characterId);
-  const query = existingLocation
-    ? db
-        .update(characterLocations)
-        .set({
-          regionKey: targetNode.regionId,
-          nodeKey: targetNode.nodeId,
-          previousNodeKey: currentNode.nodeId,
-          updatedAt: now
-        })
-        .where(eq(characterLocations.id, existingLocation.characterLocationId))
-    : db.insert(characterLocations).values({
+  let locationResult;
+
+  if (existingLocation) {
+    locationResult = await db
+      .update(characterLocations)
+      .set({
+        regionKey: targetNode.regionId,
+        nodeKey: targetNode.nodeId,
+        previousNodeKey: currentNode.nodeId,
+        updatedAt: now
+      })
+      .where(eq(characterLocations.id, existingLocation.characterLocationId))
+      .returning({
+        characterLocationId: characterLocations.id,
+        characterId: characterLocations.characterId,
+        regionId: characterLocations.regionKey,
+        nodeId: characterLocations.nodeKey,
+        previousNodeId: characterLocations.previousNodeKey,
+        updatedAt: characterLocations.updatedAt
+      });
+  } else {
+    locationResult = await db
+      .insert(characterLocations)
+      .values({
         characterId,
         regionKey: targetNode.regionId,
         nodeKey: targetNode.nodeId,
         previousNodeKey: currentNode.nodeId,
         updatedAt: now
+      })
+      .returning({
+        characterLocationId: characterLocations.id,
+        characterId: characterLocations.characterId,
+        regionId: characterLocations.regionKey,
+        nodeId: characterLocations.nodeKey,
+        previousNodeId: characterLocations.previousNodeKey,
+        updatedAt: characterLocations.updatedAt
       });
-  const locationResult = await query
-    .returning({
-      characterLocationId: characterLocations.id,
-      characterId: characterLocations.characterId,
-      regionId: characterLocations.regionKey,
-      nodeId: characterLocations.nodeKey,
-      previousNodeId: characterLocations.previousNodeKey,
-      updatedAt: characterLocations.updatedAt
-    });
+  }
 
   return locationResult[0];
 }
 
 // Add travel reward items into one character's inventory.
+// Used when travel grants supplies/materials after a successful move.
 export async function addTravelInventoryReward({ characterId, itemId, quantity }) {
   const now = new Date();
   const existing = await findInventoryItem(characterId, itemId);
   const nextQuantity = Number(existing?.quantity || 0) + quantity;
-  const query = existing
-    ? db
-        .update(characterInventory)
-        .set({
-          quantity: nextQuantity,
-          updatedAt: now
-        })
-        .where(eq(characterInventory.id, existing.characterInventoryId))
-    : db.insert(characterInventory).values({
+  let result;
+
+  if (existing) {
+    result = await db
+      .update(characterInventory)
+      .set({
+        quantity: nextQuantity,
+        updatedAt: now
+      })
+      .where(eq(characterInventory.id, existing.characterInventoryId))
+      .returning({
+        characterInventoryId: characterInventory.id,
+        characterId: characterInventory.characterId,
+        itemId: characterInventory.itemKey,
+        quantity: characterInventory.quantity,
+        acquiredAt: characterInventory.acquiredAt,
+        updatedAt: characterInventory.updatedAt
+      });
+  } else {
+    result = await db
+      .insert(characterInventory)
+      .values({
         characterId,
         itemKey: itemId,
         quantity: nextQuantity,
         acquiredAt: now,
         updatedAt: now
+      })
+      .returning({
+        characterInventoryId: characterInventory.id,
+        characterId: characterInventory.characterId,
+        itemId: characterInventory.itemKey,
+        quantity: characterInventory.quantity,
+        acquiredAt: characterInventory.acquiredAt,
+        updatedAt: characterInventory.updatedAt
       });
-  const result = await query
-    .returning({
-      characterInventoryId: characterInventory.id,
-      characterId: characterInventory.characterId,
-      itemId: characterInventory.itemKey,
-      quantity: characterInventory.quantity,
-      acquiredAt: characterInventory.acquiredAt,
-      updatedAt: characterInventory.updatedAt
-    });
+  }
 
   return result[0];
 }
@@ -137,6 +168,7 @@ export async function addTravelInventoryReward({ characterId, itemId, quantity }
 // ------------------------------------------------------------
 
 // Find one inventory item helper row by character and item.
+// Private helper because it is only needed inside map reward saving.
 async function findInventoryItem(characterId, itemId) {
   const result = await db
     .select({

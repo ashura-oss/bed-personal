@@ -1,36 +1,46 @@
 // Faction controller functions return fixed faction data.
+// Factions are fixed constants; saved reputation is handled by state controllers/models.
 import { FACTION_DEFINITIONS, findFactionDefinitionById } from "../constants/factions.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return all faction definitions.
-export async function getFactions(req, res, next) {
+// Gets all faction definitions.
+export async function getFactions(_req, res) {
   try {
     const factions = [...FACTION_DEFINITIONS].sort((left, right) =>
       left.name.localeCompare(right.name)
     );
 
-    res.locals.data = factions;
-    next();
+    return res.status(200).json({
+      message: "Factions retrieved.",
+      data: factions
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one faction definition by id.
-export async function getFactionById(req, res, next) {
+// Gets one faction definition by id.
+export async function getFactionById(req, res) {
   try {
     const faction = findFactionDefinitionById(req.params.factionId);
 
     if (!faction) {
-      return res.status(404).json({ message: "Faction definition was not found." });
+      throw createHttpError(404, "Not Found", "Faction definition was not found.");
     }
 
-    res.locals.data = faction;
-    next();
+    return res.status(200).json({
+      message: "Faction retrieved.",
+      data: faction
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------

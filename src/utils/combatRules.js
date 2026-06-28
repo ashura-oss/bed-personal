@@ -1,10 +1,12 @@
 // Pure combat helper functions used by combat controllers.
+// This file calculates combat results only; combat models handle saving sessions and logs.
 import { findClassDamageRange } from "../constants/combatBalance.js";
 
 const validPlayerActions = ["attack", "ability", "defend"];
 const validCombatAbilityTypes = ["attack", "ultimate", "heal", "defend", "support", "command"];
 
-// Resolve one complete round: player action first, then enemy counter if still alive.
+// Resolves one complete round: player action first, then enemy counter if still alive.
+// The returned session updates and turn logs are saved by the combat model.
 export function resolveCombatTurn({
   session,
   character,
@@ -86,7 +88,8 @@ export function resolveCombatTurn({
   };
 }
 
-// Validate turn input before calculating damage.
+// Validates turn input before calculating damage.
+// Returning an error object keeps this helper pure and lets the controller choose the response.
 function validateCombatTurn({ session, actionType, ability }) {
   if (!session) {
     return { status: 404, message: "Combat session was not found." };
@@ -115,7 +118,8 @@ function validateCombatTurn({ session, actionType, ability }) {
   return null;
 }
 
-// Build damage ranges from class, stats, equipment, level, and ability power.
+// Builds player damage ranges from class, stats, equipment, level, and ability power.
+// Better weapons, stats, levels, and abilities raise the random damage range.
 export function buildPlayerDamageRange({ character, ability = null }) {
   const classDamage = findClassDamageRange(character.className);
   const classRange = classDamage?.damageRange || { min: 2, max: 5 };
@@ -142,7 +146,7 @@ export function buildPlayerDamageRange({ character, ability = null }) {
   return normalizeRange(range);
 }
 
-// Build enemy damage range.
+// Builds enemy damage range from the enemy definition.
 export function buildEnemyDamageRange(enemy) {
   return normalizeRange(
     enemy.damageRange || {
@@ -152,7 +156,7 @@ export function buildEnemyDamageRange(enemy) {
   );
 }
 
-// Convert each possible player action into damage, healing, or defence.
+// Converts each possible player action into damage, healing, or defence.
 function resolvePlayerAction({ session, character, enemy, actionType, ability, rng }) {
   if (actionType === "defend") {
     return {
@@ -184,7 +188,7 @@ function resolvePlayerAction({ session, character, enemy, actionType, ability, r
   };
 }
 
-// Resolve ability action.
+// Resolves ability actions by ability type: heal, defend, support, command, or attack.
 function resolveAbilityAction({ session, character, enemy, ability, rng }) {
   if (ability.abilityType === "heal") {
     const healingRange = normalizeRange(
@@ -247,7 +251,8 @@ function resolveAbilityAction({ session, character, enemy, ability, rng }) {
   };
 }
 
-// Resolve the enemy counterattack after the player acts.
+// Resolves the enemy counterattack after the player acts.
+// Defence and equipment can reduce this damage before HP is updated.
 function resolveEnemyAction({ character, enemy, enemyHpAfterPlayer, damageReduction, rng }) {
   const enemyDamageRange = buildEnemyDamageRange(enemy);
   const rawDamage = roll(enemyDamageRange.min, enemyDamageRange.max, rng);
@@ -264,7 +269,7 @@ function resolveEnemyAction({ character, enemy, enemyHpAfterPlayer, damageReduct
   };
 }
 
-// Build a damage range from an ability power value.
+// Builds a fallback damage range from an ability power value.
 function buildPowerDamageRange(ability) {
   if (!ability) {
     return { min: 0, max: 0 };
@@ -278,7 +283,7 @@ function buildPowerDamageRange(ability) {
   };
 }
 
-// Normalize a damage range so min and max are safe numbers.
+// Normalizes a damage range so min and max are safe numbers.
 function normalizeRange(range) {
   const min = Math.max(0, Number(range?.min || 0));
   const max = Math.max(min, Number(range?.max || min));
@@ -286,7 +291,7 @@ function normalizeRange(range) {
   return { min, max };
 }
 
-// Random rolls are isolated so tests can pass a predictable rng function.
+// Rolls an inclusive integer and accepts a custom rng for predictable tests.
 function roll(min, max, rng) {
   const rollValue = Math.min(Math.max(rng(), 0), 0.999999);
 

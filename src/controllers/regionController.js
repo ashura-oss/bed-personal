@@ -1,27 +1,16 @@
 // Region controller functions return fixed region data.
+// Region unlock progress is saved separately in state models.
 import { REGION_DEFINITIONS, findRegionDefinitionById } from "../constants/regions.js";
+import { createHttpError, getOptionalPositiveIntegerQuery, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return all region definitions, optionally filtered by danger level.
-export async function getRegions(req, res, next) {
+// Gets all region definitions, optionally filtered by danger level.
+export async function getRegions(req, res) {
   try {
-    let dangerLevel;
-
-    if (req.query.dangerLevel !== undefined) {
-      if (Array.isArray(req.query.dangerLevel)) {
-        return res.status(400).json({ message: "dangerLevel query must be provided once." });
-      }
-
-      dangerLevel = Number(req.query.dangerLevel);
-
-      if (!Number.isInteger(dangerLevel) || dangerLevel < 1) {
-        return res.status(400).json({ message: "dangerLevel query must be a positive integer." });
-      }
-    }
-
+    const dangerLevel = getOptionalPositiveIntegerQuery(req.query, "dangerLevel");
     let regionList = [...REGION_DEFINITIONS].sort(
       (left, right) => left.dangerLevel - right.dangerLevel
     );
@@ -30,25 +19,33 @@ export async function getRegions(req, res, next) {
       regionList = regionList.filter((region) => region.dangerLevel === dangerLevel);
     }
 
-    res.locals.data = regionList;
-    next();
+    return res.status(200).json({
+      message: "Regions retrieved.",
+      data: regionList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one region definition by id.
-export async function getRegionById(req, res, next) {
+// Gets one region definition by id.
+export async function getRegionById(req, res) {
   try {
     const region = findRegionDefinitionById(req.params.id);
 
     if (!region) {
-      return res.status(404).json({ message: "Region was not found." });
+      throw createHttpError(404, "Not Found", "Region was not found.");
     }
 
-    res.locals.data = region;
-    next();
+    return res.status(200).json({
+      message: "Region retrieved.",
+      data: region
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------

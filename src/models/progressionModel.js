@@ -1,4 +1,5 @@
 // Progression model functions read and save character progression rows.
+// Level calculations are done in utils, while this file saves the resulting values.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterQuestCompletions, characterRunStates, characters } from "../db/schema.js";
@@ -9,6 +10,7 @@ import { buildCharacterProgression } from "../utils/leveling.js";
 // ------------------------------------------------------------
 
 // Find one character with run state and quest completion progress.
+// Used by progression endpoints to show the player's saved campaign status.
 export async function findCharacterProgressionById(characterId) {
   const characterResult = await db
     .select({
@@ -51,6 +53,7 @@ export async function findCharacterProgressionById(characterId) {
 // ------------------------------------------------------------
 
 // Save character stats and run state changes together.
+// The transaction keeps character stats and run-state values from drifting apart.
 export async function saveCharacterProgression({
   characterId,
   characterUpdates,
@@ -95,27 +98,39 @@ export async function saveCharacterProgression({
         .where(eq(characterRunStates.characterId, characterId))
         .limit(1);
       const existingRunState = existingRunStateResult[0] || null;
-      const runStateQuery = existingRunState
-        ? tx
-            .update(characterRunStates)
-            .set({
-              supplies: runStateUpdates.supplies,
-              morale: runStateUpdates.morale,
-              storyPhase: runStateUpdates.storyPhase,
-              commandModeUnlocked: runStateUpdates.commandModeUnlocked,
-              savedAt: runStateUpdates.savedAt
-            })
-            .where(eq(characterRunStates.characterId, characterId))
-        : tx.insert(characterRunStates).values(runStateUpdates);
 
-      runStateResult = await runStateQuery.returning({
-        characterId: characterRunStates.characterId,
-        supplies: characterRunStates.supplies,
-        morale: characterRunStates.morale,
-        storyPhase: characterRunStates.storyPhase,
-        commandModeUnlocked: characterRunStates.commandModeUnlocked,
-        savedAt: characterRunStates.savedAt
-      });
+      if (existingRunState) {
+        runStateResult = await tx
+          .update(characterRunStates)
+          .set({
+            supplies: runStateUpdates.supplies,
+            morale: runStateUpdates.morale,
+            storyPhase: runStateUpdates.storyPhase,
+            commandModeUnlocked: runStateUpdates.commandModeUnlocked,
+            savedAt: runStateUpdates.savedAt
+          })
+          .where(eq(characterRunStates.characterId, characterId))
+          .returning({
+            characterId: characterRunStates.characterId,
+            supplies: characterRunStates.supplies,
+            morale: characterRunStates.morale,
+            storyPhase: characterRunStates.storyPhase,
+            commandModeUnlocked: characterRunStates.commandModeUnlocked,
+            savedAt: characterRunStates.savedAt
+          });
+      } else {
+        runStateResult = await tx
+          .insert(characterRunStates)
+          .values(runStateUpdates)
+          .returning({
+            characterId: characterRunStates.characterId,
+            supplies: characterRunStates.supplies,
+            morale: characterRunStates.morale,
+            storyPhase: characterRunStates.storyPhase,
+            commandModeUnlocked: characterRunStates.commandModeUnlocked,
+            savedAt: characterRunStates.savedAt
+          });
+      }
     } else {
       runStateResult = await tx
         .select({
@@ -139,6 +154,7 @@ export async function saveCharacterProgression({
 }
 
 // Claim a character quest completion inside one transaction.
+// Inserts the completion and applies XP once, so the same quest cannot reward repeatedly.
 export async function claimCharacterQuestCompletion({ characterId, questReward }) {
   return db.transaction(async (tx) => {
     const now = new Date();
@@ -232,6 +248,7 @@ export async function claimCharacterQuestCompletion({ characterId, questReward }
 // ------------------------------------------------------------
 
 // Find one character row inside an existing transaction.
+// Private helper used when calculating quest reward updates.
 async function findCharacterInTransaction(tx, characterId) {
   const result = await tx
     .select({
@@ -260,6 +277,7 @@ async function findCharacterInTransaction(tx, characterId) {
 }
 
 // Find one quest completion row inside an existing transaction.
+// Private helper used to block duplicate quest completion rewards.
 async function findQuestCompletionInTransaction(tx, characterId, questId) {
   const result = await tx
     .select({

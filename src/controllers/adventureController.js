@@ -1,54 +1,106 @@
-// Adventure controller functions resolve quest attempts and return rewards.
-import * as adventureModel from "../models/adventureModel.js";
+// Adventure controller functions resolve non-combat quest attempts and return rewards.
+// The controller validates ownership and quest type before the model saves logs and rewards.
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
+import * as adventureModel from "../models/adventureModel.js";
+import * as characterModel from "../models/characterModel.js";
+import * as userModel from "../models/userModel.js";
 import { resolveQuestAttempt } from "../utils/gameRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
+import {
+  createHttpError,
+  getRequiredId,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Resolve one adventure attempt and prepare its reward response.
-export async function postAdventureAttempt(req, res, next) {
+// Gets adventure logs owned by one user.
+export async function getAdventureLogsByUserId(req, res) {
   try {
-    const userId = typeof req.body?.userId === "string" ? Number(req.body.userId) : req.body?.userId;
-    const characterId =
-      typeof req.body?.characterId === "string" ? Number(req.body.characterId) : req.body?.characterId;
+    const userId = getRequiredIdParam(req.params, "userId");
 
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "userId must be a positive integer id." });
+    await findRequiredUser(userId);
+
+    const adventureLogList = await adventureModel.findAdventureLogsByUserId(userId);
+
+    return res.status(200).json({
+      message: "User adventure logs retrieved.",
+      data: enrichAdventureLogRows(adventureLogList)
+    });
+  } catch (error) {
+    return sendErrorResponse(res, error);
+  }
+}
+
+// Gets adventure logs for one character.
+export async function getAdventureLogsByCharacterId(req, res) {
+  try {
+    const characterId = getRequiredIdParam(req.params, "characterId");
+
+    await findRequiredCharacter(characterId);
+
+    const adventureLogList = await adventureModel.findAdventureLogsByCharacterId(characterId);
+
+    return res.status(200).json({
+      message: "Character adventure logs retrieved.",
+      data: enrichAdventureLogRows(adventureLogList)
+    });
+  } catch (error) {
+    return sendErrorResponse(res, error);
+  }
+}
+
+// ------------------------------------------------------------
+// POST
+// ------------------------------------------------------------
+
+// Resolves one non-combat quest attempt and applies rewards.
+export async function postAdventureAttempt(req, res) {
+  try {
+    const userId = getRequiredId(req.body, "userId");
+    const characterId = getRequiredId(req.body, "characterId");
+    const questId = getRequiredString(req.body, "questId");
+    const user = await findRequiredUser(userId);
+    const character = await findRequiredCharacter(characterId);
+    const quest = findQuestDefinitionById(questId);
+
+    if (!quest) {
+      throw createHttpError(404, "Not Found", "Quest was not found.");
     }
-
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
-
-    if (typeof req.body?.questId !== "string" || req.body.questId.trim().length === 0) {
-      return res.status(400).json({ message: "questId is required." });
-    }
-
-    const questId = req.body.questId.trim();
-    const user = res.locals.user;
-    const character = res.locals.character;
-    const quest = res.locals.quest;
 
     if (character.userId !== userId) {
-      return res.status(400).json({ message: "Character does not belong to the provided user." });
+      throw createHttpError(403, "Forbidden", "Character does not belong to the provided user.");
     }
 
     if (character.level < quest.requiredLevel) {
-      return res.status(400).json({ message: `Character level ${character.level} is too low for this quest. Required level is ${quest.requiredLevel}.` });
+      throw createHttpError(
+        403,
+        "Forbidden",
+        `Character level ${character.level} is too low for this quest. Required level is ${quest.requiredLevel}.`
+      );
     }
 
     if (["combat", "boss", "strategy"].includes(quest.questType)) {
-      return res.status(400).json({ message: "This quest type must be resolved through its gameplay route." });
+      throw createHttpError(
+        400,
+        "Bad Request",
+        "This quest type must be resolved through its gameplay route."
+      );
     }
 
     const attemptResult = resolveQuestAttempt(character, quest);
 
     if (attemptResult.error) {
-      return res.status(attemptResult.error.status).json({ message: attemptResult.error.message });
+      throw createHttpError(
+        attemptResult.error.status,
+        "Bad Request",
+        attemptResult.error.message
+      );
     }
 
     const characterProgression = buildCharacterProgression(character, attemptResult.xpGained);
@@ -69,68 +121,41 @@ export async function postAdventureAttempt(req, res, next) {
       userUpdates: userProgression.updates
     });
 
-    res.locals.data = {
-      outcome: attemptResult.outcome,
-      resultText: attemptResult.resultText,
-      rewards: {
-        xp: attemptResult.xpGained,
-        gold: attemptResult.goldGained
-      },
-      challenge: attemptResult.challenge,
-      quest: {
-        questId: quest.questId,
-        title: quest.title,
-        questType: quest.questType,
-        requiredLevel: quest.requiredLevel,
-        difficulty: quest.difficulty
-      },
-      characterProgression: characterProgression.summary,
-      userProgression: userProgression.summary,
-      character: savedAttempt.character,
-      user: savedAttempt.user,
-      adventureLog: savedAttempt.adventureLog
-    };
-    next();
+    return res.status(200).json({
+      message: "Adventure attempt resolved.",
+      data: {
+        outcome: attemptResult.outcome,
+        resultText: attemptResult.resultText,
+        rewards: {
+          xp: attemptResult.xpGained,
+          gold: attemptResult.goldGained
+        },
+        challenge: attemptResult.challenge,
+        quest: {
+          questId: quest.questId,
+          title: quest.title,
+          questType: quest.questType,
+          requiredLevel: quest.requiredLevel,
+          difficulty: quest.difficulty
+        },
+        characterProgression: characterProgression.summary,
+        userProgression: userProgression.summary,
+        character: savedAttempt.character,
+        user: savedAttempt.user,
+        adventureLog: savedAttempt.adventureLog
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// Helpers
 // ------------------------------------------------------------
 
-// Get adventure logs by user id.
-export async function getAdventureLogsByUserId(req, res, next) {
-  try {
-    const adventureLogList = await adventureModel.findAdventureLogsByUserId(res.locals.user.userId);
-
-    res.locals.data = enrichAdventureLogRows(adventureLogList);
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// Get adventure logs by character id.
-export async function getAdventureLogsByCharacterId(req, res, next) {
-  try {
-    const adventureLogList = await adventureModel.findAdventureLogsByCharacterId(
-      res.locals.character.characterId
-    );
-
-    res.locals.data = enrichAdventureLogRows(adventureLogList);
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// PRIVATE HELPERS
-// ------------------------------------------------------------
-
-// Enrich adventure log rows with related details.
+// Adds fixed quest and region details to adventure log rows.
+// Log rows store ids, so this attaches readable names for API responses.
 function enrichAdventureLogRows(rows) {
   return rows.map((row) => {
     const quest = findQuestDefinitionById(row.questId);
@@ -144,4 +169,26 @@ function enrichAdventureLogRows(rows) {
       regionName: region?.name || null
     };
   });
+}
+
+// Finds one user or raises a 404 controller error.
+async function findRequiredUser(userId) {
+  const user = await userModel.findUserById(userId);
+
+  if (!user) {
+    throw createHttpError(404, "Not Found", "User was not found.");
+  }
+
+  return user;
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

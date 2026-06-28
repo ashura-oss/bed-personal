@@ -1,4 +1,5 @@
-// Pure equipment helper functions used to apply item stat bonuses.
+// Pure equipment helper functions used to apply item stat and army bonuses.
+// These helpers read item constants only; they do not read or write saved inventory rows.
 import { findItemDefinitionById } from "../constants/items.js";
 
 const characterStatFields = [
@@ -11,7 +12,7 @@ const characterStatFields = [
   "charisma"
 ];
 
-// Apply equipment bonuses.
+// Applies equipped item stat bonuses to a copy of the character used for combat.
 export function applyEquipmentBonuses(character, equipment = []) {
   const combatCharacter = {
     ...character,
@@ -65,7 +66,7 @@ export function applyEquipmentBonuses(character, equipment = []) {
   return combatCharacter;
 }
 
-// Combine base and equipment damage ranges.
+// Combines multiple weapon damage ranges into one total range.
 function combineDamageRanges(currentRange, addedRange) {
   if (!currentRange) {
     return {
@@ -80,7 +81,7 @@ function combineDamageRanges(currentRange, addedRange) {
   };
 }
 
-// Calculate army equipment bonus.
+// Calculates army command bonuses from equipped items that affect army battles.
 export function calculateArmyEquipmentBonus(equipment = []) {
   let commandPower = 0;
   let morale = 0;

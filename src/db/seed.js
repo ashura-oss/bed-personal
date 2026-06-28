@@ -7,7 +7,14 @@
 import "dotenv/config";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db.js";
-import { characterAbilities, characterInventory, characterLocations, characterRunStates, characters, users } from "./schema.js";
+import {
+  characterAbilities,
+  characterInventory,
+  characterLocations,
+  characterRunStates,
+  characters,
+  users
+} from "./schema.js";
 
 const now = new Date();
 
@@ -118,7 +125,7 @@ async function seedStartingAbility(characterId) {
   }
 }
 
-// Creates the first story/run state used by map, progression, and frontend save screens.
+// Creates the first story/run state used by map, progression, and save screens.
 async function seedStartingRunState(characterId) {
   const existingRunStates = await db
     .select({ id: characterRunStates.id })
@@ -197,7 +204,7 @@ try {
 
   console.log("Dawn of Man database seeded successfully.");
   console.log(`Database: ${process.env.DATABASE_URL}`);
-  console.log("Authored game definitions are loaded from src/constants.");
+  console.log("fixed game definitions are loaded from src/constants.");
 } catch (error) {
   console.error("Failed to seed Dawn of Man database.");
   console.error(error);

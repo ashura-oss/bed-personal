@@ -11,6 +11,7 @@ import path from "node:path";
 const databaseUrl = process.env.DATABASE_URL || "file:dawn-of-man.db";
 
 // Only local file databases are deleted. Remote libSQL URLs are ignored.
+// This prevents the reset script from accidentally deleting remote project data.
 if (databaseUrl.startsWith("file:")) {
   const databasePath = databaseUrl.slice("file:".length) || "dawn-of-man.db";
   const absoluteDatabasePath = path.resolve(databasePath);

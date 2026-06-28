@@ -1,6 +1,15 @@
 // Progression controller functions read and save story and quest progression.
-import * as progressionModel from "../models/progressionModel.js";
+// The controller validates editable fields before progression models save character/run rows.
 import { findQuestDefinitionById } from "../constants/quests.js";
+import * as characterModel from "../models/characterModel.js";
+import * as progressionModel from "../models/progressionModel.js";
+import {
+  createHttpError,
+  getOptionalInteger,
+  getOptionalString,
+  getRequiredIdParam,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 const DEFAULT_RUN_STATE = {
   supplies: 3,
@@ -10,50 +19,48 @@ const DEFAULT_RUN_STATE = {
 };
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Read the current story, run, and quest progression.
-export async function getCharacterProgression(req, res, next) {
+// Gets the current story, run, and quest progression for one character.
+export async function getCharacterProgression(req, res) {
   try {
-    const progression = await progressionModel.findCharacterProgressionById(
-      res.locals.character.characterId
-    );
+    const characterId = getRequiredIdParam(req.params, "characterId");
 
-    res.locals.data = progression;
-    next();
+    await findRequiredCharacter(characterId);
+
+    const progression = await progressionModel.findCharacterProgressionById(characterId);
+
+    return res.status(200).json({
+      message: "Character progression retrieved.",
+      data: progression
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// SAVE CONTROLLERS
+// PUT
 // ------------------------------------------------------------
 
-// Save editable progression fields for frontend state updates.
-export async function putCharacterProgression(req, res, next) {
+// Saves editable progression fields for one character.
+// Character stats and run state are prepared separately before the model writes both.
+export async function putCharacterProgression(req, res) {
   try {
-    const characterId = Number(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
 
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
+    await findRequiredCharacter(characterId);
 
-    const characterUpdates = buildCharacterProgressionUpdates(req.body, res);
-
-    if (!characterUpdates) {
-      return;
-    }
-
-    const runStateChanges = buildRunStateChanges(req.body, res);
-
-    if (runStateChanges === false) {
-      return;
-    }
+    const characterUpdates = buildCharacterProgressionUpdates(req.body);
+    const runStateChanges = buildRunStateChanges(req.body);
 
     if (Object.keys(characterUpdates).length === 0 && runStateChanges === null) {
-      return res.status(400).json({ message: "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked." });
+      throw createHttpError(
+        400,
+        "Bad Request",
+        "Provide at least one updatable field: level, xp, hp, supplies, morale, storyPhase, or commandModeUnlocked."
+      );
     }
 
     let runStateUpdates = null;
@@ -84,21 +91,22 @@ export async function putCharacterProgression(req, res, next) {
       runStateUpdates
     });
 
-    res.locals.data = savedProgression;
-    next();
+    return res.status(200).json({
+      message: "Character progression saved.",
+      data: savedProgression
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Claim dialogue quest rewards that are not handled by combat.
-export async function putCharacterQuestCompletion(req, res, next) {
+// Claims dialogue quest rewards that are not handled by combat.
+// Combat and army quests are resolved elsewhere so direct claims stay limited to dialogue.
+export async function putCharacterQuestCompletion(req, res) {
   try {
-    const characterId = Number(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
 
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
+    await findRequiredCharacter(characterId);
 
     const quest = findQuestDefinitionById(req.params.questId);
     const questReward = quest
@@ -112,11 +120,11 @@ export async function putCharacterQuestCompletion(req, res, next) {
       : null;
 
     if (!questReward) {
-      return res.status(404).json({ message: "Quest completion reward was not found." });
+      throw createHttpError(404, "Not Found", "Quest completion reward was not found.");
     }
 
     if (questReward.questType !== "dialogue") {
-      return res.status(400).json({ message: "Only dialogue story milestones can be claimed directly." });
+      throw createHttpError(400, "Bad Request", "Only dialogue story milestones can be claimed directly.");
     }
 
     const claimResult = await progressionModel.claimCharacterQuestCompletion({
@@ -124,139 +132,89 @@ export async function putCharacterQuestCompletion(req, res, next) {
       questReward
     });
 
-    res.locals.data = {
-      awarded: claimResult.awarded,
-      rewards: {
-        xp: claimResult.awardedXp
-      },
-      quest: questReward,
-      characterProgression: claimResult.characterProgression,
-      character: claimResult.character,
-      questCompletion: claimResult.questCompletion
-    };
-    next();
+    return res.status(200).json({
+      message: "Quest completion claimed.",
+      data: {
+        awarded: claimResult.awarded,
+        rewards: {
+          xp: claimResult.awardedXp
+        },
+        quest: questReward,
+        characterProgression: claimResult.characterProgression,
+        character: claimResult.character,
+        questCompletion: claimResult.questCompletion
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// Build valid character progression updates from the request body.
-function buildCharacterProgressionUpdates(body, res) {
+// Builds valid character stat updates from the request body.
+// Only fields provided in the request are added to the update object.
+function buildCharacterProgressionUpdates(body) {
   const updates = {};
+  const level = getOptionalInteger(body, "level", { min: 1 });
+  const xp = getOptionalInteger(body, "xp", { min: 0 });
+  const hp = getOptionalInteger(body, "hp", { min: 0 });
 
-  if (body.level !== undefined) {
-    if (!Number.isInteger(body.level)) {
-      res.status(400).json({ message: "level must be an integer." });
-      return null;
-    }
-
-    if (body.level < 1) {
-      res.status(400).json({ message: "level must be at least 1." });
-      return null;
-    }
-
-    updates.level = body.level;
+  if (level !== undefined) {
+    updates.level = level;
   }
 
-  if (body.xp !== undefined) {
-    if (!Number.isInteger(body.xp)) {
-      res.status(400).json({ message: "xp must be an integer." });
-      return null;
-    }
-
-    if (body.xp < 0) {
-      res.status(400).json({ message: "xp must be at least 0." });
-      return null;
-    }
-
-    updates.xp = body.xp;
+  if (xp !== undefined) {
+    updates.xp = xp;
   }
 
-  if (body.hp !== undefined) {
-    if (!Number.isInteger(body.hp)) {
-      res.status(400).json({ message: "hp must be an integer." });
-      return null;
-    }
-
-    if (body.hp < 0) {
-      res.status(400).json({ message: "hp must be at least 0." });
-      return null;
-    }
-
-    updates.hp = body.hp;
+  if (hp !== undefined) {
+    updates.hp = hp;
   }
 
   return updates;
 }
 
-// Build run state changes.
-function buildRunStateChanges(body, res) {
+// Builds valid run state updates from the request body.
+// Missing fields are filled from the current run state before saving.
+function buildRunStateChanges(body) {
   const updates = {};
+  const supplies = getOptionalInteger(body, "supplies", { min: 0 });
+  const morale = getOptionalInteger(body, "morale", { min: 0, max: 100 });
+  const storyPhase = getOptionalString(body, "storyPhase");
+  const commandModeUnlocked = getOptionalInteger(body, "commandModeUnlocked", {
+    min: 0,
+    max: 1
+  });
 
-  if (body.supplies !== undefined) {
-    if (!Number.isInteger(body.supplies)) {
-      res.status(400).json({ message: "supplies must be an integer." });
-      return false;
-    }
-
-    if (body.supplies < 0) {
-      res.status(400).json({ message: "supplies must be at least 0." });
-      return false;
-    }
-
-    updates.supplies = body.supplies;
+  if (supplies !== undefined) {
+    updates.supplies = supplies;
   }
 
-  if (body.morale !== undefined) {
-    if (!Number.isInteger(body.morale)) {
-      res.status(400).json({ message: "morale must be an integer." });
-      return false;
-    }
-
-    if (body.morale < 0) {
-      res.status(400).json({ message: "morale must be at least 0." });
-      return false;
-    }
-
-    if (body.morale > 100) {
-      res.status(400).json({ message: "morale must be at most 100." });
-      return false;
-    }
-
-    updates.morale = body.morale;
+  if (morale !== undefined) {
+    updates.morale = morale;
   }
 
-  if (body.storyPhase !== undefined) {
-    if (typeof body.storyPhase !== "string" || body.storyPhase.trim().length === 0) {
-      res.status(400).json({ message: "storyPhase must be a non-empty string when provided." });
-      return false;
-    }
-
-    updates.storyPhase = body.storyPhase.trim();
+  if (storyPhase !== undefined) {
+    updates.storyPhase = storyPhase;
   }
 
-  if (body.commandModeUnlocked !== undefined) {
-    if (!Number.isInteger(body.commandModeUnlocked)) {
-      res.status(400).json({ message: "commandModeUnlocked must be an integer." });
-      return false;
-    }
-
-    if (body.commandModeUnlocked < 0) {
-      res.status(400).json({ message: "commandModeUnlocked must be at least 0." });
-      return false;
-    }
-
-    if (body.commandModeUnlocked > 1) {
-      res.status(400).json({ message: "commandModeUnlocked must be at most 1." });
-      return false;
-    }
-
-    updates.commandModeUnlocked = body.commandModeUnlocked;
+  if (commandModeUnlocked !== undefined) {
+    updates.commandModeUnlocked = commandModeUnlocked;
   }
 
   return Object.keys(updates).length > 0 ? updates : null;
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

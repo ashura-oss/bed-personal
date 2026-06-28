@@ -1,4 +1,5 @@
 // Ability model functions read and save unlocked character abilities.
+// Ability definitions stay in constants; this file only stores what a character has unlocked.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterAbilities, characterInventory, characters } from "../db/schema.js";
@@ -8,6 +9,7 @@ import { characterAbilities, characterInventory, characters } from "../db/schema
 // ------------------------------------------------------------
 
 // Find one unlocked ability for one character.
+// Used before unlocking so the same ability is not added twice.
 export async function findCharacterAbility(characterId, abilityId) {
   const result = await db
     .select({
@@ -29,6 +31,7 @@ export async function findCharacterAbility(characterId, abilityId) {
 }
 
 // Find all unlocked ability rows for one character.
+// Controllers combine these rows with ability constants for readable API responses.
 export async function findCharacterAbilityRowsByCharacterId(characterId) {
   return db
     .select({
@@ -46,6 +49,7 @@ export async function findCharacterAbilityRowsByCharacterId(characterId) {
 // ------------------------------------------------------------
 
 // Insert one unlocked ability for one character.
+// This transaction spends XP/items and inserts the unlock together so partial unlocks are not saved.
 export async function createCharacterAbility({ character, ability }) {
   return db.transaction(async (tx) => {
     const now = new Date();

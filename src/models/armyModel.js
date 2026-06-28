@@ -1,4 +1,5 @@
-// Army model functions read and save army state and battle logs.
+// Army model functions read and save army state and battle results.
+// Army rules are calculated outside this file; this file only persists the army numbers.
 import { eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterArmyStates, characterRunStates } from "../db/schema.js";
@@ -8,6 +9,7 @@ import { characterArmyStates, characterRunStates } from "../db/schema.js";
 // ------------------------------------------------------------
 
 // Find one character's army state row.
+// Returns null until the character unlocks command mode.
 export async function findArmyStateByCharacterId(characterId) {
   const result = await db
     .select({
@@ -34,6 +36,7 @@ export async function findArmyStateByCharacterId(characterId) {
 // ------------------------------------------------------------
 
 // Insert or update one character's army state row.
+// Uses a normal select-then-insert/update flow so the code stays close to practical style.
 export async function upsertArmyState({
   characterId,
   isUnlocked,
@@ -58,35 +61,53 @@ export async function upsertArmyState({
     updatedAt: now
   };
 
-  const query = existing
-    ? db
-        .update(characterArmyStates)
-        .set({
-          isUnlocked: nextArmyState.isUnlocked,
-          commandRank: nextArmyState.commandRank,
-          soldiers: nextArmyState.soldiers,
-          archers: nextArmyState.archers,
-          cavalry: nextArmyState.cavalry,
-          morale: nextArmyState.morale,
-          strategy: nextArmyState.strategy,
-          updatedAt: now
-        })
-        .where(eq(characterArmyStates.id, existing.characterArmyStateId))
-    : db.insert(characterArmyStates).values(nextArmyState);
-  const result = await query
-    .returning({
-      characterArmyStateId: characterArmyStates.id,
-      characterId: characterArmyStates.characterId,
-      isUnlocked: characterArmyStates.isUnlocked,
-      commandRank: characterArmyStates.commandRank,
-      soldiers: characterArmyStates.soldiers,
-      archers: characterArmyStates.archers,
-      cavalry: characterArmyStates.cavalry,
-      morale: characterArmyStates.morale,
-      strategy: characterArmyStates.strategy,
-      updatedAt: characterArmyStates.updatedAt
-    });
+  let result;
 
+  if (existing) {
+    result = await db
+      .update(characterArmyStates)
+      .set({
+        isUnlocked: nextArmyState.isUnlocked,
+        commandRank: nextArmyState.commandRank,
+        soldiers: nextArmyState.soldiers,
+        archers: nextArmyState.archers,
+        cavalry: nextArmyState.cavalry,
+        morale: nextArmyState.morale,
+        strategy: nextArmyState.strategy,
+        updatedAt: now
+      })
+      .where(eq(characterArmyStates.id, existing.characterArmyStateId))
+      .returning({
+        characterArmyStateId: characterArmyStates.id,
+        characterId: characterArmyStates.characterId,
+        isUnlocked: characterArmyStates.isUnlocked,
+        commandRank: characterArmyStates.commandRank,
+        soldiers: characterArmyStates.soldiers,
+        archers: characterArmyStates.archers,
+        cavalry: characterArmyStates.cavalry,
+        morale: characterArmyStates.morale,
+        strategy: characterArmyStates.strategy,
+        updatedAt: characterArmyStates.updatedAt
+      });
+  } else {
+    result = await db
+      .insert(characterArmyStates)
+      .values(nextArmyState)
+      .returning({
+        characterArmyStateId: characterArmyStates.id,
+        characterId: characterArmyStates.characterId,
+        isUnlocked: characterArmyStates.isUnlocked,
+        commandRank: characterArmyStates.commandRank,
+        soldiers: characterArmyStates.soldiers,
+        archers: characterArmyStates.archers,
+        cavalry: characterArmyStates.cavalry,
+        morale: characterArmyStates.morale,
+        strategy: characterArmyStates.strategy,
+        updatedAt: characterArmyStates.updatedAt
+      });
+  }
+
+  // When command mode is unlocked, the run state is also updated so progression matches army state.
   if (nextArmyState.isUnlocked === 1) {
     const existingRunStateResult = await db
       .select({
@@ -127,6 +148,7 @@ export async function upsertArmyState({
 // ------------------------------------------------------------
 
 // Save troop losses and morale changes after one army battle.
+// The battle calculation is already done before this function receives battleResult.
 export async function saveArmyBattleResult({ characterId, battleResult }) {
   const result = await db
     .update(characterArmyStates)

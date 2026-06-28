@@ -1,13 +1,16 @@
 // User model functions run Drizzle queries for user rows.
+// User rows are the parent records for characters and save slots.
 import { asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
-import { users } from "../db/schema.js";
+import { characters, saveSlots, users } from "../db/schema.js";
+import { deleteCharacterById } from "./characterModel.js";
 
 // ------------------------------------------------------------
 // DATABASE READS
 // ------------------------------------------------------------
 
 // Find all users, with optional level filtering.
+// Supports the query route without putting SQL code inside the controller.
 export async function findUsers(filters = {}) {
   const query = db.select({
     userId: users.id,
@@ -26,37 +29,41 @@ export async function findUsers(filters = {}) {
 }
 
 // Find one user row by id.
+// Returns null when the id does not exist so the controller can send 404.
 export async function findUserById(userId) {
-  const user = await db.query.users.findFirst({
-    columns: {
-      id: true,
-      username: true,
-      level: true,
-      xp: true,
-      gold: true,
-      createdAt: true
-    },
-    where: eq(users.id, userId)
-  });
+  const result = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      level: users.level,
+      xp: users.xp,
+      gold: users.gold,
+      createdAt: users.createdAt
+    })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
 
-  return formatUser(user);
+  return formatUser(result[0]);
 }
 
 // Find one user row by username.
+// Used before creating a user so duplicate usernames can be rejected.
 export async function findUserByUsername(username) {
-  const user = await db.query.users.findFirst({
-    columns: {
-      id: true,
-      username: true,
-      level: true,
-      xp: true,
-      gold: true,
-      createdAt: true
-    },
-    where: eq(users.username, username)
-  });
+  const result = await db
+    .select({
+      id: users.id,
+      username: users.username,
+      level: users.level,
+      xp: users.xp,
+      gold: users.gold,
+      createdAt: users.createdAt
+    })
+    .from(users)
+    .where(eq(users.username, username))
+    .limit(1);
 
-  return formatUser(user);
+  return formatUser(result[0]);
 }
 
 // ------------------------------------------------------------
@@ -64,6 +71,7 @@ export async function findUserByUsername(username) {
 // ------------------------------------------------------------
 
 // Insert one user row.
+// New users always start with default level, XP, and gold.
 export async function createUser({ username }) {
   const result = await db
     .insert(users)
@@ -84,6 +92,7 @@ export async function createUser({ username }) {
 // ------------------------------------------------------------
 
 // Update one user row by id.
+// The controller decides which fields are allowed to change.
 export async function updateUserById(userId, updates) {
   const result = await db
     .update(users)
@@ -99,7 +108,21 @@ export async function updateUserById(userId, updates) {
 // ------------------------------------------------------------
 
 // Delete one user row by id.
+// Characters are deleted first so their dependent gameplay rows are also cleaned.
 export async function deleteUserById(userId) {
+  const characterResult = await db
+    .select({
+      characterId: characters.id
+    })
+    .from(characters)
+    .where(eq(characters.userId, userId));
+
+  for (const character of characterResult) {
+    await deleteCharacterById(character.characterId);
+  }
+
+  await db.delete(saveSlots).where(eq(saveSlots.userId, userId));
+
   const result = await db
     .delete(users)
     .where(eq(users.id, userId))
@@ -113,6 +136,7 @@ export async function deleteUserById(userId) {
 // ------------------------------------------------------------
 
 // Convert a user database row into the API response shape.
+// This keeps database column names separate from API field names.
 function formatUser(user) {
   if (!user) {
     return null;

@@ -1,146 +1,144 @@
 // Map controller functions read map data and move characters between nodes.
+// Map definitions are constants; current character location is saved through models.
+import { findEnemyDefinitionById } from "../constants/enemies.js";
+import { MAP_NODE_DEFINITIONS, findMapNodeDefinitionById } from "../constants/mapNodes.js";
+import * as characterModel from "../models/characterModel.js";
 import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import * as combatModel from "../models/combatModel.js";
 import * as mapModel from "../models/mapModel.js";
-import { findEnemyDefinitionById } from "../constants/enemies.js";
-import { MAP_NODE_DEFINITIONS, findMapNodeDefinitionById } from "../constants/mapNodes.js";
 import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
+import {
+  createHttpError,
+  getOptionalString,
+  getRequiredId,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 const START_NODE_ID = "node_hearthvale_square";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return map definitions, optionally filtered by region.
-export async function getMapNodes(req, res, next) {
+// Gets map definitions, optionally filtered by region.
+export async function getMapNodes(req, res) {
   try {
-    let regionId = req.query.regionId;
-
-    if (regionId !== undefined) {
-      if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        return res.status(400).json({ message: "regionId must be a non-empty string." });
-      }
-
-      regionId = regionId.trim();
-    }
-
+    const regionId = getOptionalString(req.query, "regionId");
     let nodes = [...MAP_NODE_DEFINITIONS].sort((left, right) => left.positionX - right.positionX);
 
     if (regionId !== undefined) {
       nodes = nodes.filter((node) => node.regionId === regionId);
     }
 
-    res.locals.data = nodes;
-    next();
+    return res.status(200).json({
+      message: "Map nodes retrieved.",
+      data: nodes
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one map node definition by id.
-export async function getMapNodeById(req, res, next) {
+// Gets one map node definition by id.
+export async function getMapNodeById(req, res) {
   try {
     const node = findMapNodeDefinitionById(req.params.nodeId);
 
     if (!node) {
-      return res.status(404).json({ message: "Map node was not found." });
+      throw createHttpError(404, "Not Found", "Map node was not found.");
     }
 
-    res.locals.data = node;
-    next();
+    return res.status(200).json({
+      message: "Map node retrieved.",
+      data: node
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Get character map location.
-export async function getCharacterMapLocation(req, res, next) {
+// Gets one character's current map location.
+export async function getCharacterMapLocation(req, res) {
   try {
-    const characterId = res.locals.character.characterId;
-    const location = await findOrCreateReadableLocation(characterId, res);
+    const characterId = getRequiredIdParam(req.params, "characterId");
 
-    if (!location) {
-      return;
-    }
+    await findRequiredCharacter(characterId);
 
-    res.locals.data = location;
-    next();
+    const location = await findOrCreateReadableLocation(characterId);
+
+    return res.status(200).json({
+      message: "Character map location retrieved.",
+      data: location
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// POST
 // ------------------------------------------------------------
 
-// Move a character only if the target node is connected and unlocked.
-export async function postTravelToNode(req, res, next) {
+// Moves one character only if the target node is connected and unlocked.
+export async function postTravelToNode(req, res) {
   try {
-    const character = res.locals.character;
-    const characterId = character.characterId;
-    const targetNodeIdValue = req.body?.targetNodeId;
-
-    if (typeof targetNodeIdValue !== "string" || targetNodeIdValue.trim().length === 0) {
-      return res.status(400).json({ message: "targetNodeId is required." });
-    }
-
-    const targetNodeId = targetNodeIdValue.trim();
-    const currentLocation = await findOrCreateReadableLocation(characterId, res);
-
-    if (!currentLocation) {
-      return;
-    }
-
+    const characterId = getRequiredId(req.body, "characterId");
+    const targetNodeId = getRequiredString(req.body, "targetNodeId");
+    const character = await findRequiredCharacter(characterId);
+    const currentLocation = await findOrCreateReadableLocation(characterId);
     const currentNode = findMapNodeDefinitionById(currentLocation.nodeId);
     const targetNode = findMapNodeDefinitionById(targetNodeId);
     const activeCombatSession = await combatModel.findActiveCombatSessionByCharacterId(characterId);
 
     if (activeCombatSession) {
-      return res.status(409).json({ message: "Resolve the active combat session before travelling again." });
+      throw createHttpError(
+        409,
+        "Conflict",
+        "Resolve the active combat session before travelling again."
+      );
     }
 
     if (!targetNode) {
-      return res.status(404).json({ message: "Target map node was not found." });
+      throw createHttpError(404, "Not Found", "Target map node was not found.");
     }
 
     if (!currentNode.connectedNodeIds.includes(targetNode.nodeId)) {
-      return res.status(400).json({ message: "Target map node is not connected to the current node." });
+      throw createHttpError(403, "Forbidden", "Target map node is not connected to the current node.");
     }
 
     const travelAccess = await mapModel.findNodeTravelAccess({ characterId, targetNode });
 
     if (!travelAccess.canTravel) {
-      return res.status(403).json({ message: "Target map node is locked by story progression." });
+      throw createHttpError(403, "Forbidden", "Target map node is locked by story progression.");
     }
 
     const location = await mapModel.moveCharacterToNode({ characterId, currentNode, targetNode });
-    const travelEvent = await buildTravelEvent(character, targetNode, res);
+    const travelEvent = await buildTravelEvent(character, targetNode);
 
-    if (!travelEvent) {
-      return;
-    }
-
-    res.locals.data = {
-      location,
-      fromNode: currentNode,
-      toNode: targetNode,
-      transitionEffect: targetNode.transitionEffect,
-      travelEvent
-    };
-    next();
+    return res.status(200).json({
+      message: "Travel resolved.",
+      data: {
+        location,
+        fromNode: currentNode,
+        toNode: targetNode,
+        transitionEffect: targetNode.transitionEffect,
+        travelEvent
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// A missing location is created at the starting node.
-async function findOrCreateReadableLocation(characterId, res) {
+// Creates a missing location at the starting node.
+// This gives old or newly-created characters a safe starting map position.
+async function findOrCreateReadableLocation(characterId) {
   const existingLocation = await mapModel.findCharacterLocation(characterId);
 
   if (existingLocation) {
@@ -150,15 +148,15 @@ async function findOrCreateReadableLocation(characterId, res) {
   const startNode = findMapNodeDefinitionById(START_NODE_ID);
 
   if (!startNode) {
-    res.status(500).json({ message: "Start map node was not seeded." });
-    return null;
+    throw createHttpError(500, "Internal Server Error", "Start map node was not seeded.");
   }
 
   return mapModel.moveCharacterToNode({ characterId, currentNode: startNode, targetNode: startNode });
 }
 
-// Build the result shown by the frontend after movement.
-async function buildTravelEvent(character, targetNode, res) {
+// Builds the result returned after movement.
+// Travel can return a normal movement result or an ambush combat session.
+async function buildTravelEvent(character, targetNode) {
   if (targetNode.nodeType === "gathering") {
     const inventoryItem = await mapModel.addTravelInventoryReward({
       characterId: character.characterId,
@@ -191,7 +189,7 @@ async function buildTravelEvent(character, targetNode, res) {
   }
 
   if (targetNode.encounterEnemyId && shouldTriggerEncounter(targetNode)) {
-    return createAmbushTravelEvent({ character, targetNode, res });
+    return createAmbushTravelEvent({ character, targetNode });
   }
 
   if (targetNode.travelDanger >= 2) {
@@ -208,13 +206,13 @@ async function buildTravelEvent(character, targetNode, res) {
   };
 }
 
-// Create ambush travel event.
-async function createAmbushTravelEvent({ character, targetNode, res }) {
+// Creates an ambush combat session when travel triggers a random encounter.
+// Equipment bonuses are applied before enemy HP and player HP are saved.
+async function createAmbushTravelEvent({ character, targetNode }) {
   const enemy = findEnemyDefinitionById(targetNode.encounterEnemyId);
 
   if (!enemy) {
-    res.status(500).json({ message: "Travel encounter enemy was not found." });
-    return null;
+    throw createHttpError(500, "Internal Server Error", "Travel encounter enemy was not found.");
   }
 
   const equipment = await characterInventoryModel.findEquipmentByCharacterId(character.characterId);
@@ -237,7 +235,8 @@ async function createAmbushTravelEvent({ character, targetNode, res }) {
   };
 }
 
-// Decide whether travel should trigger a random encounter.
+// Decides whether travel should trigger a random encounter.
+// Nodes without an encounter enemy never trigger combat.
 function shouldTriggerEncounter(targetNode) {
   const encounterChance = Number(targetNode.encounterChance || 0);
 
@@ -250,4 +249,15 @@ function shouldTriggerEncounter(targetNode) {
   }
 
   return Math.random() * 100 < encounterChance;
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

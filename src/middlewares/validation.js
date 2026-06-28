@@ -1,4 +1,5 @@
 // Checks that required JSON body fields exist before controller logic runs.
+// This keeps simple "missing field" validation out of each route controller.
 export function requireBodyFields(...fieldNames) {
   return (req, res, next) => {
     if (!hasJsonObjectBody(req.body)) {
@@ -20,6 +21,7 @@ export function requireBodyFields(...fieldNames) {
 }
 
 // Checks that at least one allowed JSON body field exists for update routes.
+// PUT routes use this so empty update requests fail before model logic runs.
 export function requireAnyBodyField(...fieldNames) {
   return (req, res, next) => {
     if (!hasJsonObjectBody(req.body)) {
@@ -41,6 +43,7 @@ export function requireAnyBodyField(...fieldNames) {
 }
 
 // Checks that required route parameters exist before controller logic runs.
+// Controllers still validate type and ownership after this middleware confirms presence.
 export function requireParamFields(...fieldNames) {
   return (req, res, next) => {
     for (const fieldName of fieldNames) {
@@ -56,6 +59,7 @@ export function requireParamFields(...fieldNames) {
 }
 
 // Responds when the request body is not valid JSON.
+// Express passes malformed JSON here before the request reaches any route file.
 export function handleJsonParseError(error, _req, res, _next) {
   if (error.type === "entity.parse.failed") {
     return res.status(400).json({
@@ -67,11 +71,13 @@ export function handleJsonParseError(error, _req, res, _next) {
 }
 
 // Treats undefined, null, and blank strings as missing request data.
+// A value of 0 is allowed because some routes use 0/1 flags.
 function isMissing(value) {
   return value === undefined || value === null || (typeof value === "string" && value.trim() === "");
 }
 
-// Accept only a non-empty JSON object for body-based routes.
+// Accepts only a non-empty JSON object for body-based routes.
+// Arrays and empty objects are rejected because controllers expect named fields.
 function hasJsonObjectBody(body) {
   return body !== undefined && body !== null && typeof body === "object" && !Array.isArray(body) && Object.keys(body).length > 0;
 }

@@ -1,203 +1,98 @@
-// Character controller functions handle character validation, loading, and CRUD.
+// Character controller functions validate requests, call character models, and send responses.
+// Character option validation uses constants, while saved character rows are handled by models.
 import * as characterModel from "../models/characterModel.js";
-import { calculateCharacterStats, validateAffinity, validateCharacterName, validateClassName, validateOrigin } from "../utils/gameRules.js";
+import * as userModel from "../models/userModel.js";
+import {
+  calculateCharacterStats,
+  validateAffinity,
+  validateCharacterName,
+  validateClassName,
+  validateOrigin
+} from "../utils/gameRules.js";
+import {
+  createHttpError,
+  getOptionalString,
+  getRequiredId,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// RESOURCE LOADERS
+// GET
 // ------------------------------------------------------------
 
-// Shared controller steps used before routes that need an existing character.
-export async function loadCharacterFromCharacterIdParam(req, res, next) {
+// Gets all characters, optionally filtered by class.
+export async function getCharacters(req, res) {
   try {
-    const characterId = Number(req.params.characterId);
-
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
-
-    const character = await characterModel.findCharacterById(characterId);
-
-    if (!character) {
-      return res.status(404).json({ message: "Character was not found." });
-    }
-
-    res.locals.character = character;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// Load character from id param for the next controller.
-export async function loadCharacterFromIdParam(req, res, next) {
-  try {
-    const characterId = Number(req.params.id);
-
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
-
-    const character = await characterModel.findCharacterById(characterId);
-
-    if (!character) {
-      return res.status(404).json({ message: "Character was not found." });
-    }
-
-    res.locals.character = character;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// Load character from body for the next controller.
-export async function loadCharacterFromBody(req, res, next) {
-  try {
-    const value = req.body?.characterId;
-    const characterId = typeof value === "string" ? Number(value) : value;
-
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
-
-    const character = await characterModel.findCharacterById(characterId);
-
-    if (!character) {
-      return res.status(404).json({ message: "Character was not found." });
-    }
-
-    res.locals.character = character;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// READ CONTROLLERS
-// ------------------------------------------------------------
-
-// Return all characters, optionally filtered by class.
-export async function getCharacters(req, res, next) {
-  try {
-    let className = req.query.className;
+    const className = getOptionalString(req.query, "className");
 
     if (className !== undefined) {
-      if (typeof className !== "string" || className.trim().length === 0) {
-        return res.status(400).json({ message: "className must be a non-empty string." });
-      }
-
-      className = className.trim();
-    }
-
-    if (className !== undefined) {
-      const classNameError = validateClassName(className);
-
-      if (classNameError) {
-        return res.status(400).json({ message: classNameError });
-      }
+      validateClassNameOrThrow(className);
     }
 
     const characterList = await characterModel.findCharacters({ className });
 
-    res.locals.data = characterList;
-    next();
+    return res.status(200).json({
+      message: "Characters retrieved.",
+      data: characterList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one character by id.
-export async function getCharacterById(req, res, next) {
+// Gets one character by id.
+export async function getCharacterById(req, res) {
   try {
-    const characterId = Number(req.params.id);
+    const characterId = getRequiredIdParam(req.params, "id");
+    const character = await findRequiredCharacter(characterId);
 
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
-
-    const character = await characterModel.findCharacterById(characterId);
-
-    if (!character) {
-      return res.status(404).json({ message: "Character was not found." });
-    }
-
-    res.locals.data = character;
-    next();
+    return res.status(200).json({
+      message: "Character retrieved.",
+      data: character
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Get characters by user id.
-export async function getCharactersByUserId(req, res, next) {
+// Gets all characters owned by one user.
+export async function getCharactersByUserId(req, res) {
   try {
-    const characterList = await characterModel.findCharactersByUserId(res.locals.user.userId);
+    const userId = getRequiredIdParam(req.params, "userId");
 
-    res.locals.data = characterList;
-    next();
+    await findRequiredUser(userId);
+
+    const characterList = await characterModel.findCharactersByUserId(userId);
+
+    return res.status(200).json({
+      message: "User characters retrieved.",
+      data: characterList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// POST
 // ------------------------------------------------------------
 
-// Create a character after validating owner and character choices.
-export async function postCharacter(req, res, next) {
+// Creates one character after validating owner and character choices.
+export async function postCharacter(req, res) {
   try {
-    const userId = typeof req.body?.userId === "string" ? Number(req.body.userId) : req.body?.userId;
+    const userId = getRequiredId(req.body, "userId");
+    const characterName = getRequiredString(req.body, "characterName");
+    const origin = getRequiredString(req.body, "origin");
+    const className = getRequiredString(req.body, "className");
+    const affinity = getRequiredString(req.body, "affinity");
 
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "userId must be a positive integer id." });
-    }
-
-    if (typeof req.body?.characterName !== "string" || req.body.characterName.trim().length === 0) {
-      return res.status(400).json({ message: "characterName is required." });
-    }
-
-    if (typeof req.body?.origin !== "string" || req.body.origin.trim().length === 0) {
-      return res.status(400).json({ message: "origin is required." });
-    }
-
-    if (typeof req.body?.className !== "string" || req.body.className.trim().length === 0) {
-      return res.status(400).json({ message: "className is required." });
-    }
-
-    if (typeof req.body?.affinity !== "string" || req.body.affinity.trim().length === 0) {
-      return res.status(400).json({ message: "affinity is required." });
-    }
-
-    const characterName = req.body.characterName.trim();
-    const origin = req.body.origin.trim();
-    const className = req.body.className.trim();
-    const affinity = req.body.affinity.trim();
-
-    const characterNameError = validateCharacterName(characterName);
-
-    if (characterNameError) {
-      return res.status(400).json({ message: characterNameError });
-    }
-
-    const originError = validateOrigin(origin);
-
-    if (originError) {
-      return res.status(400).json({ message: originError });
-    }
-
-    const classNameError = validateClassName(className);
-
-    if (classNameError) {
-      return res.status(400).json({ message: classNameError });
-    }
-
-    const affinityError = validateAffinity(affinity);
-
-    if (affinityError) {
-      return res.status(400).json({ message: affinityError });
-    }
+    await findRequiredUser(userId);
+    validateCharacterNameOrThrow(characterName);
+    validateOriginOrThrow(origin);
+    validateClassNameOrThrow(className);
+    validateAffinityOrThrow(affinity);
 
     const stats = calculateCharacterStats({ origin, className, affinity });
     const character = await characterModel.createCharacter({
@@ -209,157 +104,95 @@ export async function postCharacter(req, res, next) {
       stats
     });
 
-    res.locals.data = character;
-    next();
+    return res.status(201).json({
+      message: "Character created.",
+      data: character
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// SAVE CONTROLLERS
+// PUT
 // ------------------------------------------------------------
 
-// Update one character row by id.
-export async function putCharacterById(req, res, next) {
+// Updates one character.
+export async function putCharacterById(req, res) {
   try {
-    const characterId = Number(req.params.id);
-
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
-
-    const updates = buildCharacterUpdates(req.body, res.locals.character, res);
-
-    if (!updates) {
-      return;
-    }
-
+    const characterId = getRequiredIdParam(req.params, "id");
+    const existingCharacter = await findRequiredCharacter(characterId);
+    const updates = buildCharacterUpdates(req.body, existingCharacter);
     const updatedCharacter = await characterModel.updateCharacterById(characterId, updates);
 
-    res.locals.data = updatedCharacter;
-    next();
+    return res.status(200).json({
+      message: "Character updated.",
+      data: updatedCharacter
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// REMOVE CONTROLLERS
+// DELETE
 // ------------------------------------------------------------
 
-// Delete character.
-export async function deleteCharacter(req, res, next) {
+// Deletes one character.
+export async function deleteCharacter(req, res) {
   try {
-    const characterId = Number(req.params.id);
+    const characterId = getRequiredIdParam(req.params, "id");
+    const deletedCharacter = await characterModel.deleteCharacterById(characterId);
 
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
+    if (!deletedCharacter) {
+      throw createHttpError(404, "Not Found", "Character was not found.");
     }
 
-    await characterModel.deleteCharacterById(characterId);
-
-    next();
+    return res.status(204).send();
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// Build allowed updates and recalculate stats if class data changes.
-function buildCharacterUpdates(body, existingCharacter, res) {
+// Builds allowed character update fields.
+// If origin, class, or affinity changes, stats are recalculated using the same creation rules.
+function buildCharacterUpdates(body, existingCharacter) {
   const updates = {};
-  let characterName = body?.characterName;
-  let origin = body?.origin;
-  let className = body?.className;
-  let affinity = body?.affinity;
+  const characterName = getOptionalString(body, "characterName");
+  const origin = getOptionalString(body, "origin");
+  const className = getOptionalString(body, "className");
+  const affinity = getOptionalString(body, "affinity");
 
   if (characterName !== undefined) {
-    if (typeof characterName !== "string" || characterName.trim().length === 0) {
-      res.status(400).json({ message: "characterName must be a non-empty string." });
-      return null;
-    }
-
-    characterName = characterName.trim();
-  }
-
-  if (origin !== undefined) {
-    if (typeof origin !== "string" || origin.trim().length === 0) {
-      res.status(400).json({ message: "origin must be a non-empty string." });
-      return null;
-    }
-
-    origin = origin.trim();
-  }
-
-  if (className !== undefined) {
-    if (typeof className !== "string" || className.trim().length === 0) {
-      res.status(400).json({ message: "className must be a non-empty string." });
-      return null;
-    }
-
-    className = className.trim();
-  }
-
-  if (affinity !== undefined) {
-    if (typeof affinity !== "string" || affinity.trim().length === 0) {
-      res.status(400).json({ message: "affinity must be a non-empty string." });
-      return null;
-    }
-
-    affinity = affinity.trim();
-  }
-
-  if (characterName !== undefined) {
-    const characterNameError = validateCharacterName(characterName);
-
-    if (characterNameError) {
-      res.status(400).json({ message: characterNameError });
-      return null;
-    }
-
+    validateCharacterNameOrThrow(characterName);
     updates.characterName = characterName;
   }
 
   if (origin !== undefined) {
-    const originError = validateOrigin(origin);
-
-    if (originError) {
-      res.status(400).json({ message: originError });
-      return null;
-    }
-
+    validateOriginOrThrow(origin);
     updates.origin = origin;
   }
 
   if (className !== undefined) {
-    const classNameError = validateClassName(className);
-
-    if (classNameError) {
-      res.status(400).json({ message: classNameError });
-      return null;
-    }
-
+    validateClassNameOrThrow(className);
     updates.className = className;
   }
 
   if (affinity !== undefined) {
-    const affinityError = validateAffinity(affinity);
-
-    if (affinityError) {
-      res.status(400).json({ message: affinityError });
-      return null;
-    }
-
+    validateAffinityOrThrow(affinity);
     updates.affinity = affinity;
   }
 
   if (Object.keys(updates).length === 0) {
-    res.status(400).json({ message: "Provide at least one updatable field: characterName, origin, className, or affinity." });
-    return null;
+    throw createHttpError(
+      400,
+      "Bad Request",
+      "Provide at least one updatable field: characterName, origin, className, or affinity."
+    );
   }
 
   if (origin !== undefined || className !== undefined || affinity !== undefined) {
@@ -380,4 +213,54 @@ function buildCharacterUpdates(body, existingCharacter, res) {
   }
 
   return updates;
+}
+
+// Converts game rule validation results into controller errors.
+// This keeps game-rule validation errors in the same JSON format as request errors.
+function throwIfValidationError(errorMessage) {
+  if (errorMessage) {
+    throw createHttpError(400, "Bad Request", errorMessage);
+  }
+}
+
+// Validates character name.
+function validateCharacterNameOrThrow(characterName) {
+  throwIfValidationError(validateCharacterName(characterName));
+}
+
+// Validates origin.
+function validateOriginOrThrow(origin) {
+  throwIfValidationError(validateOrigin(origin));
+}
+
+// Validates class.
+function validateClassNameOrThrow(className) {
+  throwIfValidationError(validateClassName(className));
+}
+
+// Validates affinity.
+function validateAffinityOrThrow(affinity) {
+  throwIfValidationError(validateAffinity(affinity));
+}
+
+// Finds one user or raises a 404 controller error.
+async function findRequiredUser(userId) {
+  const user = await userModel.findUserById(userId);
+
+  if (!user) {
+    throw createHttpError(404, "Not Found", "User was not found.");
+  }
+
+  return user;
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

@@ -3,8 +3,8 @@
 // ------------------------------------------------------------
 // Drizzle table definitions for user-created and saved game data.
 // Constants such as items, quests, regions, enemies, and abilities stay in src/constants.
-// The database stores player-owned data, progress, logs, and frontend save state.
-import { integer, real, sqliteTable, text, uniqueIndex } from "drizzle-orm/sqlite-core";
+// The database stores player-owned data, progress, logs, and saved-game state.
+import { integer, real, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
 // ------------------------------------------------------------
 // CORE PLAYER TABLES
@@ -23,13 +23,13 @@ export const users = sqliteTable("users", {
 });
 
 // Stores each playable character owned by a user.
-// userId is a foreign key back to users, so deleting a user deletes their characters.
+// userId is a foreign key back to users; user deletion cleanup is handled in the model.
 // Stats are saved here because equipment, combat, and progression all read them.
 export const characters = sqliteTable("characters", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: integer("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => users.id),
   characterName: text("character_name").notNull(),
   origin: text("origin").notNull(),
   className: text("class_name").notNull(),
@@ -57,7 +57,7 @@ export const adventureLogs = sqliteTable("adventure_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
     .notNull()
-    .references(() => characters.id, { onDelete: "cascade" }),
+    .references(() => characters.id),
   questKey: text("quest_key").notNull(),
   outcome: text("outcome").notNull(),
   xpGained: integer("xp_gained").notNull(),
@@ -68,47 +68,30 @@ export const adventureLogs = sqliteTable("adventure_logs", {
 
 // Stores which fixed ability definitions each character has unlocked.
 // abilityKey points to src/constants/abilities.js.
-// Unique rule: one character cannot unlock the same ability twice.
-export const characterAbilities = sqliteTable(
-  "character_abilities",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    abilityKey: text("ability_key").notNull(),
-    unlockedAt: integer("unlocked_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterAbilityUnique: uniqueIndex("character_abilities_character_ability_unique").on(
-      table.characterId,
-      table.abilityKey
-    )
-  })
-);
+// Model logic checks that one character cannot unlock the same ability twice.
+export const characterAbilities = sqliteTable("character_abilities", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  abilityKey: text("ability_key").notNull(),
+  unlockedAt: integer("unlocked_at", { mode: "timestamp" }).notNull()
+});
 
 // Stores one persistent story/run state row per character.
-// Used by: progression routes, map locks, army unlock flow, frontend save/load.
-// Unique rule: each character has only one current run state row.
-export const characterRunStates = sqliteTable(
-  "character_run_states",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    supplies: integer("supplies").notNull().default(3),
-    morale: integer("morale").notNull().default(50),
-    storyPhase: text("story_phase").notNull().default("village_rebellion"),
-    commandModeUnlocked: integer("command_mode_unlocked").notNull().default(0),
-    savedAt: integer("saved_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterRunStateUnique: uniqueIndex("character_run_states_character_unique").on(
-      table.characterId
-    )
-  })
-);
+// Used by: progression routes, map locks, army unlock flow, and save/load state.
+// Model logic keeps one current run state row per character.
+export const characterRunStates = sqliteTable("character_run_states", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  supplies: integer("supplies").notNull().default(3),
+  morale: integer("morale").notNull().default(50),
+  storyPhase: text("story_phase").notNull().default("village_rebellion"),
+  commandModeUnlocked: integer("command_mode_unlocked").notNull().default(0),
+  savedAt: integer("saved_at", { mode: "timestamp" }).notNull()
+});
 
 // ------------------------------------------------------------
 // MAP AND TRAVEL STATE
@@ -116,25 +99,17 @@ export const characterRunStates = sqliteTable(
 
 // Stores one current map location row per character.
 // nodeKey and regionKey point to fixed map/region definitions in src/constants.
-// Unique rule: each character has only one current location row.
-export const characterLocations = sqliteTable(
-  "character_locations",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    regionKey: text("region_key").notNull(),
-    nodeKey: text("node_key").notNull(),
-    previousNodeKey: text("previous_node_key"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterLocationUnique: uniqueIndex("character_locations_character_unique").on(
-      table.characterId
-    )
-  })
-);
+// Model logic keeps one current location row per character.
+export const characterLocations = sqliteTable("character_locations", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  regionKey: text("region_key").notNull(),
+  nodeKey: text("node_key").notNull(),
+  previousNodeKey: text("previous_node_key"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
 // ------------------------------------------------------------
 // COMBAT STATE
@@ -147,7 +122,7 @@ export const combatSessions = sqliteTable("combat_sessions", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   characterId: integer("character_id")
     .notNull()
-    .references(() => characters.id, { onDelete: "cascade" }),
+    .references(() => characters.id),
   enemyKey: text("enemy_key").notNull(),
   questKey: text("quest_key"),
   regionKey: text("region_key").notNull(),
@@ -164,13 +139,13 @@ export const combatSessions = sqliteTable("combat_sessions", {
 });
 
 // Stores individual combat turn results for a combat session.
-// Used by: GET /combat/sessions/:combatSessionId so the frontend can show battle history.
-// Deleting a combat session deletes its turn logs.
+// Used by: GET /combat/sessions/:combatSessionId so battle history can be returned.
+// Combat turn logs are cleaned by model logic when their session/character is removed.
 export const combatTurnLogs = sqliteTable("combat_turn_logs", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   combatSessionId: integer("combat_session_id")
     .notNull()
-    .references(() => combatSessions.id, { onDelete: "cascade" }),
+    .references(() => combatSessions.id),
   actor: text("actor").notNull(),
   actionType: text("action_type").notNull(),
   abilityKey: text("ability_key"),
@@ -187,29 +162,21 @@ export const combatTurnLogs = sqliteTable("combat_turn_logs", {
 
 // Stores one army state row for a character after command mode is unlocked.
 // Used by: army state endpoints and army battle simulation.
-// Unique rule: each character has one current army state row.
-export const characterArmyStates = sqliteTable(
-  "character_army_states",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    isUnlocked: integer("is_unlocked").notNull().default(0),
-    commandRank: text("command_rank").notNull().default("none"),
-    soldiers: integer("soldiers").notNull().default(0),
-    archers: integer("archers").notNull().default(0),
-    cavalry: integer("cavalry").notNull().default(0),
-    morale: integer("morale").notNull().default(50),
-    strategy: text("strategy").notNull().default("hold"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterArmyStateUnique: uniqueIndex("character_army_states_character_unique").on(
-      table.characterId
-    )
-  })
-);
+// Model logic keeps one current army state row per character.
+export const characterArmyStates = sqliteTable("character_army_states", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  isUnlocked: integer("is_unlocked").notNull().default(0),
+  commandRank: text("command_rank").notNull().default("none"),
+  soldiers: integer("soldiers").notNull().default(0),
+  archers: integer("archers").notNull().default(0),
+  cavalry: integer("cavalry").notNull().default(0),
+  morale: integer("morale").notNull().default(50),
+  strategy: text("strategy").notNull().default("hold"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
 // ------------------------------------------------------------
 // COMPLETION AND SAVE STATE
@@ -217,51 +184,32 @@ export const characterArmyStates = sqliteTable(
 
 // Stores completed quest flags and reward XP for each character.
 // questKey points to fixed quest definitions in src/constants/quests.js.
-// Unique rule: one character cannot claim the same quest completion twice.
-export const characterQuestCompletions = sqliteTable(
-  "character_quest_completions",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    questKey: text("quest_key").notNull(),
-    rewardXp: integer("reward_xp").notNull(),
-    awardedAt: integer("awarded_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterQuestCompletionUnique: uniqueIndex(
-      "character_quest_completions_character_quest_unique"
-    ).on(table.characterId, table.questKey)
-  })
-);
+// Model logic checks that one character cannot claim the same quest completion twice.
+export const characterQuestCompletions = sqliteTable("character_quest_completions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  questKey: text("quest_key").notNull(),
+  rewardXp: integer("reward_xp").notNull(),
+  awardedAt: integer("awarded_at", { mode: "timestamp" }).notNull()
+});
 
-// Stores save slot metadata for frontend save/load screens.
+// Stores save slot metadata for save/load screens.
 // userId owns the slot; characterId can be null if the linked character is deleted.
-// Unique rule: one user cannot have two save slots with the same slot index.
-export const saveSlots = sqliteTable(
-  "save_slots",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    userId: integer("user_id")
-      .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
-    characterId: integer("character_id").references(() => characters.id, {
-      onDelete: "set null"
-    }),
-    slotIndex: integer("slot_index").notNull(),
-    slotName: text("slot_name").notNull(),
-    createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
-    lastPlayedAt: integer("last_played_at", { mode: "timestamp" })
-  },
-  (table) => ({
-    saveSlotUserIndexUnique: uniqueIndex("save_slots_user_slot_index_unique").on(
-      table.userId,
-      table.slotIndex
-    )
-  })
-);
+// Model logic keeps one save slot row per user and slot index.
+export const saveSlots = sqliteTable("save_slots", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: integer("user_id")
+    .notNull()
+    .references(() => users.id),
+  characterId: integer("character_id").references(() => characters.id),
+  slotIndex: integer("slot_index").notNull(),
+  slotName: text("slot_name").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull(),
+  lastPlayedAt: integer("last_played_at", { mode: "timestamp" })
+});
 
 // ------------------------------------------------------------
 // INVENTORY AND EQUIPMENT
@@ -269,170 +217,109 @@ export const saveSlots = sqliteTable(
 
 // Stores owned item quantities for each character.
 // itemKey points to fixed item definitions in src/constants/items.js.
-// Unique rule: one character has one row per item type.
-export const characterInventory = sqliteTable(
-  "character_inventory",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    itemKey: text("item_key").notNull(),
-    quantity: integer("quantity").notNull().default(1),
-    acquiredAt: integer("acquired_at", { mode: "timestamp" }).notNull(),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterInventoryItemUnique: uniqueIndex("character_inventory_character_item_unique").on(
-      table.characterId,
-      table.itemKey
-    )
-  })
-);
+// Model logic keeps one inventory row per character and item type.
+export const characterInventory = sqliteTable("character_inventory", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  itemKey: text("item_key").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  acquiredAt: integer("acquired_at", { mode: "timestamp" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
 // Stores equipped items by character and equipment slot.
 // itemKey still points to a fixed item definition; this table only stores ownership state.
-// Unique rule: one character can equip only one item per slot.
-export const characterEquipment = sqliteTable(
-  "character_equipment",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    equipmentSlot: text("equipment_slot").notNull(),
-    itemKey: text("item_key").notNull(),
-    equippedAt: integer("equipped_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterEquipmentSlotUnique: uniqueIndex("character_equipment_character_slot_unique").on(
-      table.characterId,
-      table.equipmentSlot
-    )
-  })
-);
+// Model logic keeps one equipped item per character and equipment slot.
+export const characterEquipment = sqliteTable("character_equipment", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  equipmentSlot: text("equipment_slot").notNull(),
+  itemKey: text("item_key").notNull(),
+  equippedAt: integer("equipped_at", { mode: "timestamp" }).notNull()
+});
 
 // ------------------------------------------------------------
-// FRONTEND AND STORY FLAGS
+// STORY AND GAME STATE FLAGS
 // ------------------------------------------------------------
 
 // Stores dialogue flags so completed conversations are remembered.
 // flagKey points to fixed dialogue/story keys from src/constants/dialogues.js.
-// Unique rule: one character has one row per dialogue flag.
-export const characterDialogueFlags = sqliteTable(
-  "character_dialogue_flags",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    flagKey: text("flag_key").notNull(),
-    flagValue: integer("flag_value").notNull().default(1),
-    setAt: integer("set_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterDialogueFlagUnique: uniqueIndex("character_dialogue_flags_character_flag_unique").on(
-      table.characterId,
-      table.flagKey
-    )
-  })
-);
+// Model logic keeps one row per character and dialogue flag.
+export const characterDialogueFlags = sqliteTable("character_dialogue_flags", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  flagKey: text("flag_key").notNull(),
+  flagValue: integer("flag_value").notNull().default(1),
+  setAt: integer("set_at", { mode: "timestamp" }).notNull()
+});
 
 // Stores boss progress, attempt count, defeat count, and latest outcome.
 // bossKey points to boss enemy definitions in src/constants/enemies.js.
-// Unique rule: one character has one row per boss.
-export const characterBossStates = sqliteTable(
-  "character_boss_states",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    bossKey: text("boss_key").notNull(),
-    status: text("status").notNull().default("unknown"),
-    attempts: integer("attempts").notNull().default(0),
-    defeats: integer("defeats").notNull().default(0),
-    bestTimeSeconds: real("best_time_seconds"),
-    lastOutcome: text("last_outcome"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterBossStateUnique: uniqueIndex("character_boss_states_character_boss_unique").on(
-      table.characterId,
-      table.bossKey
-    )
-  })
-);
+// Model logic keeps one boss state row per character and boss.
+export const characterBossStates = sqliteTable("character_boss_states", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  bossKey: text("boss_key").notNull(),
+  status: text("status").notNull().default("unknown"),
+  attempts: integer("attempts").notNull().default(0),
+  defeats: integer("defeats").notNull().default(0),
+  bestTimeSeconds: real("best_time_seconds"),
+  lastOutcome: text("last_outcome"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
-// Stores campaign markers shown on the frontend map.
+// Stores campaign markers shown on the game map.
 // markerKey is fixed game content, while reveal/completion state belongs to the player.
-// Unique rule: one character has one row per campaign marker.
-export const characterCampaignMarkers = sqliteTable(
-  "character_campaign_markers",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    markerKey: text("marker_key").notNull(),
-    regionKey: text("region_key").notNull(),
-    markerType: text("marker_type").notNull(),
-    isRevealed: integer("is_revealed").notNull().default(1),
-    isCompleted: integer("is_completed").notNull().default(0),
-    positionX: real("position_x"),
-    positionY: real("position_y"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterCampaignMarkerUnique: uniqueIndex(
-      "character_campaign_markers_character_marker_unique"
-    ).on(table.characterId, table.markerKey)
-  })
-);
+// Model logic keeps one campaign marker row per character and marker.
+export const characterCampaignMarkers = sqliteTable("character_campaign_markers", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  markerKey: text("marker_key").notNull(),
+  regionKey: text("region_key").notNull(),
+  markerType: text("marker_type").notNull(),
+  isRevealed: integer("is_revealed").notNull().default(1),
+  isCompleted: integer("is_completed").notNull().default(0),
+  positionX: real("position_x"),
+  positionY: real("position_y"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
 // Stores one character's reputation state with each faction.
 // factionKey points to src/constants/factions.js.
-// Unique rule: one character has one row per faction.
-export const characterFactionReputation = sqliteTable(
-  "character_faction_reputation",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    factionKey: text("faction_key").notNull(),
-    reputation: integer("reputation").notNull().default(0),
-    rank: text("rank").notNull().default("neutral"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterFactionReputationUnique: uniqueIndex(
-      "character_faction_reputation_character_faction_unique"
-    ).on(table.characterId, table.factionKey)
-  })
-);
+// Model logic keeps one faction reputation row per character and faction.
+export const characterFactionReputation = sqliteTable("character_faction_reputation", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  factionKey: text("faction_key").notNull(),
+  reputation: integer("reputation").notNull().default(0),
+  rank: text("rank").notNull().default("neutral"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});
 
 // Stores per-region unlock, discovery, threat, and world-state progress.
 // regionKey points to fixed region definitions in src/constants/regions.js.
-// Unique rule: one character has one row per region.
-export const characterRegionStates = sqliteTable(
-  "character_region_states",
-  {
-    id: integer("id").primaryKey({ autoIncrement: true }),
-    characterId: integer("character_id")
-      .notNull()
-      .references(() => characters.id, { onDelete: "cascade" }),
-    regionKey: text("region_key").notNull(),
-    isUnlocked: integer("is_unlocked").notNull().default(0),
-    isDiscovered: integer("is_discovered").notNull().default(0),
-    threatLevel: integer("threat_level").notNull().default(0),
-    worldState: text("world_state").notNull().default("stable"),
-    updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
-  },
-  (table) => ({
-    characterRegionStateUnique: uniqueIndex("character_region_states_character_region_unique").on(
-      table.characterId,
-      table.regionKey
-    )
-  })
-);
+// Model logic keeps one region state row per character and region.
+export const characterRegionStates = sqliteTable("character_region_states", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  characterId: integer("character_id")
+    .notNull()
+    .references(() => characters.id),
+  regionKey: text("region_key").notNull(),
+  isUnlocked: integer("is_unlocked").notNull().default(0),
+  isDiscovered: integer("is_discovered").notNull().default(0),
+  threatLevel: integer("threat_level").notNull().default(0),
+  worldState: text("world_state").notNull().default("stable"),
+  updatedAt: integer("updated_at", { mode: "timestamp" }).notNull()
+});

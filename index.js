@@ -1,4 +1,4 @@
-// Express entry point that mounts all route files and starts the API server.
+// Express entry point that prepares middleware, mounts route modules, and starts the API server.
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
@@ -17,15 +17,16 @@ import questRoutes from "./src/routes/questRoutes.js";
 import regionRoutes from "./src/routes/regionRoutes.js";
 import stateRoutes from "./src/routes/stateRoutes.js";
 import userRoutes from "./src/routes/userRoutes.js";
-import { errorHandler } from "./src/middlewares/statusMessage.js";
 import { handleJsonParseError } from "./src/middlewares/validation.js";
 
 const app = express();
 
+// Global request setup runs before any route so every controller receives parsed JSON.
 app.use(cors());
 app.use(express.json());
 app.use(handleJsonParseError);
 
+// Route modules are grouped by resource so each file handles one area of the backend.
 app.use("/users", userRoutes);
 app.use("/characters", characterRoutes);
 app.use("/regions", regionRoutes);
@@ -42,16 +43,17 @@ app.use("/army", armyRoutes);
 app.use("/progression", progressionRoutes);
 app.use("/state", stateRoutes);
 
+// Final 404 response for requests that did not match any mounted route.
 app.use((req, res) => {
   res.status(404).json({
-    message: "Route was not found."
+    error: "Not Found",
+    message: `No route found for ${req.method} ${req.originalUrl}`
   });
 });
 
-app.use(errorHandler);
-
 const PORT = process.env.PORT || 3000;
 
+// Tests import the app without opening a network port.
 if (process.env.NODE_ENV !== "test") {
   app.listen(PORT, () => console.log(`Dawn of Man API on :${PORT}`));
 }

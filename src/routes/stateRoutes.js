@@ -1,10 +1,23 @@
 // Saved state route definitions.
+// Route order: validate required params/body fields first, then let controllers save game state rows.
 import { Router } from "express";
-import { deleteEquipment, deleteInventoryItem, postConsumeInventoryItem, putEquipment, putInventoryItem } from "../controllers/inventoryController.js";
-import { getCharacterFullState, getSaveSlotsForUser, putBossState, putCampaignMarker, putDialogueFlag, putFactionReputation, putRegionState, putSaveSlotForUser } from "../controllers/stateController.js";
-import { loadCharacterFromCharacterIdParam } from "../controllers/characterController.js";
-import { loadUserFromUserIdParam } from "../controllers/userController.js";
-import { sendResponse, withMessage } from "../middlewares/statusMessage.js";
+import {
+  deleteEquipment,
+  deleteInventoryItem,
+  postConsumeInventoryItem,
+  putEquipment,
+  putInventoryItem
+} from "../controllers/inventoryController.js";
+import {
+  getCharacterFullState,
+  getSaveSlotsForUser,
+  putBossState,
+  putCampaignMarker,
+  putDialogueFlag,
+  putFactionReputation,
+  putRegionState,
+  putSaveSlotForUser
+} from "../controllers/stateController.js";
 import { requireAnyBodyField, requireBodyFields, requireParamFields } from "../middlewares/validation.js";
 
 const router = Router();
@@ -13,180 +26,141 @@ const router = Router();
 // GET
 // ------------------------------------------------------------
 
-//Get save slots for one user.
-//Required fields: userId parameter
-//Optional fields: none
+// Get save slots for one user.
+// Required fields: userId parameter
+// Optional fields: none
 router.get(
   "/users/:userId/save-slots",
   requireParamFields("userId"),
-  loadUserFromUserIdParam,
-  getSaveSlotsForUser,
-  withMessage("Save slots retrieved."),
-  sendResponse
+  getSaveSlotsForUser
 );
 
-//Get full saved state for one character.
-//Required fields: characterId parameter
-//Optional fields: none
+// Get full saved state for one character.
+// Required fields: characterId parameter
+// Optional fields: none
 router.get(
   "/characters/:characterId/full",
   requireParamFields("characterId"),
-  loadCharacterFromCharacterIdParam,
-  getCharacterFullState,
-  withMessage("Character state retrieved."),
-  sendResponse
+  getCharacterFullState
 );
 
 // ------------------------------------------------------------
 // POST
 // ------------------------------------------------------------
 
-//Consume one inventory item for a character.
-//Required fields: characterId parameter, itemId parameter
-//Optional fields: none
+// Consume one inventory item for a character.
+// Required fields: characterId parameter, itemId parameter
+// Optional fields: none
 router.post(
   "/characters/:characterId/consume/:itemId",
   requireParamFields("characterId", "itemId"),
-  loadCharacterFromCharacterIdParam,
-  postConsumeInventoryItem,
-  withMessage("Inventory item consumed."),
-  sendResponse
+  postConsumeInventoryItem
 );
 
 // ------------------------------------------------------------
 // PUT
 // ------------------------------------------------------------
 
-//Save one user save slot.
-//Required fields: userId parameter, slotIndex parameter, one save slot field
-//Optional fields: characterId, slotName
+// Save one user save slot.
+// Required fields: userId parameter, slotIndex parameter, one save slot field
+// Optional fields: characterId, slotName
 router.put(
   "/users/:userId/save-slots/:slotIndex",
   requireParamFields("userId", "slotIndex"),
   requireAnyBodyField("characterId", "slotName"),
-  loadUserFromUserIdParam,
-  putSaveSlotForUser,
-  withMessage("Save slot saved."),
-  sendResponse
+  putSaveSlotForUser
 );
 
-//Save one inventory item for a character.
-//Required fields: characterId parameter, itemId parameter, quantity
-//Optional fields: none
+// Save one inventory item for a character.
+// Required fields: characterId parameter, itemId parameter, quantity
+// Optional fields: none
 router.put(
   "/characters/:characterId/inventory/:itemId",
   requireParamFields("characterId", "itemId"),
   requireBodyFields("quantity"),
-  loadCharacterFromCharacterIdParam,
-  putInventoryItem,
-  withMessage("Inventory item saved."),
-  sendResponse
+  putInventoryItem
 );
 
-//Equip one item for a character.
-//Required fields: characterId parameter, equipmentSlot parameter, itemId
-//Optional fields: none
+// Equip one item for a character.
+// Required fields: characterId parameter, equipmentSlot parameter, itemId
+// Optional fields: none
 router.put(
   "/characters/:characterId/equipment/:equipmentSlot",
   requireParamFields("characterId", "equipmentSlot"),
   requireBodyFields("itemId"),
-  loadCharacterFromCharacterIdParam,
-  putEquipment,
-  withMessage("Equipment saved."),
-  sendResponse
+  putEquipment
 );
 
-//Save one dialogue flag for a character.
-//Required fields: characterId parameter, flagId parameter, value
-//Optional fields: none
+// Save one dialogue flag for a character.
+// Required fields: characterId parameter, flagId parameter, value
+// Optional fields: none
 router.put(
   "/characters/:characterId/dialogue-flags/:flagId",
   requireParamFields("characterId", "flagId"),
   requireBodyFields("value"),
-  loadCharacterFromCharacterIdParam,
-  putDialogueFlag,
-  withMessage("Dialogue flag saved."),
-  sendResponse
+  putDialogueFlag
 );
 
-//Save one boss state for a character.
-//Required fields: characterId parameter, bossId parameter, one boss state field
-//Optional fields: status, attempts, defeats, bestTimeSeconds, lastOutcome
+// Save one boss state for a character.
+// Required fields: characterId parameter, bossId parameter, one boss state field
+// Optional fields: status, attempts, defeats, bestTimeSeconds, lastOutcome
 router.put(
   "/characters/:characterId/boss-states/:bossId",
   requireParamFields("characterId", "bossId"),
   requireAnyBodyField("status", "attempts", "defeats", "bestTimeSeconds", "lastOutcome"),
-  loadCharacterFromCharacterIdParam,
-  putBossState,
-  withMessage("Boss state saved."),
-  sendResponse
+  putBossState
 );
 
-//Save one campaign marker for a character.
-//Required fields: characterId parameter, markerId parameter, regionId, markerType
-//Optional fields: isRevealed, isCompleted, positionX, positionY
+// Save one campaign marker for a character.
+// Required fields: characterId parameter, markerId parameter, regionId, markerType
+// Optional fields: isRevealed, isCompleted, positionX, positionY
 router.put(
   "/characters/:characterId/campaign-markers/:markerId",
   requireParamFields("characterId", "markerId"),
   requireBodyFields("regionId", "markerType"),
-  loadCharacterFromCharacterIdParam,
-  putCampaignMarker,
-  withMessage("Campaign marker saved."),
-  sendResponse
+  putCampaignMarker
 );
 
-//Save one faction reputation record for a character.
-//Required fields: characterId parameter, factionId parameter, one reputation field
-//Optional fields: reputation, rank
+// Save one faction reputation record for a character.
+// Required fields: characterId parameter, factionId parameter, one reputation field
+// Optional fields: reputation, rank
 router.put(
   "/characters/:characterId/faction-reputation/:factionId",
   requireParamFields("characterId", "factionId"),
   requireAnyBodyField("reputation", "rank"),
-  loadCharacterFromCharacterIdParam,
-  putFactionReputation,
-  withMessage("Faction reputation saved."),
-  sendResponse
+  putFactionReputation
 );
 
-//Save one region state for a character.
-//Required fields: characterId parameter, regionId parameter, one region state field
-//Optional fields: isUnlocked, isDiscovered, threatLevel, worldState
+// Save one region state for a character.
+// Required fields: characterId parameter, regionId parameter, one region state field
+// Optional fields: isUnlocked, isDiscovered, threatLevel, worldState
 router.put(
   "/characters/:characterId/region-states/:regionId",
   requireParamFields("characterId", "regionId"),
   requireAnyBodyField("isUnlocked", "isDiscovered", "threatLevel", "worldState"),
-  loadCharacterFromCharacterIdParam,
-  putRegionState,
-  withMessage("Region state saved."),
-  sendResponse
+  putRegionState
 );
 
 // ------------------------------------------------------------
 // DELETE
 // ------------------------------------------------------------
 
-//Remove one inventory item from a character.
-//Required fields: characterId parameter, itemId parameter
-//Optional fields: none
+// Remove one inventory item from a character.
+// Required fields: characterId parameter, itemId parameter
+// Optional fields: none
 router.delete(
   "/characters/:characterId/inventory/:itemId",
   requireParamFields("characterId", "itemId"),
-  loadCharacterFromCharacterIdParam,
-  deleteInventoryItem,
-  withMessage("Inventory item removed.", 204),
-  sendResponse
+  deleteInventoryItem
 );
 
-//Unequip one item for a character.
-//Required fields: characterId parameter, equipmentSlot parameter
-//Optional fields: none
+// Unequip one item for a character.
+// Required fields: characterId parameter, equipmentSlot parameter
+// Optional fields: none
 router.delete(
   "/characters/:characterId/equipment/:equipmentSlot",
   requireParamFields("characterId", "equipmentSlot"),
-  loadCharacterFromCharacterIdParam,
-  deleteEquipment,
-  withMessage("Equipment removed.", 204),
-  sendResponse
+  deleteEquipment
 );
 
 export default router;

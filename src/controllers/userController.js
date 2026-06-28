@@ -1,262 +1,174 @@
-// User controller functions handle user validation, loading, and CRUD.
+// User controller functions validate requests, call user models, and send responses.
+// User models store account-level progress such as level, XP, and gold.
 import * as userModel from "../models/userModel.js";
+import {
+  createHttpError,
+  getOptionalInteger,
+  getOptionalPositiveIntegerQuery,
+  getOptionalString,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// RESOURCE LOADERS
+// GET
 // ------------------------------------------------------------
 
-// Shared controller steps used before routes that need an existing user.
-export async function loadUserFromUserIdParam(req, res, next) {
+// Gets all users, optionally filtered by level.
+export async function getUsers(req, res) {
   try {
-    const userId = Number(req.params.userId);
-
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "userId must be a positive integer id." });
-    }
-
-    const user = await userModel.findUserById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User was not found." });
-    }
-
-    res.locals.user = user;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// Load user from body for the next controller.
-export async function loadUserFromBody(req, res, next) {
-  try {
-    const value = req.body?.userId;
-    const userId = typeof value === "string" ? Number(value) : value;
-
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "userId must be a positive integer id." });
-    }
-
-    const user = await userModel.findUserById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User was not found." });
-    }
-
-    res.locals.user = user;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// READ CONTROLLERS
-// ------------------------------------------------------------
-
-// Return all users, optionally filtered by level.
-export async function getUsers(req, res, next) {
-  try {
-    let level;
-
-    if (req.query.level !== undefined) {
-      if (Array.isArray(req.query.level)) {
-        return res.status(400).json({ message: "level query must be provided once." });
-      }
-
-      level = Number(req.query.level);
-
-      if (!Number.isInteger(level) || level < 1) {
-        return res.status(400).json({ message: "level query must be a positive integer." });
-      }
-    }
-
+    const level = getOptionalPositiveIntegerQuery(req.query, "level");
     const userList = await userModel.findUsers({ level });
 
-    res.locals.data = userList;
-    next();
+    return res.status(200).json({
+      message: "Users retrieved.",
+      data: userList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one user by id.
-export async function getUserById(req, res, next) {
+// Gets one user by id.
+export async function getUserById(req, res) {
   try {
-    const userId = Number(req.params.id);
+    const userId = getRequiredIdParam(req.params, "id");
+    const user = await findRequiredUser(userId);
 
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
-
-    const user = await userModel.findUserById(userId);
-
-    if (!user) {
-      return res.status(404).json({ message: "User was not found." });
-    }
-
-    res.locals.data = user;
-    next();
+    return res.status(200).json({
+      message: "User retrieved.",
+      data: user
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// POST
 // ------------------------------------------------------------
 
-// Create a user after validating the username.
-export async function postUser(req, res, next) {
+// Creates one user.
+export async function postUser(req, res) {
   try {
-    if (typeof req.body.username !== "string" || req.body.username.trim().length === 0) {
-      return res.status(400).json({ message: "username is required and must be a non-empty string." });
-    }
-
-    const username = req.body.username.trim();
+    const username = getRequiredString(req.body, "username");
     const existingUser = await userModel.findUserByUsername(username);
 
     if (existingUser) {
-      return res.status(409).json({ message: "Username is already taken." });
+      throw createHttpError(409, "Conflict", "Username is already taken.");
     }
 
     const user = await userModel.createUser({ username });
 
-    res.locals.data = user;
-    next();
+    return res.status(201).json({
+      message: "User created.",
+      data: user
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// SAVE CONTROLLERS
+// PUT
 // ------------------------------------------------------------
 
-// Update one user row by id.
-export async function putUserById(req, res, next) {
+// Updates one user.
+export async function putUserById(req, res) {
   try {
-    const userId = Number(req.params.id);
+    const userId = getRequiredIdParam(req.params, "id");
 
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
+    await findRequiredUser(userId);
 
-    const updates = buildUserUpdates(req.body, res);
-
-    if (!updates) {
-      return;
-    }
+    const updates = buildUserUpdates(req.body);
 
     if (updates.username !== undefined) {
       const usernameOwner = await userModel.findUserByUsername(updates.username);
 
       if (usernameOwner && usernameOwner.userId !== userId) {
-        return res.status(409).json({ message: "Username is already taken." });
+        throw createHttpError(409, "Conflict", "Username is already taken.");
       }
     }
 
     const updatedUser = await userModel.updateUserById(userId, updates);
 
-    if (!updatedUser) {
-      return res.status(404).json({ message: "User was not found." });
-    }
-
-    res.locals.data = updatedUser;
-    next();
+    return res.status(200).json({
+      message: "User updated.",
+      data: updatedUser
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// REMOVE CONTROLLERS
+// DELETE
 // ------------------------------------------------------------
 
-// Delete user.
-export async function deleteUser(req, res, next) {
+// Deletes one user.
+export async function deleteUser(req, res) {
   try {
-    const userId = Number(req.params.id);
-
-    if (!Number.isInteger(userId) || userId < 1) {
-      return res.status(400).json({ message: "id must be a positive integer id." });
-    }
-
+    const userId = getRequiredIdParam(req.params, "id");
     const deletedUser = await userModel.deleteUserById(userId);
 
     if (!deletedUser) {
-      return res.status(404).json({ message: "User was not found." });
+      throw createHttpError(404, "Not Found", "User was not found.");
     }
 
-    next();
+    return res.status(204).send();
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// Build only the user fields that the request is allowed to update.
-function buildUserUpdates(body, res) {
+// Builds allowed user update fields.
+// Only fields present in the request body are sent to the model update.
+function buildUserUpdates(body) {
   const updates = {};
+  const username = getOptionalString(body, "username");
+  const level = getOptionalInteger(body, "level", { min: 1 });
+  const xp = getOptionalInteger(body, "xp", { min: 0 });
+  const gold = getOptionalInteger(body, "gold", { min: 0 });
 
-  if (body.username !== undefined) {
-    if (typeof body.username !== "string" || body.username.trim().length === 0) {
-      res.status(400).json({ message: "username must be a non-empty string when provided." });
-      return null;
-    }
-
-    updates.username = body.username.trim();
+  if (username !== undefined) {
+    updates.username = username;
   }
 
-  if (body.level !== undefined) {
-    if (!Number.isInteger(body.level)) {
-      res.status(400).json({ message: "level must be an integer." });
-      return null;
-    }
-
-    if (body.level < 1) {
-      res.status(400).json({ message: "level must be at least 1." });
-      return null;
-    }
-
-    updates.level = body.level;
+  if (level !== undefined) {
+    updates.level = level;
   }
 
-  if (body.xp !== undefined) {
-    if (!Number.isInteger(body.xp)) {
-      res.status(400).json({ message: "xp must be an integer." });
-      return null;
-    }
-
-    if (body.xp < 0) {
-      res.status(400).json({ message: "xp must be at least 0." });
-      return null;
-    }
-
-    updates.xp = body.xp;
+  if (xp !== undefined) {
+    updates.xp = xp;
   }
 
-  if (body.gold !== undefined) {
-    if (!Number.isInteger(body.gold)) {
-      res.status(400).json({ message: "gold must be an integer." });
-      return null;
-    }
-
-    if (body.gold < 0) {
-      res.status(400).json({ message: "gold must be at least 0." });
-      return null;
-    }
-
-    updates.gold = body.gold;
+  if (gold !== undefined) {
+    updates.gold = gold;
   }
 
   if (Object.keys(updates).length === 0) {
-    res.status(400).json({ message: "Provide at least one updatable field: username, level, xp, or gold." });
-    return null;
+    throw createHttpError(
+      400,
+      "Bad Request",
+      "Provide at least one updatable field: username, level, xp, or gold."
+    );
   }
 
   return updates;
+}
+
+// Finds one user or raises a 404 controller error.
+async function findRequiredUser(userId) {
+  const user = await userModel.findUserById(userId);
+
+  if (!user) {
+    throw createHttpError(404, "Not Found", "User was not found.");
+  }
+
+  return user;
 }

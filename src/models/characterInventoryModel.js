@@ -1,4 +1,5 @@
 // Character inventory model functions read and save inventory and equipment rows.
+// Item definitions stay in constants; this file stores owned items and equipped slots.
 import { and, asc, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
 import { characterEquipment, characterInventory, characterRunStates, characters } from "../db/schema.js";
@@ -8,6 +9,7 @@ import { characterEquipment, characterInventory, characterRunStates, characters 
 // ------------------------------------------------------------
 
 // Find every inventory item owned by one character.
+// Used by inventory endpoints and the full state endpoint.
 export function findInventoryByCharacterId(characterId) {
   return db
     .select({
@@ -24,6 +26,7 @@ export function findInventoryByCharacterId(characterId) {
 }
 
 // Find one inventory item row for one character.
+// Used before adding, removing, equipping, or consuming an item.
 export async function findInventoryItemByCharacterId(characterId, itemId) {
   const result = await db
     .select({
@@ -44,6 +47,7 @@ export async function findInventoryItemByCharacterId(characterId, itemId) {
 }
 
 // Find all equipped items for one character.
+// Returns only saved equipment slots; item details are added from constants in controllers.
 export function findEquipmentByCharacterId(characterId) {
   return db
     .select({
@@ -62,39 +66,54 @@ export function findEquipmentByCharacterId(characterId) {
 // DATABASE WRITES
 // ------------------------------------------------------------
 
-// Insert, update, or clear one inventory item quantity.
+// Insert or update one inventory item quantity.
+// This keeps one row per character and item instead of duplicating the same item.
 export async function upsertInventoryItem({ characterId, itemId, quantity }) {
   const now = new Date();
   const existing = await findInventoryItemByCharacterId(characterId, itemId);
-  const query = existing
-    ? db
-        .update(characterInventory)
-        .set({
-          quantity,
-          updatedAt: now
-        })
-        .where(eq(characterInventory.id, existing.characterInventoryId))
-    : db.insert(characterInventory).values({
+  let result;
+
+  if (existing) {
+    result = await db
+      .update(characterInventory)
+      .set({
+        quantity,
+        updatedAt: now
+      })
+      .where(eq(characterInventory.id, existing.characterInventoryId))
+      .returning({
+        characterInventoryId: characterInventory.id,
+        characterId: characterInventory.characterId,
+        itemId: characterInventory.itemKey,
+        quantity: characterInventory.quantity,
+        acquiredAt: characterInventory.acquiredAt,
+        updatedAt: characterInventory.updatedAt
+      });
+  } else {
+    result = await db
+      .insert(characterInventory)
+      .values({
         characterId,
         itemKey: itemId,
         quantity,
         acquiredAt: now,
         updatedAt: now
+      })
+      .returning({
+        characterInventoryId: characterInventory.id,
+        characterId: characterInventory.characterId,
+        itemId: characterInventory.itemKey,
+        quantity: characterInventory.quantity,
+        acquiredAt: characterInventory.acquiredAt,
+        updatedAt: characterInventory.updatedAt
       });
-  const result = await query
-    .returning({
-      characterInventoryId: characterInventory.id,
-      characterId: characterInventory.characterId,
-      itemId: characterInventory.itemKey,
-      quantity: characterInventory.quantity,
-      acquiredAt: characterInventory.acquiredAt,
-      updatedAt: characterInventory.updatedAt
-    });
+  }
 
   return result[0];
 }
 
 // Insert or update one equipped item slot.
+// Each slot should point to the latest item equipped in that slot.
 export async function upsertEquipment({ characterId, equipmentSlot, itemId }) {
   const now = new Date();
   const existingResult = await db
@@ -110,32 +129,46 @@ export async function upsertEquipment({ characterId, equipmentSlot, itemId }) {
     )
     .limit(1);
   const existing = existingResult[0] || null;
-  const query = existing
-    ? db
-        .update(characterEquipment)
-        .set({
-          itemKey: itemId,
-          equippedAt: now
-        })
-        .where(eq(characterEquipment.id, existing.characterEquipmentId))
-    : db.insert(characterEquipment).values({
+  let result;
+
+  if (existing) {
+    result = await db
+      .update(characterEquipment)
+      .set({
+        itemKey: itemId,
+        equippedAt: now
+      })
+      .where(eq(characterEquipment.id, existing.characterEquipmentId))
+      .returning({
+        characterEquipmentId: characterEquipment.id,
+        characterId: characterEquipment.characterId,
+        equipmentSlot: characterEquipment.equipmentSlot,
+        itemId: characterEquipment.itemKey,
+        equippedAt: characterEquipment.equippedAt
+      });
+  } else {
+    result = await db
+      .insert(characterEquipment)
+      .values({
         characterId,
         equipmentSlot,
         itemKey: itemId,
         equippedAt: now
+      })
+      .returning({
+        characterEquipmentId: characterEquipment.id,
+        characterId: characterEquipment.characterId,
+        equipmentSlot: characterEquipment.equipmentSlot,
+        itemId: characterEquipment.itemKey,
+        equippedAt: characterEquipment.equippedAt
       });
-  const result = await query.returning({
-    characterEquipmentId: characterEquipment.id,
-    characterId: characterEquipment.characterId,
-    equipmentSlot: characterEquipment.equipmentSlot,
-    itemId: characterEquipment.itemKey,
-    equippedAt: characterEquipment.equippedAt
-  });
+  }
 
   return result[0];
 }
 
 // Consume an item and apply its saved-game effect in one transaction.
+// This keeps inventory quantity and character/run-state effects together.
 export async function consumeInventoryItem({ characterId, item }) {
   return db.transaction(async (tx) => {
     const inventoryResult = await tx
@@ -277,26 +310,40 @@ export async function consumeInventoryItem({ characterId, item }) {
         commandModeUnlocked: existingRunState?.commandModeUnlocked ?? 0,
         savedAt: now
       };
-      const runStateQuery = existingRunState
-        ? tx
-            .update(characterRunStates)
-            .set({
-              supplies: nextRunState.supplies,
-              morale: nextRunState.morale,
-              storyPhase: nextRunState.storyPhase,
-              commandModeUnlocked: nextRunState.commandModeUnlocked,
-              savedAt: now
-            })
-            .where(eq(characterRunStates.characterId, characterId))
-        : tx.insert(characterRunStates).values(nextRunState);
-      const runStateResult = await runStateQuery.returning({
-        characterId: characterRunStates.characterId,
-        supplies: characterRunStates.supplies,
-        morale: characterRunStates.morale,
-        storyPhase: characterRunStates.storyPhase,
-        commandModeUnlocked: characterRunStates.commandModeUnlocked,
-        savedAt: characterRunStates.savedAt
-      });
+      let runStateResult;
+
+      if (existingRunState) {
+        runStateResult = await tx
+          .update(characterRunStates)
+          .set({
+            supplies: nextRunState.supplies,
+            morale: nextRunState.morale,
+            storyPhase: nextRunState.storyPhase,
+            commandModeUnlocked: nextRunState.commandModeUnlocked,
+            savedAt: now
+          })
+          .where(eq(characterRunStates.characterId, characterId))
+          .returning({
+            characterId: characterRunStates.characterId,
+            supplies: characterRunStates.supplies,
+            morale: characterRunStates.morale,
+            storyPhase: characterRunStates.storyPhase,
+            commandModeUnlocked: characterRunStates.commandModeUnlocked,
+            savedAt: characterRunStates.savedAt
+          });
+      } else {
+        runStateResult = await tx
+          .insert(characterRunStates)
+          .values(nextRunState)
+          .returning({
+            characterId: characterRunStates.characterId,
+            supplies: characterRunStates.supplies,
+            morale: characterRunStates.morale,
+            storyPhase: characterRunStates.storyPhase,
+            commandModeUnlocked: characterRunStates.commandModeUnlocked,
+            savedAt: characterRunStates.savedAt
+          });
+      }
 
       runState = runStateResult[0] || null;
     }
@@ -317,6 +364,7 @@ export async function consumeInventoryItem({ characterId, item }) {
 // ------------------------------------------------------------
 
 // Delete one inventory item row.
+// Used when the player intentionally removes an item from inventory.
 export async function removeInventoryItem({ characterId, itemId }) {
   const result = await db
     .delete(characterInventory)
@@ -336,6 +384,7 @@ export async function removeInventoryItem({ characterId, itemId }) {
 }
 
 // Delete one equipped item slot.
+// Used when the player unequips an item from a specific slot.
 export async function removeEquipment({ characterId, equipmentSlot }) {
   const result = await db
     .delete(characterEquipment)

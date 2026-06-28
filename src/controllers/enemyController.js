@@ -1,28 +1,17 @@
 // Enemy controller functions return fixed enemy and boss data.
+// Enemy rows are not stored in the database because they are fixed game definitions.
 import { ENEMY_DEFINITIONS, findEnemyDefinitionById } from "../constants/enemies.js";
+import { createHttpError, getOptionalString, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return all enemy definitions, optionally filtered by query values.
-export async function getEnemies(req, res, next) {
+// Gets enemy definitions, optionally filtered by region or boss flag.
+export async function getEnemies(req, res) {
   try {
-    let regionId = req.query.regionId;
-    const isBoss = readOptionalBinaryQuery(req.query, "isBoss", res);
-
-    if (isBoss === null) {
-      return;
-    }
-
-    if (regionId !== undefined) {
-      if (typeof regionId !== "string" || regionId.trim().length === 0) {
-        return res.status(400).json({ message: "regionId must be a non-empty string." });
-      }
-
-      regionId = regionId.trim();
-    }
-
+    const regionId = getOptionalString(req.query, "regionId");
+    const isBoss = readOptionalBinaryQuery(req.query, "isBoss");
     const enemies = ENEMY_DEFINITIONS.filter((enemy) => {
       if (regionId !== undefined && enemy.regionId !== regionId) {
         return false;
@@ -35,35 +24,40 @@ export async function getEnemies(req, res, next) {
       return true;
     }).sort((left, right) => left.level - right.level);
 
-    res.locals.data = enemies;
-    next();
+    return res.status(200).json({
+      message: "Enemies retrieved.",
+      data: enemies
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one enemy definition by id.
-export async function getEnemyById(req, res, next) {
+// Gets one enemy definition by id.
+export async function getEnemyById(req, res) {
   try {
     const enemy = findEnemyDefinitionById(req.params.enemyId);
 
     if (!enemy) {
-      return res.status(404).json({ message: "Enemy definition was not found." });
+      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
     }
 
-    res.locals.data = enemy;
-    next();
+    return res.status(200).json({
+      message: "Enemy retrieved.",
+      data: enemy
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// Read optional binary query.
-function readOptionalBinaryQuery(query, fieldName, res) {
+// Reads optional 0/1 query values.
+// This is used for filters such as isBoss, where only 0 or 1 is valid.
+function readOptionalBinaryQuery(query, fieldName) {
   const value = query?.[fieldName];
 
   if (value === undefined) {
@@ -71,8 +65,7 @@ function readOptionalBinaryQuery(query, fieldName, res) {
   }
 
   if (value !== "0" && value !== "1") {
-    res.status(400).json({ message: `${fieldName} query must be 0 or 1.` });
-    return null;
+    throw createHttpError(400, "Bad Request", `${fieldName} query must be 0 or 1.`);
   }
 
   return Number(value);

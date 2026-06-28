@@ -1,83 +1,104 @@
 // Combat controller functions create sessions, resolve turns, and apply rewards.
-import * as abilityModel from "../models/abilityModel.js";
-import * as adventureModel from "../models/adventureModel.js";
-import * as characterInventoryModel from "../models/characterInventoryModel.js";
-import * as combatModel from "../models/combatModel.js";
-import * as mapModel from "../models/mapModel.js";
-import * as stateModel from "../models/stateModel.js";
-import * as storyModel from "../models/storyModel.js";
-import * as userModel from "../models/userModel.js";
+// Combat rules calculate the turn; models save sessions, logs, rewards, and story effects.
 import { findAbilityDefinitionById } from "../constants/abilities.js";
 import { findEnemyDefinitionById } from "../constants/enemies.js";
 import { findMapNodeDefinitionByEnemyId } from "../constants/mapNodes.js";
 import { findQuestDefinitionById } from "../constants/quests.js";
 import { findStoryMilestoneByEnemyId } from "../constants/storyMilestones.js";
-import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
+import * as abilityModel from "../models/abilityModel.js";
+import * as adventureModel from "../models/adventureModel.js";
+import * as characterInventoryModel from "../models/characterInventoryModel.js";
+import * as characterModel from "../models/characterModel.js";
+import * as combatModel from "../models/combatModel.js";
+import * as mapModel from "../models/mapModel.js";
+import * as stateModel from "../models/stateModel.js";
+import * as storyModel from "../models/storyModel.js";
+import * as userModel from "../models/userModel.js";
 import { resolveCombatTurn } from "../utils/combatRules.js";
+import { applyEquipmentBonuses } from "../utils/equipmentRules.js";
 import { buildCharacterProgression, buildUserProgression } from "../utils/leveling.js";
+import {
+  createHttpError,
+  getOptionalString,
+  getRequiredId,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Start a new session after validating enemy, quest, and boss location rules.
-export async function postCombatSession(req, res, next) {
+// Gets one combat session together with its turn logs.
+export async function getCombatSession(req, res) {
   try {
-    const character = res.locals.character;
+    const combatSessionId = getRequiredIdParam(req.params, "combatSessionId");
+    const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
-    if (typeof req.body.enemyId !== "string" || req.body.enemyId.trim().length === 0) {
-      return res.status(400).json({ message: "enemyId is required and must be a non-empty string." });
+    if (!combatSession) {
+      throw createHttpError(404, "Not Found", "Combat session was not found.");
     }
 
-    if (req.body.questId !== undefined && (typeof req.body.questId !== "string" || req.body.questId.trim().length === 0)) {
-      return res.status(400).json({ message: "questId must be a non-empty string when provided." });
-    }
+    const turnLogs = await combatModel.findCombatLogsBySessionId(combatSessionId);
 
-    if (req.body.nodeId !== undefined && (typeof req.body.nodeId !== "string" || req.body.nodeId.trim().length === 0)) {
-      return res.status(400).json({ message: "nodeId must be a non-empty string when provided." });
-    }
+    return res.status(200).json({
+      message: "Combat session retrieved.",
+      data: {
+        combatSession,
+        turnLogs
+      }
+    });
+  } catch (error) {
+    return sendErrorResponse(res, error);
+  }
+}
 
-    const enemyId = req.body.enemyId.trim();
-    const requestedQuestId = req.body.questId === undefined ? null : req.body.questId.trim();
-    let nodeId = req.body.nodeId === undefined ? null : req.body.nodeId.trim();
+// ------------------------------------------------------------
+// POST
+// ------------------------------------------------------------
+
+// Starts one combat session against an enemy or boss.
+export async function postCombatSession(req, res) {
+  try {
+    const characterId = getRequiredId(req.body, "characterId");
+    const enemyId = getRequiredString(req.body, "enemyId");
+    const requestedQuestId = getOptionalString(req.body, "questId") ?? null;
+    let nodeId = getOptionalString(req.body, "nodeId") ?? null;
+    const character = await findRequiredCharacter(characterId);
     const enemy = findEnemyDefinitionById(enemyId);
     const activeCombatSession = await combatModel.findActiveCombatSessionByCharacterId(
       character.characterId
     );
 
     if (activeCombatSession) {
-      return res.status(409).json({ message: "Character already has an active combat session." });
+      throw createHttpError(409, "Conflict", "Character already has an active combat session.");
     }
 
     if (!enemy) {
-      return res.status(404).json({ message: "Enemy definition was not found." });
+      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
     }
 
     const questId = requestedQuestId ?? enemy.questId ?? null;
 
-    if (questId !== null) {
-      const quest = findQuestDefinitionById(questId);
-
-      if (!quest) {
-        return res.status(404).json({ message: "Quest was not found." });
-      }
+    if (questId !== null && !findQuestDefinitionById(questId)) {
+      throw createHttpError(404, "Not Found", "Quest was not found.");
     }
 
     if (enemy.isBoss === 1) {
-      const bossNode = await findBossNodeForEnemy(enemy.enemyId, res);
-
-      if (!bossNode) {
-        return;
-      }
-
+      const bossNode = await findBossNodeForEnemy(enemy.enemyId);
       const location = await mapModel.findCharacterLocation(character.characterId);
 
       if (!location || location.nodeId !== bossNode.nodeId) {
-        return res.status(400).json({ message: `Character must be at ${bossNode.nodeId} before starting this boss combat.` });
+        throw createHttpError(
+          403,
+          "Forbidden",
+          `Character must be at ${bossNode.nodeId} before starting this boss combat.`
+        );
       }
 
       if (nodeId !== null && nodeId !== bossNode.nodeId) {
-        return res.status(400).json({ message: "nodeId does not match this boss encounter." });
+        throw createHttpError(400, "Bad Request", "nodeId does not match this boss encounter.");
       }
 
       nodeId = bossNode.nodeId;
@@ -88,7 +109,7 @@ export async function postCombatSession(req, res, next) {
       );
 
       if (bossState?.status === "defeated") {
-        return res.status(409).json({ message: "Boss has already been defeated." });
+        throw createHttpError(409, "Conflict", "Boss has already been defeated.");
       }
 
       await stateModel.upsertBossState({
@@ -113,96 +134,46 @@ export async function postCombatSession(req, res, next) {
       enemyHp: enemy.maxHp
     });
 
-    res.locals.data = {
-      combatSession,
-      enemy,
-      equipmentBonuses: combatCharacter.equipmentBonuses
-    };
-    next();
+    return res.status(201).json({
+      message: "Combat session started.",
+      data: {
+        combatSession,
+        enemy,
+        equipmentBonuses: combatCharacter.equipmentBonuses
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// ------------------------------------------------------------
-// READ CONTROLLERS
-// ------------------------------------------------------------
-
-// Read current session state together with previous turn logs.
-export async function getCombatSession(req, res, next) {
+// Resolves one player action and saves resulting turn logs.
+export async function postCombatTurn(req, res) {
   try {
-    const combatSessionId = Number(req.params.combatSessionId);
-
-    if (!Number.isInteger(combatSessionId) || combatSessionId < 1) {
-      return res.status(400).json({ message: "combatSessionId must be a positive integer id." });
-    }
-
+    const combatSessionId = getRequiredIdParam(req.params, "combatSessionId");
+    const characterId = getRequiredId(req.body, "characterId");
+    const actionType = getRequiredString(req.body, "actionType");
+    const abilityId = getOptionalString(req.body, "abilityId") ?? null;
     const combatSession = await combatModel.findCombatSessionById(combatSessionId);
 
     if (!combatSession) {
-      return res.status(404).json({ message: "Combat session was not found." });
+      throw createHttpError(404, "Not Found", "Combat session was not found.");
     }
 
-    const turnLogs = await combatModel.findCombatLogsBySessionId(combatSessionId);
-
-    res.locals.data = {
-      combatSession,
-      turnLogs
-    };
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
-// ------------------------------------------------------------
-
-// Resolve one player action and save resulting turn logs.
-export async function postCombatTurn(req, res, next) {
-  try {
-    const combatSessionId = Number(req.params.combatSessionId);
-
-    if (!Number.isInteger(combatSessionId) || combatSessionId < 1) {
-      return res.status(400).json({ message: "combatSessionId must be a positive integer id." });
-    }
-
-    if (typeof req.body.actionType !== "string" || req.body.actionType.trim().length === 0) {
-      return res.status(400).json({ message: "actionType is required and must be a non-empty string." });
-    }
-
-    if (req.body.abilityId !== undefined && (typeof req.body.abilityId !== "string" || req.body.abilityId.trim().length === 0)) {
-      return res.status(400).json({ message: "abilityId must be a non-empty string when provided." });
-    }
-
-    const actionType = req.body.actionType.trim();
-    const abilityId = req.body.abilityId === undefined ? null : req.body.abilityId.trim();
-    const combatSession = await combatModel.findCombatSessionById(combatSessionId);
-
-    if (!combatSession) {
-      return res.status(404).json({ message: "Combat session was not found." });
-    }
-
-    const character = res.locals.character;
+    const character = await findRequiredCharacter(characterId);
 
     if (combatSession.characterId !== character.characterId) {
-      return res.status(400).json({ message: "Combat session does not belong to this character." });
+      throw createHttpError(403, "Forbidden", "Combat session does not belong to this character.");
     }
 
     const enemy = findEnemyDefinitionById(combatSession.enemyId);
 
     if (!enemy) {
-      return res.status(404).json({ message: "Enemy definition was not found." });
+      throw createHttpError(404, "Not Found", "Enemy definition was not found.");
     }
 
     const combatCharacter = await buildCombatCharacter(character);
-    const ability = abilityId === null ? null : await findUnlockedAbility(character.characterId, abilityId, res);
-
-    if (abilityId !== null && !ability) {
-      return;
-    }
-
+    const ability = abilityId === null ? null : await findUnlockedAbility(character.characterId, abilityId);
     const turnResult = resolveCombatTurn({
       session: combatSession,
       character: combatCharacter,
@@ -212,7 +183,7 @@ export async function postCombatTurn(req, res, next) {
     });
 
     if (turnResult.error) {
-      return res.status(turnResult.error.status).json({ message: turnResult.error.message });
+      throw createHttpError(turnResult.error.status, "Bad Request", turnResult.error.message);
     }
 
     const savedTurn = await combatModel.saveCombatTurn({
@@ -223,11 +194,7 @@ export async function postCombatTurn(req, res, next) {
     let rewardResult = null;
 
     if (savedTurn.session.status === "won") {
-      rewardResult = await awardCombatWin({ character, enemy, combatSession: savedTurn.session, res });
-
-      if (!rewardResult) {
-        return;
-      }
+      rewardResult = await awardCombatWin({ character, enemy, combatSession: savedTurn.session });
     }
 
     if (savedTurn.session.status === "lost" && enemy.isBoss === 1) {
@@ -247,61 +214,64 @@ export async function postCombatTurn(req, res, next) {
       });
     }
 
-    res.locals.data = {
-      combatSession: savedTurn.session,
-      turnLogs: savedTurn.turnLogs,
-      rewardResult,
-      equipmentBonuses: combatCharacter.equipmentBonuses
-    };
-    next();
+    return res.status(200).json({
+      message: "Combat turn resolved.",
+      data: {
+        combatSession: savedTurn.session,
+        turnLogs: savedTurn.turnLogs,
+        rewardResult,
+        equipmentBonuses: combatCharacter.equipmentBonuses
+      }
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// Helpers
 // ------------------------------------------------------------
 
-// Find the map node connected to a boss enemy.
-async function findBossNodeForEnemy(enemyId, res) {
+// Finds the map node connected to a boss enemy.
+// Boss sessions use this to make sure the fight is started from the correct map location.
+async function findBossNodeForEnemy(enemyId) {
   const bossNode = findMapNodeDefinitionByEnemyId(enemyId);
 
   if (!bossNode) {
-    res.status(404).json({ message: "Boss map node was not found." });
-    return null;
+    throw createHttpError(404, "Not Found", "Boss map node was not found.");
   }
 
   return bossNode;
 }
 
-// Build combat character.
+// Applies equipment bonuses before combat damage is calculated.
+// The returned copy of the character includes weapon range, defence, and stat bonuses.
 async function buildCombatCharacter(character) {
   const equipment = await characterInventoryModel.findEquipmentByCharacterId(character.characterId);
 
   return applyEquipmentBonuses(character, equipment);
 }
 
-// Find unlocked ability.
-async function findUnlockedAbility(characterId, abilityId, res) {
+// Finds an ability only if the character already unlocked it.
+// The fixed ability definition is returned after the saved unlock row is confirmed.
+async function findUnlockedAbility(characterId, abilityId) {
   const unlockedAbility = await abilityModel.findCharacterAbility(characterId, abilityId);
   const ability = unlockedAbility ? findAbilityDefinitionById(abilityId) : null;
 
   if (!ability) {
-    res.status(400).json({ message: "Character has not unlocked this ability." });
-    return null;
+    throw createHttpError(403, "Forbidden", "Character has not unlocked this ability.");
   }
 
   return ability;
 }
 
-// Apply XP, gold, adventure log, and story updates after a combat win.
-async function awardCombatWin({ character, enemy, combatSession, res }) {
+// Applies XP, gold, adventure log, and story updates after a combat win.
+// Boss wins can also apply story milestones and update saved world state.
+async function awardCombatWin({ character, enemy, combatSession }) {
   const user = await userModel.findUserById(character.userId);
 
   if (!user) {
-    res.status(404).json({ message: "User was not found." });
-    return null;
+    throw createHttpError(404, "Not Found", "User was not found.");
   }
 
   const xpGained = Number(enemy.xpReward || 0);
@@ -342,4 +312,15 @@ async function awardCombatWin({ character, enemy, combatSession, res }) {
     adventureLog: savedAttempt.adventureLog,
     storyResult
   };
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
+  }
+
+  return character;
 }

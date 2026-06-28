@@ -1,49 +1,34 @@
-// Ability controller functions validate requests and prepare ability responses.
-import * as abilityModel from "../models/abilityModel.js";
-import * as characterInventoryModel from "../models/characterInventoryModel.js";
+// Ability controller functions validate ability requests, call ability models, and send responses.
+// Fixed ability definitions come from constants; unlocked abilities are saved through models.
 import { ABILITY_DEFINITIONS, findAbilityDefinitionById } from "../constants/abilities.js";
+import * as abilityModel from "../models/abilityModel.js";
+import * as characterModel from "../models/characterModel.js";
+import * as characterInventoryModel from "../models/characterInventoryModel.js";
 import { validateAffinity, validateClassName } from "../utils/gameRules.js";
+import {
+  createHttpError,
+  getOptionalString,
+  getRequiredIdParam,
+  getRequiredString,
+  sendErrorResponse
+} from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// READ CONTROLLERS
+// GET
 // ------------------------------------------------------------
 
-// Return fixed ability definitions, optionally filtered by class or affinity.
-export async function getAbilities(req, res, next) {
+// Gets ability definitions, optionally filtered by class or affinity.
+export async function getAbilities(req, res) {
   try {
-    let className = req.query.className;
-    let affinity = req.query.affinity;
+    const className = getOptionalString(req.query, "className");
+    const affinity = getOptionalString(req.query, "affinity");
 
     if (className !== undefined) {
-      if (typeof className !== "string" || className.trim().length === 0) {
-        return res.status(400).json({ message: "className must be a non-empty string." });
-      }
-
-      className = className.trim();
+      throwIfValidationError(validateClassName(className));
     }
 
     if (affinity !== undefined) {
-      if (typeof affinity !== "string" || affinity.trim().length === 0) {
-        return res.status(400).json({ message: "affinity must be a non-empty string." });
-      }
-
-      affinity = affinity.trim();
-    }
-
-    if (className !== undefined) {
-      const classNameError = validateClassName(className);
-
-      if (classNameError) {
-        return res.status(400).json({ message: classNameError });
-      }
-    }
-
-    if (affinity !== undefined) {
-      const affinityError = validateAffinity(affinity);
-
-      if (affinityError) {
-        return res.status(400).json({ message: affinityError });
-      }
+      throwIfValidationError(validateAffinity(affinity));
     }
 
     const abilityList = ABILITY_DEFINITIONS.filter((ability) => {
@@ -58,79 +43,23 @@ export async function getAbilities(req, res, next) {
       return true;
     }).sort((left, right) => left.requiredLevel - right.requiredLevel);
 
-    res.locals.data = abilityList;
-    next();
+    return res.status(200).json({
+      message: "Abilities retrieved.",
+      data: abilityList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// ------------------------------------------------------------
-// CREATE AND ACTION CONTROLLERS
-// ------------------------------------------------------------
-
-// Unlock an ability after checking character level, class, affinity, and cost.
-export async function unlockCharacterAbility(req, res, next) {
+// Gets all abilities already unlocked by one character.
+export async function getCharacterAbilities(req, res) {
   try {
-    const characterId = Number(req.params.characterId);
+    const characterId = getRequiredIdParam(req.params, "characterId");
 
-    if (!Number.isInteger(characterId) || characterId < 1) {
-      return res.status(400).json({ message: "characterId must be a positive integer id." });
-    }
+    await findRequiredCharacter(characterId);
 
-    if (typeof req.body?.abilityId !== "string" || req.body.abilityId.trim().length === 0) {
-      return res.status(400).json({ message: "abilityId is required." });
-    }
-
-    const abilityId = req.body.abilityId.trim();
-    const character = res.locals.character;
-
-    const ability = findAbilityDefinitionById(abilityId);
-
-    if (!ability) {
-      return res.status(404).json({ message: "Ability was not found." });
-    }
-
-    if (!validateAbilityUnlock(character, ability, res)) {
-      return;
-    }
-
-    const existingUnlock = await abilityModel.findCharacterAbility(characterId, abilityId);
-
-    if (existingUnlock) {
-      return res.status(409).json({ message: "Character already unlocked this ability." });
-    }
-
-    const hasAbilityCost = await validateAbilityCost(character, ability, res);
-
-    if (!hasAbilityCost) {
-      return;
-    }
-
-    const unlockResult = await abilityModel.createCharacterAbility({ character, ability });
-
-    res.locals.data = {
-      characterAbility: unlockResult.characterAbility,
-      ability,
-      character: unlockResult.character,
-      spent: unlockResult.spent
-    };
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// READ CONTROLLERS
-// ------------------------------------------------------------
-
-// Return abilities already unlocked by one character.
-export async function getCharacterAbilities(req, res, next) {
-  try {
-    const unlockedAbilityRows = await abilityModel.findCharacterAbilityRowsByCharacterId(
-      res.locals.character.characterId
-    );
+    const unlockedAbilityRows = await abilityModel.findCharacterAbilityRowsByCharacterId(characterId);
     const unlockedAbilities = unlockedAbilityRows
       .map((unlockRow) => {
         const ability = findAbilityDefinitionById(unlockRow.abilityId);
@@ -148,24 +77,79 @@ export async function getCharacterAbilities(req, res, next) {
       .filter(Boolean)
       .sort((left, right) => left.requiredLevel - right.requiredLevel);
 
-    res.locals.data = unlockedAbilities;
-    next();
+    return res.status(200).json({
+      message: "Character abilities retrieved.",
+      data: unlockedAbilities
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
 // ------------------------------------------------------------
-// PRIVATE HELPERS
+// POST
 // ------------------------------------------------------------
 
-// Validate XP and item costs before unlocking an ability.
-async function validateAbilityCost(character, ability, res) {
+// Unlocks an ability after checking character level, class, affinity, and cost.
+export async function unlockCharacterAbility(req, res) {
+  try {
+    const characterId = getRequiredIdParam(req.params, "characterId");
+    const abilityId = getRequiredString(req.body, "abilityId");
+    const character = await findRequiredCharacter(characterId);
+    const ability = findAbilityDefinitionById(abilityId);
+
+    if (!ability) {
+      throw createHttpError(404, "Not Found", "Ability was not found.");
+    }
+
+    validateAbilityUnlock(character, ability);
+
+    const existingUnlock = await abilityModel.findCharacterAbility(characterId, abilityId);
+
+    if (existingUnlock) {
+      throw createHttpError(409, "Conflict", "Character already unlocked this ability.");
+    }
+
+    await validateAbilityCost(character, ability);
+
+    const unlockResult = await abilityModel.createCharacterAbility({ character, ability });
+
+    return res.status(201).json({
+      message: "Character ability unlocked.",
+      data: {
+        characterAbility: unlockResult.characterAbility,
+        ability,
+        character: unlockResult.character,
+        spent: unlockResult.spent
+      }
+    });
+  } catch (error) {
+    return sendErrorResponse(res, error);
+  }
+}
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------
+
+// Converts game rule validation results into controller errors.
+// This keeps constant validation messages consistent with JSON API errors.
+function throwIfValidationError(errorMessage) {
+  if (errorMessage) {
+    throw createHttpError(400, "Bad Request", errorMessage);
+  }
+}
+
+// Validates XP and item costs before unlocking an ability.
+async function validateAbilityCost(character, ability) {
   const xpCost = Number(ability.xpCost || 0);
 
   if (character.xp < xpCost) {
-    res.status(400).json({ message: `Character needs ${xpCost} XP to unlock this ability.` });
-    return false;
+    throw createHttpError(
+      403,
+      "Forbidden",
+      `Character needs ${xpCost} XP to unlock this ability.`
+    );
   }
 
   for (const requiredItem of ability.requiredItems || []) {
@@ -175,30 +159,49 @@ async function validateAbilityCost(character, ability, res) {
     );
 
     if (!inventoryItem || inventoryItem.quantity < requiredItem.quantity) {
-      res.status(400).json({ message: `Character needs ${requiredItem.quantity} ${requiredItem.itemId} to unlock this ability.` });
-      return false;
+      throw createHttpError(
+        403,
+        "Forbidden",
+        `Character needs ${requiredItem.quantity} ${requiredItem.itemId} to unlock this ability.`
+      );
     }
   }
-
-  return true;
 }
 
-// Validate level, class, and affinity requirements for an ability.
-function validateAbilityUnlock(character, ability, res) {
+// Validates level, class, and affinity requirements for an ability.
+function validateAbilityUnlock(character, ability) {
   if (character.level < ability.requiredLevel) {
-    res.status(400).json({ message: `Character level ${character.level} is too low for this ability. Required level is ${ability.requiredLevel}.` });
-    return false;
+    throw createHttpError(
+      403,
+      "Forbidden",
+      `Character level ${character.level} is too low for this ability. Required level is ${ability.requiredLevel}.`
+    );
   }
 
   if (ability.className !== null && ability.className !== character.className) {
-    res.status(400).json({ message: `Ability requires className ${ability.className}.` });
-    return false;
+    throw createHttpError(
+      403,
+      "Forbidden",
+      `Ability requires className ${ability.className}.`
+    );
   }
 
   if (ability.affinity !== null && ability.affinity !== character.affinity) {
-    res.status(400).json({ message: `Ability requires affinity ${ability.affinity}.` });
-    return false;
+    throw createHttpError(
+      403,
+      "Forbidden",
+      `Ability requires affinity ${ability.affinity}.`
+    );
+  }
+}
+
+// Finds one character or raises a 404 controller error.
+async function findRequiredCharacter(characterId) {
+  const character = await characterModel.findCharacterById(characterId);
+
+  if (!character) {
+    throw createHttpError(404, "Not Found", "Character was not found.");
   }
 
-  return true;
+  return character;
 }

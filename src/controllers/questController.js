@@ -1,83 +1,70 @@
-// Quest controller functions return quest definitions and validate quest references.
+// Quest controller functions return quest definitions.
+// Quest definitions are fixed constants; completion and reward state are saved elsewhere.
 import { QUEST_DEFINITIONS, findQuestDefinitionById } from "../constants/quests.js";
 import { findRegionDefinitionById } from "../constants/regions.js";
+import { createHttpError, sendErrorResponse } from "../utils/requestHelpers.js";
 
 // ------------------------------------------------------------
-// RESOURCE LOADERS
+// GET
 // ------------------------------------------------------------
 
-// Load quest from body for the next controller.
-export async function loadQuestFromBody(req, res, next) {
-  try {
-    const value = req.body?.questId;
-
-    if (typeof value !== "string" || value.trim().length === 0) {
-      return res.status(400).json({ message: "questId is required." });
-    }
-
-    const quest = findQuestDefinitionById(value.trim());
-
-    if (!quest) {
-      return res.status(404).json({ message: "Quest was not found." });
-    }
-
-    res.locals.quest = quest;
-    next();
-  } catch (error) {
-    next(error);
-  }
-}
-
-// ------------------------------------------------------------
-// READ CONTROLLERS
-// ------------------------------------------------------------
-
-// Return all quest definitions, optionally filtered by region.
-export async function getQuests(req, res, next) {
+// Gets all quest definitions.
+export async function getQuests(_req, res) {
   try {
     const questList = [...QUEST_DEFINITIONS].sort(
       (left, right) => left.requiredLevel - right.requiredLevel
     );
 
-    res.locals.data = questList;
-    next();
+    return res.status(200).json({
+      message: "Quests retrieved.",
+      data: questList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Read one quest definition by id.
-export async function getQuestById(req, res, next) {
+// Gets one quest definition by id.
+export async function getQuestById(req, res) {
   try {
     const quest = findQuestDefinitionById(req.params.id);
 
     if (!quest) {
-      return res.status(404).json({ message: "Quest was not found." });
+      throw createHttpError(404, "Not Found", "Quest was not found.");
     }
 
-    res.locals.data = quest;
-    next();
+    return res.status(200).json({
+      message: "Quest retrieved.",
+      data: quest
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
 
-// Get quests by region id.
-export async function getQuestsByRegionId(req, res, next) {
+// Gets all quests inside one region.
+// Region ids are validated against fixed region definitions before filtering quests.
+export async function getQuestsByRegionId(req, res) {
   try {
     const region = findRegionDefinitionById(req.params.regionId);
 
     if (!region) {
-      return res.status(404).json({ message: "Region was not found." });
+      throw createHttpError(404, "Not Found", "Region was not found.");
     }
 
     const questList = QUEST_DEFINITIONS.filter(
       (quest) => quest.regionId === req.params.regionId
     ).sort((left, right) => left.requiredLevel - right.requiredLevel);
 
-    res.locals.data = questList;
-    next();
+    return res.status(200).json({
+      message: "Region quests retrieved.",
+      data: questList
+    });
   } catch (error) {
-    next(error);
+    return sendErrorResponse(res, error);
   }
 }
+
+// ------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------

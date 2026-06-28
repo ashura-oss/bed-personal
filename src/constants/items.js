@@ -50,7 +50,7 @@ export const ITEM_DEFINITIONS = [
     consumeEffect: {
       supplies: 1
     },
-    description: "Food for travel between 2D map nodes."
+    description: "Food for travel between map nodes."
   },
   {
     itemId: "item_rebel_bandage",

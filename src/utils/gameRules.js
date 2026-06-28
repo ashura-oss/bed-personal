@@ -1,27 +1,37 @@
-// Pure character creation and stat validation helpers.
-import { affinityBonuses, allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins, baseStats, classBonuses, originBonuses } from "../constants/characterOptions.js";
+// Pure character creation, stat validation, and non-combat quest helpers.
+// Controllers call these before saving through models so game rules stay outside route files.
+import {
+  affinityBonuses,
+  allowedAffinities,
+  allowedCharacterStats,
+  allowedClasses,
+  allowedOrigins,
+  baseStats,
+  classBonuses,
+  originBonuses
+} from "../constants/characterOptions.js";
 
 const MIN_CHARACTER_NAME_LENGTH = 2;
 const MAX_CHARACTER_NAME_LENGTH = 40;
 
 export { allowedAffinities, allowedCharacterStats, allowedClasses, allowedOrigins };
 
-// Validate fixed character creation options from constants.
+// Validates origin against fixed character creation options from constants.
 export function validateOrigin(origin) {
   return validateAllowedValue("origin", origin, allowedOrigins);
 }
 
-// Validate class name.
+// Validates class name against fixed character creation options from constants.
 export function validateClassName(className) {
   return validateAllowedValue("className", className, allowedClasses);
 }
 
-// Validate affinity.
+// Validates affinity against fixed character creation options from constants.
 export function validateAffinity(affinity) {
   return validateAllowedValue("affinity", affinity, allowedAffinities);
 }
 
-// Validate character name.
+// Validates character name length and prevents blank names.
 export function validateCharacterName(characterName) {
   if (typeof characterName !== "string" || characterName.trim().length === 0) {
     return "characterName is required and must be a non-empty string.";
@@ -35,12 +45,13 @@ export function validateCharacterName(characterName) {
   return null;
 }
 
-// Validate required stat.
+// Validates that a quest required stat matches one of the saved character stat fields.
 export function validateRequiredStat(requiredStat) {
   return validateAllowedValue("requiredStat", requiredStat, allowedCharacterStats);
 }
 
-// Resolve non-combat quest success from the character's required stat.
+// Resolves non-combat quest success from the character's required stat.
+// This returns a result object only; the adventure model handles saving rewards and logs.
 export function resolveQuestAttempt(character, quest) {
   const statError = validateRequiredStat(quest.requiredStat);
 
@@ -89,7 +100,8 @@ export function resolveQuestAttempt(character, quest) {
   };
 }
 
-// Build starting stats from origin, class, affinity, and level.
+// Builds starting stats from origin, class, affinity, and level.
+// Character creation and character edits use this to keep stat calculations consistent.
 export function calculateCharacterStats({ origin, className, affinity, level = 1 }) {
   const stats = {
     ...baseStats
@@ -104,14 +116,14 @@ export function calculateCharacterStats({ origin, className, affinity, level = 1
   return stats;
 }
 
-// Apply bonuses.
+// Applies one bonus object onto the mutable stats object.
 function applyBonuses(stats, bonuses) {
   for (const [statName, value] of Object.entries(bonuses || {})) {
     stats[statName] += value;
   }
 }
 
-// Calculate failure xp.
+// Calculates partial XP for failed quests so failed attempts still give limited progress.
 function calculateFailureXp(quest) {
   if (quest.rewardXp <= 0) {
     return 0;
@@ -120,7 +132,7 @@ function calculateFailureXp(quest) {
   return Math.min(quest.rewardXp, Math.max(5, quest.difficulty * 5));
 }
 
-// Validate allowed value.
+// Validates one value against a fixed list and returns an error message when invalid.
 function validateAllowedValue(fieldName, value, allowedValues) {
   if (!allowedValues.includes(value)) {
     return `${fieldName} must be one of the allowed values.`;

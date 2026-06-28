@@ -1,13 +1,24 @@
 // Story model functions apply campaign changes after major story events.
+// These functions still belong in models because every step is a database write.
 import { and, eq } from "drizzle-orm";
 import { db } from "../db/db.js";
-import { characterArmyStates, characterBossStates, characterCampaignMarkers, characterFactionReputation, characterInventory, characterQuestCompletions, characterRegionStates, characterRunStates } from "../db/schema.js";
+import {
+  characterArmyStates,
+  characterBossStates,
+  characterCampaignMarkers,
+  characterFactionReputation,
+  characterInventory,
+  characterQuestCompletions,
+  characterRegionStates,
+  characterRunStates
+} from "../db/schema.js";
 
 // ------------------------------------------------------------
 // DATABASE WRITES
 // ------------------------------------------------------------
 
 // Apply all campaign changes caused by defeating a boss.
+// The transaction keeps boss state, quest completion, region unlocks, markers, items, and army state together.
 export async function applyCombatVictoryStory({ characterId, enemy, questId, milestone }) {
   if (!milestone) {
     return null;
@@ -69,6 +80,7 @@ export async function applyCombatVictoryStory({ characterId, enemy, questId, mil
 }
 
 // Apply campaign changes caused by winning an army encounter.
+// Similar to boss victory, this saves every campaign effect from the encounter as one unit.
 export async function applyArmyVictoryStory({ characterId, encounter }) {
   return db.transaction(async (tx) => {
     const now = new Date();
@@ -108,6 +120,7 @@ export async function applyArmyVictoryStory({ characterId, encounter }) {
 // ------------------------------------------------------------
 
 // Mark one boss as defeated inside a story transaction.
+// Creates the boss state if the character has never fought this boss before.
 async function markBossDefeated(tx, { characterId, bossId, now }) {
   const existingResult = await tx
     .select({
@@ -148,6 +161,7 @@ async function markBossDefeated(tx, { characterId, bossId, now }) {
 }
 
 // Insert quest completion only once so rewards cannot be duplicated.
+// This protects story rewards from being claimed repeatedly.
 async function recordQuestCompletion(tx, { characterId, questId, rewardXp, now }) {
   const existingResult = await tx
     .select({
@@ -174,6 +188,7 @@ async function recordQuestCompletion(tx, { characterId, questId, rewardXp, now }
 }
 
 // Insert or update one character run state row.
+// Run state stores the current story phase, morale, supplies, and command mode unlock.
 async function upsertRunState(
   tx,
   { characterId, storyPhase, moraleChange, commandModeUnlocked, now }
@@ -214,6 +229,7 @@ async function upsertRunState(
 }
 
 // Unlock one region for a character during story progression.
+// Region unlocks are saved per character so different characters can progress separately.
 async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
   const existingResult = await tx
     .select({
@@ -253,6 +269,7 @@ async function unlockRegion(tx, { characterId, regionId, worldState, now }) {
 }
 
 // Reveal one campaign marker during story progression.
+// Markers let the API remember important story/map points that are now visible.
 async function revealCampaignMarker(tx, { characterId, marker, now }) {
   const existingResult = await tx
     .select({
@@ -296,6 +313,7 @@ async function revealCampaignMarker(tx, { characterId, marker, now }) {
 }
 
 // Save one faction reputation change during story progression.
+// Reputation changes are added to the existing value instead of replacing the full history.
 async function applyFactionChange(tx, { characterId, factionChange, now }) {
   const existingResult = await tx
     .select({
@@ -334,6 +352,7 @@ async function applyFactionChange(tx, { characterId, factionChange, now }) {
 }
 
 // Add an item reward during a story update.
+// Adds to the existing inventory quantity if the character already owns the item.
 async function addInventoryReward(tx, { characterId, itemReward, now }) {
   const existingResult = await tx
     .select({
@@ -371,6 +390,7 @@ async function addInventoryReward(tx, { characterId, itemReward, now }) {
 }
 
 // Unlock command mode and army state during story progression.
+// This is triggered when the story reaches the point where army gameplay begins.
 async function unlockArmyState(tx, { characterId, armyState, now }) {
   const existingResult = await tx
     .select({
